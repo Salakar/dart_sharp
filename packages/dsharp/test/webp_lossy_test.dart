@@ -97,4 +97,40 @@ void main() {
       ], reason: 'mode $mode');
     }
   });
+
+  test('decodes VP8 streams with EOB residual partitions', () async {
+    final bytes = eobResidualVp8Webp(width: 2, height: 2);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.width, 2);
+    expect(image.height, 2);
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
+  test('rejects VP8 residual coefficient values explicitly', () async {
+    final bytes = nonEmptyResidualVp8Webp(width: 2, height: 2);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
 }

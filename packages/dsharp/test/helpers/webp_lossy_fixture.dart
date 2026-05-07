@@ -1,6 +1,8 @@
 import 'dart:convert' as convert;
 import 'dart:typed_data';
 
+part 'webp_lossy_residual_fixture.dart';
+
 /// Builds a minimal lossy VP8 WebP with skipped macroblocks.
 Uint8List solidVp8Webp({
   required int width,

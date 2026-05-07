@@ -6,6 +6,7 @@ import 'binary_io.dart';
 import 'webp_vp8_bool.dart';
 
 part 'webp_vp8_prediction.dart';
+part 'webp_vp8_residual.dart';
 
 const _kfYModeTree = <int>[-4, 2, 4, 6, 0, -1, -2, -3];
 const _kfYModeProb = <int>[145, 156, 163, 128];
@@ -24,16 +25,12 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   final bits = Vp8BoolDecoder(chunk.sublist(10, firstEnd));
   _readSupportedFrameHeader(bits);
   final mbNoSkipCoeff = bits.readBit() == 1;
-  if (!mbNoSkipCoeff) {
-    throw const UnsupportedCodecException(
-      'VP8 residual coefficient decoding is not implemented yet.',
-    );
-  }
-  final probSkipFalse = bits.readLiteral(8);
+  final probSkipFalse = mbNoSkipCoeff ? bits.readLiteral(8) : 0;
+  final coeffs = Vp8BoolDecoder(chunk.sublist(firstEnd));
   final planes = _Vp8Planes(header.width, header.height);
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
     for (var mbX = 0; mbX < planes.mbCols; mbX += 1) {
-      final skipCoeff = bits.readBool(probSkipFalse) == 1;
+      final skipCoeff = mbNoSkipCoeff && bits.readBool(probSkipFalse) == 1;
       final yMode = bits.readTree(_kfYModeTree, _kfYModeProb);
       if (yMode == 4) {
         throw const UnsupportedCodecException(
@@ -41,12 +38,10 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
         );
       }
       final uvMode = bits.readTree(_kfUvModeTree, _kfUvModeProb);
-      if (!skipCoeff) {
-        throw const UnsupportedCodecException(
-          'VP8 residual coefficient decoding is not implemented yet.',
-        );
-      }
       planes.predictMacroblock(mbX, mbY, yMode, uvMode);
+      if (!skipCoeff) {
+        _readEmptyResidual(coeffs);
+      }
     }
   }
   return RawPixels(
