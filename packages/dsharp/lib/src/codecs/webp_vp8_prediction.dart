@@ -55,6 +55,18 @@ final class _Vp8Planes {
     _addDctBlock(y, yWidth, bx, by, coefficients);
   }
 
+  void addLumaDctWithDc(
+    int mbX,
+    int mbY,
+    int block,
+    int dcCoefficient,
+    List<int>? acCoefficients,
+  ) {
+    final coefficients = acCoefficients ?? List<int>.filled(16, 0);
+    coefficients[0] = dcCoefficient;
+    addLumaDct(mbX, mbY, block, coefficients);
+  }
+
   Uint8List composeRgba() {
     final rgba = Uint8List(width * height * 4);
     for (var py = 0; py < height; py += 1) {

@@ -264,6 +264,13 @@ const _acQuantLookup = <int>[
 
 int _yAcQuant(int index) => _acQuantLookup[_clampQuantIndex(index)];
 
+int _y2DcQuant(int index) => _dcQuantLookup[_clampQuantIndex(index)] * 2;
+
+int _y2AcQuant(int index) {
+  final quant = (_acQuantLookup[_clampQuantIndex(index)] * 155) ~/ 100;
+  return quant < 8 ? 8 : quant;
+}
+
 int _uvDcQuant(int index) {
   final quant = _dcQuantLookup[_clampQuantIndex(index)];
   return quant > 132 ? 132 : quant;

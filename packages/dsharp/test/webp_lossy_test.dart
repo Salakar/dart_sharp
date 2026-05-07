@@ -125,6 +125,31 @@ void main() {
     ]);
   });
 
+  test('applies supported VP8 Y2 DC residuals', () async {
+    final bytes = y2DcResidualVp8Webp(width: 2, height: 2);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      129,
+      129,
+      129,
+      255,
+      129,
+      129,
+      129,
+      255,
+      129,
+      129,
+      129,
+      255,
+      129,
+      129,
+      129,
+      255,
+    ]);
+  });
+
   test('rejects VP8 residual coefficient values explicitly', () async {
     final bytes = nonEmptyResidualVp8Webp(width: 2, height: 2);
 

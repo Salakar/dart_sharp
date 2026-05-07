@@ -1,6 +1,5 @@
 part of 'webp_vp8.dart';
 
-const _y2EobProb = 198;
 const _dctEobNode = 0;
 const _dctZeroNode = 1;
 const _dctOneNode = 2;
@@ -56,6 +55,48 @@ const _defaultYAcProbs = <List<List<int>>>[
     [255, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
   ],
 ];
+const _defaultY2Probs = <List<List<int>>>[
+  [
+    [198, 35, 237, 223, 193, 187, 162, 160, 145, 155, 62],
+    [131, 45, 198, 221, 172, 176, 220, 157, 252, 221, 1],
+    [68, 47, 146, 208, 149, 167, 221, 162, 255, 223, 128],
+  ],
+  [
+    [1, 149, 241, 255, 221, 224, 255, 255, 128, 128, 128],
+    [184, 141, 234, 253, 222, 220, 255, 199, 128, 128, 128],
+    [81, 99, 181, 242, 176, 190, 249, 202, 255, 255, 128],
+  ],
+  [
+    [1, 129, 232, 253, 214, 197, 242, 196, 255, 255, 128],
+    [99, 121, 210, 250, 201, 198, 255, 202, 128, 128, 128],
+    [23, 91, 163, 242, 170, 187, 247, 210, 255, 255, 128],
+  ],
+  [
+    [1, 200, 246, 255, 234, 255, 128, 128, 128, 128, 128],
+    [109, 178, 241, 255, 231, 245, 255, 255, 128, 128, 128],
+    [44, 130, 201, 253, 205, 192, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 132, 239, 251, 219, 209, 255, 165, 128, 128, 128],
+    [94, 136, 225, 251, 218, 190, 255, 255, 128, 128, 128],
+    [22, 100, 174, 245, 186, 161, 255, 199, 128, 128, 128],
+  ],
+  [
+    [1, 182, 249, 255, 232, 235, 128, 128, 128, 128, 128],
+    [124, 143, 241, 255, 227, 234, 128, 128, 128, 128, 128],
+    [35, 77, 181, 251, 193, 211, 255, 205, 128, 128, 128],
+  ],
+  [
+    [1, 157, 247, 255, 236, 231, 255, 255, 128, 128, 128],
+    [121, 141, 235, 255, 225, 227, 255, 255, 128, 128, 128],
+    [45, 99, 188, 251, 195, 217, 255, 224, 128, 128, 128],
+  ],
+  [
+    [1, 1, 251, 255, 213, 255, 128, 128, 128, 128, 128],
+    [203, 1, 248, 255, 255, 128, 128, 128, 128, 128, 128],
+    [137, 1, 177, 255, 224, 255, 128, 128, 128, 128, 128],
+  ],
+];
 const _defaultUvDcProbs = <int>[
   202,
   24,
@@ -96,9 +137,17 @@ void _readResidual(
   int mbY,
   _Vp8FrameHeader frame,
 ) {
-  _readEobOnlyBlock(coeffs, _y2EobProb);
+  final lumaDc = _readY2Block(coeffs, frame);
   for (var block = 0; block < 16; block += 1) {
-    _readLumaAcBlock(coeffs, planes, mbX, mbY, block, frame);
+    _readLumaAcBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      frame,
+      lumaDc?[block] ?? 0,
+    );
   }
   for (var block = 0; block < 4; block += 1) {
     final coefficient = _readUvDcCoefficient(coeffs, frame.uvDcProbs);
@@ -128,6 +177,31 @@ void _readResidual(
   }
 }
 
+List<int>? _readY2Block(Vp8BoolDecoder coeffs, _Vp8FrameHeader frame) {
+  List<int>? coefficients;
+  var context = 0;
+  for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
+    int probabilityAt(int node) =>
+        frame.y2Probs.probabilityAt(coefficientIndex, context, node);
+    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+      break;
+    }
+    if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
+      context = 0;
+      continue;
+    }
+    final magnitude = _readDctMagnitude(coeffs, probabilityAt);
+    final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
+    final quant = coefficientIndex == 0
+        ? _y2DcQuant(frame.y2DcQuantIndex)
+        : _y2AcQuant(frame.y2AcQuantIndex);
+    coefficients ??= List<int>.filled(16, 0);
+    coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
+    context = magnitude == 1 ? 1 : 2;
+  }
+  return coefficients == null ? null : _inverseWht(coefficients);
+}
+
 void _readLumaAcBlock(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
@@ -135,9 +209,10 @@ void _readLumaAcBlock(
   int mbY,
   int block,
   _Vp8FrameHeader frame,
+  int dcCoefficient,
 ) {
   final quant = _yAcQuant(frame.yAcQuantIndex);
-  List<int>? coefficients;
+  List<int>? coefficients = dcCoefficient == 0 ? null : List<int>.filled(16, 0);
   var context = 0;
   for (var coefficientIndex = 1; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
@@ -155,16 +230,10 @@ void _readLumaAcBlock(
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
   }
-  if (coefficients != null) {
+  if (dcCoefficient != 0) {
+    planes.addLumaDctWithDc(mbX, mbY, block, dcCoefficient, coefficients);
+  } else if (coefficients != null) {
     planes.addLumaDct(mbX, mbY, block, coefficients);
-  }
-}
-
-void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
-  if (coeffs.readBool(eobProbability) != 0) {
-    throw const UnsupportedCodecException(
-      'VP8 residual coefficient values are not implemented yet.',
-    );
   }
 }
 
@@ -245,6 +314,22 @@ final class _Vp8LumaAcProbs {
   }
 }
 
+final class _Vp8Y2Probs {
+  _Vp8Y2Probs.defaults()
+    : _probabilities = [
+        for (final band in _defaultY2Probs)
+          [for (final context in band) List<int>.of(context, growable: false)],
+      ];
+
+  final List<List<List<int>>> _probabilities;
+
+  List<List<int>> operator [](int band) => _probabilities[band];
+
+  int probabilityAt(int coefficientIndex, int context, int node) {
+    return _probabilities[_coefficientBands[coefficientIndex]][context][node];
+  }
+}
+
 final class _Vp8ChromaDcProbs {
   _Vp8ChromaDcProbs.defaults()
     : _probabilities = List<int>.of(_defaultUvDcProbs, growable: false);
@@ -258,6 +343,32 @@ final class _Vp8ChromaDcProbs {
   void operator []=(int index, int value) {
     _probabilities[index] = value;
   }
+}
+
+List<int> _inverseWht(List<int> input) {
+  final output = List<int>.filled(16, 0);
+  for (var i = 0; i < 4; i += 1) {
+    final a1 = input[i] + input[12 + i];
+    final b1 = input[4 + i] + input[8 + i];
+    final c1 = input[4 + i] - input[8 + i];
+    final d1 = input[i] - input[12 + i];
+    output[i] = a1 + b1;
+    output[4 + i] = c1 + d1;
+    output[8 + i] = a1 - b1;
+    output[12 + i] = d1 - c1;
+  }
+  for (var row = 0; row < 4; row += 1) {
+    final base = row * 4;
+    final a1 = output[base] + output[base + 3];
+    final b1 = output[base + 1] + output[base + 2];
+    final c1 = output[base + 1] - output[base + 2];
+    final d1 = output[base] - output[base + 3];
+    output[base] = (a1 + b1 + 3) >> 3;
+    output[base + 1] = (c1 + d1 + 3) >> 3;
+    output[base + 2] = (a1 - b1 + 3) >> 3;
+    output[base + 3] = (d1 - c1 + 3) >> 3;
+  }
+  return output;
 }
 
 int _readCategoryExtra(Vp8BoolDecoder coeffs, List<int> probabilities) {

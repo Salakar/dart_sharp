@@ -67,6 +67,23 @@ Uint8List unsupportedChromaDcRunVp8Webp({
   return _simpleWebp(vp8);
 }
 
+/// Builds a VP8 WebP with a supported Y2 DC residual.
+Uint8List y2DcResidualVp8Webp({
+  required int width,
+  required int height,
+  int qIndex = 12,
+  int coefficient = 1,
+}) {
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    y2Dc: true,
+    qIndex: qIndex,
+    coefficient: coefficient,
+  );
+  return _simpleWebp(vp8);
+}
+
 /// Builds a VP8 WebP with a supported chroma DC residual.
 Uint8List chromaDcResidualVp8Webp({
   required int width,
@@ -90,6 +107,7 @@ Uint8List _residualVp8Payload({
   required int width,
   required int height,
   bool nonEmpty = false,
+  bool y2Dc = false,
   bool lumaAc = false,
   bool chromaDc = false,
   bool unsupportedChromaRun = false,
@@ -147,7 +165,11 @@ Uint8List _residualVp8Payload({
   final firstPartition = first.finish();
   final coeffs = _BoolWriter();
   for (var i = 0; i < mbCols * mbRows; i += 1) {
-    coeffs.prob(198, nonEmpty && i == 0);
+    if (y2Dc && i == 0) {
+      _writeY2DcToken(coeffs, coefficient);
+    } else {
+      coeffs.prob(198, false);
+    }
     for (var block = 0; block < 16; block += 1) {
       if (lumaAc && i == 0 && block == 0) {
         _writeYAcToken(
@@ -163,7 +185,9 @@ Uint8List _residualVp8Payload({
         coeffs.prob(253, false);
       }
     }
-    if (unsupportedChromaRun && i == 0) {
+    if (nonEmpty && i == 0) {
+      _writeUnsupportedUvDcZeroToken(coeffs);
+    } else if (unsupportedChromaRun && i == 0) {
       _writeUnsupportedUvDcRunToken(coeffs);
     } else if (chromaDc && i == 0) {
       _writeUvDcToken(
@@ -192,6 +216,24 @@ Uint8List _residualVp8Payload({
 
 int _fixtureCoefficientUpdateProbabilityByIndex(int index) {
   return _fixtureCoefficientUpdateProbCodes.codeUnitAt(index);
+}
+
+void _writeY2DcToken(_BoolWriter coeffs, int coefficient) {
+  if (coefficient.abs() != 1) {
+    throw ArgumentError.value(coefficient, 'coefficient');
+  }
+  coeffs
+    ..prob(198, true)
+    ..prob(35, true)
+    ..prob(237, false)
+    ..bit(coefficient.isNegative)
+    ..prob(184, false);
+}
+
+void _writeUnsupportedUvDcZeroToken(_BoolWriter coeffs) {
+  coeffs
+    ..prob(202, true)
+    ..prob(24, false);
 }
 
 void _writeUnsupportedUvDcRunToken(_BoolWriter coeffs) =>
