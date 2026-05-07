@@ -6,6 +6,7 @@ import 'binary_io.dart';
 import 'codec.dart';
 import 'image_format.dart';
 import 'output.dart';
+import 'webp_alpha.dart';
 import 'webp_animation.dart';
 import 'webp_info.dart';
 import 'webp_lossless.dart';
@@ -34,12 +35,10 @@ final class WebpImageCodec implements ImageCodec {
     }
     if (info.compression == WebpCompression.extended &&
         _containsWebpChunk(bytes, 'VP8 ')) {
-      if (info.hasAlpha) {
-        throw const UnsupportedCodecException(
-          'WebP ALPH chunk pixel reconstruction is not implemented yet.',
-        );
-      }
-      return PixelImage.fromRawPixels(decodeWebpVp8(bytes));
+      final pixels = decodeWebpVp8(bytes);
+      return PixelImage.fromRawPixels(
+        info.hasAlpha ? applyWebpAlpha(bytes, pixels) : pixels,
+      );
     }
     return PixelImage.fromRawPixels(decodeWebpLossless(bytes));
   }

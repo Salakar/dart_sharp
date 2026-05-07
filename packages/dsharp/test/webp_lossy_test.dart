@@ -69,6 +69,64 @@ void main() {
     ]);
   });
 
+  test('decodes extended lossy WebP with uncompressed alpha', () async {
+    final bytes = alphaSolidVp8Webp(
+      width: 3,
+      height: 1,
+      alpha: <int>[0, 128, 255],
+    );
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.hasAlpha, isTrue);
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      0,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
+  test('applies WebP ALPH predictor filters', () async {
+    const alpha = <int>[10, 20, 5, 7, 40, 80];
+
+    for (final filter in <int>[1, 2, 3]) {
+      final bytes = alphaSolidVp8Webp(
+        width: 3,
+        height: 2,
+        alpha: alpha,
+        alphaFilter: filter,
+      );
+
+      final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+      final rgba = image.firstFrameBytes();
+
+      expect(
+        [for (var i = 3; i < rgba.length; i += 4) rgba[i]],
+        alpha,
+        reason: 'filter $filter',
+      );
+    }
+  });
+
+  test('rejects compressed WebP ALPH chunks explicitly', () async {
+    final bytes = compressedAlphaSolidVp8Webp(width: 2, height: 1);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('decodes supported VP8 luma prediction modes', () async {
     final cases = <(int, int)>[(0, 128), (1, 127), (2, 129), (3, 129)];
 

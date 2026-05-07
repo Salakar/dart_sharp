@@ -31,6 +31,111 @@ Uint8List extendedSolidVp8Webp({required int width, required int height}) {
   return _riffWebp(chunks.finish());
 }
 
+/// Builds an extended lossy VP8 WebP with an uncompressed ALPH chunk.
+Uint8List alphaSolidVp8Webp({
+  required int width,
+  required int height,
+  required List<int> alpha,
+  int alphaFilter = 0,
+}) {
+  if (alpha.length != width * height) {
+    throw ArgumentError.value(alpha.length, 'alpha.length');
+  }
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(
+    chunks,
+    'ALPH',
+    Uint8List.fromList(<int>[
+      (alphaFilter & 0x03) << 2,
+      ..._filteredAlphaValues(alpha, width, height, alphaFilter),
+    ]),
+  );
+  _writeChunk(chunks, 'VP8 ', vp8);
+  return _riffWebp(chunks.finish());
+}
+
+/// Builds an extended lossy VP8 WebP with compressed ALPH marker bits.
+Uint8List compressedAlphaSolidVp8Webp({
+  required int width,
+  required int height,
+}) {
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(chunks, 'ALPH', Uint8List.fromList(<int>[1, 0]));
+  _writeChunk(chunks, 'VP8 ', vp8);
+  return _riffWebp(chunks.finish());
+}
+
+List<int> _filteredAlphaValues(
+  List<int> alpha,
+  int width,
+  int height,
+  int filter,
+) {
+  final out = List<int>.filled(alpha.length, 0);
+  for (var y = 0; y < height; y += 1) {
+    for (var x = 0; x < width; x += 1) {
+      final index = y * width + x;
+      final predictor = _alphaPredictor(alpha, width, x, y, filter);
+      out[index] = (alpha[index] - predictor) & 0xff;
+    }
+  }
+  return out;
+}
+
+int _alphaPredictor(List<int> alpha, int width, int x, int y, int filter) {
+  if (x == 0 && y == 0) {
+    return 0;
+  }
+  final hasLeft = x > 0;
+  final hasAbove = y > 0;
+  final left = hasLeft ? alpha[y * width + x - 1] : 0;
+  final above = hasAbove ? alpha[(y - 1) * width + x] : 0;
+  return switch (filter) {
+    0 => 0,
+    1 => hasLeft ? left : above,
+    2 => hasAbove ? above : left,
+    3 => _gradientAlphaPredictor(alpha, width, x, y, left, above),
+    _ => throw ArgumentError.value(filter, 'filter'),
+  };
+}
+
+int _gradientAlphaPredictor(
+  List<int> alpha,
+  int width,
+  int x,
+  int y,
+  int left,
+  int above,
+) {
+  if (x == 0) {
+    return above;
+  }
+  if (y == 0) {
+    return left;
+  }
+  final upperLeft = alpha[(y - 1) * width + x - 1];
+  final predictor = left + above - upperLeft;
+  return predictor < 0 ? 0 : (predictor > 255 ? 255 : predictor);
+}
+
 Uint8List _solidVp8Payload({
   required int width,
   required int height,
