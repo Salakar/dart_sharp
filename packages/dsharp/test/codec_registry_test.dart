@@ -136,7 +136,6 @@ void main() {
       ImageFormat.rad,
       ImageFormat.vips,
       ImageFormat.deepZoom,
-      ImageFormat.webp,
     ]) {
       expect(
         () => registry.codecFor(format).decode(Uint8List.fromList(<int>[1])),

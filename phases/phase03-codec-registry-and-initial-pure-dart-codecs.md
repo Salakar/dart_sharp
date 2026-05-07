@@ -123,6 +123,11 @@ External references:
   - Ref: `sharp_clone/test/unit/webp.js`
   - Implement first-party WebP decode support or explicitly revise the support matrix and public docs to remove WebP input support.
   - Add WebP fixture decode tests for supported WebP variants and malformed WebP parser tests.
+- [ ] **3.10 Implement WebP VP8/VP8L pixel reconstruction**
+  - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
+  - Ref: `sharp_clone/test/unit/webp.js`
+  - Decode lossy VP8, lossless VP8L, alpha chunks, and animated WebP frame canvases into `PixelImage`.
+  - Add fixture tests for `4.webp`, `5_webp_a.webp`, `animated-loop-3.webp`, and malformed chunk/bitstream failures.
 
 ## Checklist (Every Task)
 

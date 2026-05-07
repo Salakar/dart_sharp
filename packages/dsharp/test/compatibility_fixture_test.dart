@@ -42,16 +42,75 @@ void main() {
     expect(image.firstFrameBytes().length, 320 * 240 * 4);
   });
 
-  test('optional upstream WebP fixture fails as unsupported', () async {
+  test('optional upstream WebP fixture exposes metadata', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {
       markTestSkipped('sharp_clone fixtures are not present.');
       return;
     }
 
-    await expectLater(
-      ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
+    final metadata = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.width, 1024);
+    expect(metadata.height, 772);
+    expect(metadata.hasAlpha, isFalse);
   });
+
+  test('optional upstream alpha WebP fixture exposes alpha metadata', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/5_webp_a.webp');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final metadata = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.width, 300);
+    expect(metadata.height, 300);
+    expect(metadata.hasAlpha, isTrue);
+  });
+
+  test(
+    'optional upstream animated WebP fixture exposes frame metadata',
+    () async {
+      final fixture = File(
+        '../../sharp_clone/test/fixtures/animated-loop-3.webp',
+      );
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+
+      final metadata = await ImagePipeline.fromBytes(
+        await fixture.readAsBytes(),
+      ).metadata();
+
+      expect(metadata.format, ImageFormat.webp);
+      expect(metadata.width, 370);
+      expect(metadata.height, 285);
+      expect(metadata.frames, greaterThan(1));
+    },
+  );
+
+  test(
+    'optional upstream WebP fixture pixel decode remains explicit',
+    () async {
+      final fixture = File('../../sharp_clone/test/fixtures/4.webp');
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+
+      await expectLater(
+        ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    },
+  );
 }

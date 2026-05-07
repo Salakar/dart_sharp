@@ -7,6 +7,7 @@ import '../codecs/encoder_options.dart';
 import '../codecs/format_sniffer.dart';
 import '../codecs/image_format.dart';
 import '../codecs/output.dart';
+import '../codecs/webp_info.dart';
 import '../composite/composite_layer.dart';
 import '../composite/composite_operation.dart';
 import '../geometry/geometry.dart';
@@ -38,6 +39,7 @@ part 'image_pipeline_color.dart';
 part 'image_pipeline_composite.dart';
 part 'image_pipeline_filter.dart';
 part 'image_pipeline_geometry.dart';
+part 'image_pipeline_metadata.dart';
 part 'image_pipeline_output.dart';
 part 'image_pipeline_output_internals.dart';
 part 'image_pipeline_transform.dart';
@@ -182,16 +184,6 @@ final class ImagePipeline {
       cancellationToken: cancellationToken,
     );
     return ImageBytesResult(bytes: encoded.bytes, info: encoded.info);
-  }
-
-  /// Reads image metadata.
-  Future<ImageMetadata> metadata({CodecRegistry? registry}) async {
-    final image = await toPixelImage(registry: registry);
-    return ImageMetadata.fromPixelImage(
-      image: image,
-      format: _sourceFormat(),
-      size: _sourceSize(),
-    );
   }
 
   /// Computes pixel statistics for the first decoded frame.

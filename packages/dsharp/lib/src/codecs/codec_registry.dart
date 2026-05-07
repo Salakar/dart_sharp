@@ -14,6 +14,7 @@ import 'png_codec.dart';
 import 'raw_codec.dart';
 import 'tiff_codec.dart';
 import 'unsupported_codec.dart';
+import 'webp_codec.dart';
 
 /// Registry of pure Dart image codecs.
 final class CodecRegistry {
@@ -31,10 +32,7 @@ final class CodecRegistry {
       const JpegImageCodec(),
       const GifImageCodec(),
       const TiffImageCodec(),
-      const UnsupportedImageCodec(
-        ImageFormat.webp,
-        reason: 'No complete first-party WebP decoder is implemented yet.',
-      ),
+      const WebpImageCodec(),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',
