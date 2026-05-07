@@ -121,8 +121,8 @@ Dart target support matrix:
 - The public API must expose `CodecSupport` and `FormatRegistry` so unsupported formats fail predictably with `UnsupportedCodecException` rather than pretending support exists.
 - Runtime codec dependencies are not permitted. PNG, baseline JPEG, GIF, and
   TIFF behavior must stay behind first-party codec interfaces. WebP container
-  metadata is parsed in-house; VP8/VP8L pixel reconstruction remains open until a
-  complete first-party decoder exists.
+  metadata and a minimal VP8L literal subset are parsed in-house; full VP8/VP8L
+  pixel reconstruction remains open until a complete first-party decoder exists.
 
 ### 3.3 Metadata and Statistics
 
@@ -444,9 +444,9 @@ Rules:
 - Implement `Codec` and `CodecRegistry` with static capability data.
 - Add raw pixel codec first because it is deterministic and does not depend on compressed formats.
 - Implement first-party raw, PNG, baseline JPEG, GIF, and TIFF codec paths
-  without runtime dependencies. Parse WebP container metadata in-house and keep
-  WebP pixel reconstruction explicitly unsupported until the VP8/VP8L decoder is
-  complete.
+  without runtime dependencies. Parse WebP container metadata and a minimal VP8L
+  literal subset in-house while keeping full VP8/VP8L reconstruction tracked
+  until the decoder is complete.
 - Add unsupported codec implementations for AVIF, HEIF, JP2, JXL, PDF, OpenSlide, Magick, DCRAW, FITS, RAD, SVG rasterization, and deep zoom until pure Dart support exists.
 - Add malformed input tests and input size limits before enabling decode APIs.
 

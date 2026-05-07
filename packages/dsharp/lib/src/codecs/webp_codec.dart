@@ -6,11 +6,13 @@ import 'codec.dart';
 import 'image_format.dart';
 import 'output.dart';
 import 'webp_info.dart';
+import 'webp_lossless.dart';
 
 /// First-party WebP container decoder.
 ///
-/// This validates RIFF/WebP structure and parses image metadata. VP8/VP8L
-/// pixel reconstruction is intentionally still reported as unsupported.
+/// This validates RIFF/WebP structure, parses metadata, and decodes a first
+/// VP8L lossless subset. Other WebP bitstream features remain explicitly
+/// unsupported.
 final class WebpImageCodec implements ImageCodec {
   /// Creates a WebP codec.
   const WebpImageCodec();
@@ -21,10 +23,13 @@ final class WebpImageCodec implements ImageCodec {
   @override
   PixelImage decode(Uint8List bytes) {
     final info = readWebpInfo(bytes);
-    throw UnsupportedCodecException(
-      'WebP ${info.compression.name} pixel reconstruction is not implemented '
-      'yet for ${info.width}x${info.height} input.',
-    );
+    if (info.compression != WebpCompression.vp8l) {
+      throw UnsupportedCodecException(
+        'WebP ${info.compression.name} pixel reconstruction is not implemented '
+        'yet for ${info.width}x${info.height} input.',
+      );
+    }
+    return PixelImage.fromRawPixels(decodeWebpLossless(bytes));
   }
 
   @override
