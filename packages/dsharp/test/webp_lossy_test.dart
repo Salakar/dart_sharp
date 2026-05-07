@@ -68,4 +68,33 @@ void main() {
       255,
     ]);
   });
+
+  test('decodes supported VP8 luma prediction modes', () async {
+    final cases = <(int, int)>[(0, 128), (1, 127), (2, 129), (3, 129)];
+
+    for (final (mode, sample) in cases) {
+      final image = await ImagePipeline.fromBytes(
+        solidVp8Webp(width: 2, height: 2, yMode: mode),
+      ).toPixelImage();
+
+      expect(image.firstFrameBytes(), <int>[
+        sample,
+        sample,
+        sample,
+        255,
+        sample,
+        sample,
+        sample,
+        255,
+        sample,
+        sample,
+        sample,
+        255,
+        sample,
+        sample,
+        sample,
+        255,
+      ], reason: 'mode $mode');
+    }
+  });
 }

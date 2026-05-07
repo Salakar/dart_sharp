@@ -1,14 +1,20 @@
 import 'dart:convert' as convert;
 import 'dart:typed_data';
 
-/// Builds a minimal lossy VP8 WebP with skipped DC-predicted macroblocks.
-Uint8List solidVp8Webp({required int width, required int height}) {
-  return _simpleWebp(_solidVp8Payload(width: width, height: height));
+/// Builds a minimal lossy VP8 WebP with skipped macroblocks.
+Uint8List solidVp8Webp({
+  required int width,
+  required int height,
+  int yMode = 0,
+}) {
+  return _simpleWebp(
+    _solidVp8Payload(width: width, height: height, yMode: yMode),
+  );
 }
 
 /// Builds an extended lossy VP8 WebP without alpha.
 Uint8List extendedSolidVp8Webp({required int width, required int height}) {
-  final vp8 = _solidVp8Payload(width: width, height: height);
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
   final chunks = _ByteWriter()
     ..ascii('VP8X')
     ..u32(10)
@@ -22,7 +28,11 @@ Uint8List extendedSolidVp8Webp({required int width, required int height}) {
   return _riffWebp(chunks.finish());
 }
 
-Uint8List _solidVp8Payload({required int width, required int height}) {
+Uint8List _solidVp8Payload({
+  required int width,
+  required int height,
+  required int yMode,
+}) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
   final first = _BoolWriter()
@@ -46,12 +56,9 @@ Uint8List _solidVp8Payload({required int width, required int height}) {
     ..bit(true)
     ..literal(128, 8);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
-    first
-      ..prob(128, true)
-      ..prob(145, true)
-      ..prob(156, false)
-      ..prob(163, false)
-      ..prob(142, false);
+    first.prob(128, true);
+    _writeYMode(first, yMode);
+    first.prob(142, false);
   }
   final firstPartition = first.finish();
   final vp8 = _ByteWriter()
@@ -81,14 +88,13 @@ Uint8List _simpleWebp(Uint8List vp8) {
   return out.finish();
 }
 
-Uint8List _riffWebp(Uint8List payload) {
-  return (_ByteWriter()
-        ..ascii('RIFF')
-        ..u32(4 + payload.length)
-        ..ascii('WEBP')
-        ..bytes(payload))
-      .finish();
-}
+Uint8List _riffWebp(Uint8List payload) =>
+    (_ByteWriter()
+          ..ascii('RIFF')
+          ..u32(4 + payload.length)
+          ..ascii('WEBP')
+          ..bytes(payload))
+        .finish();
 
 void _writeChunk(_ByteWriter out, String type, Uint8List payload) {
   out
@@ -97,6 +103,30 @@ void _writeChunk(_ByteWriter out, String type, Uint8List payload) {
     ..bytes(payload);
   if (payload.length.isOdd) {
     out.byte(0);
+  }
+}
+
+void _writeYMode(_BoolWriter out, int mode) {
+  out.prob(145, true);
+  switch (mode) {
+    case 0:
+      out
+        ..prob(156, false)
+        ..prob(163, false);
+    case 1:
+      out
+        ..prob(156, false)
+        ..prob(163, true);
+    case 2:
+      out
+        ..prob(156, true)
+        ..prob(128, false);
+    case 3:
+      out
+        ..prob(156, true)
+        ..prob(128, true);
+    default:
+      throw ArgumentError.value(mode, 'mode');
   }
 }
 
