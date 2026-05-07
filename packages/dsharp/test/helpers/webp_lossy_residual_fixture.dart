@@ -95,7 +95,7 @@ Uint8List _residualVp8Payload({
 
 void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
   final magnitude = coefficient.abs();
-  if (magnitude < 1 || magnitude > 4) {
+  if (magnitude < 1 || magnitude > 6) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
   coeffs
@@ -103,7 +103,7 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
     ..prob(24, true);
   if (magnitude == 1) {
     coeffs.prob(213, false);
-  } else {
+  } else if (magnitude <= 4) {
     coeffs
       ..prob(213, true)
       ..prob(235, false);
@@ -114,6 +114,13 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
         ..prob(186, true)
         ..prob(191, magnitude == 4);
     }
+  } else {
+    coeffs
+      ..prob(213, true)
+      ..prob(235, true)
+      ..prob(220, false)
+      ..prob(160, false)
+      ..prob(159, magnitude == 6);
   }
   coeffs
     ..bit(coefficient.isNegative)
