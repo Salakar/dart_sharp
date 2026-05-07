@@ -27,7 +27,7 @@ final class WebpImageCodec implements ImageCodec {
     if (info.isAnimated) {
       return decodeAnimatedWebpLossless(bytes);
     }
-    if (info.compression != WebpCompression.vp8l) {
+    if (info.compression == WebpCompression.vp8) {
       throw UnsupportedCodecException(
         'WebP ${info.compression.name} pixel reconstruction is not implemented '
         'yet for ${info.width}x${info.height} input.',

@@ -4,6 +4,24 @@ import 'package:test/test.dart';
 import 'helpers/webp_lossless_fixture.dart';
 
 void main() {
+  test('decodes extended static WebP with VP8L payload', () async {
+    final bytes = extendedVp8lWebp(
+      width: 2,
+      height: 1,
+      red: 33,
+      green: 44,
+      blue: 55,
+      alpha: 123,
+    );
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.hasAlpha, isTrue);
+    expect(image.firstFrameBytes(), <int>[33, 44, 55, 123, 33, 44, 55, 123]);
+  });
+
   test('decodes animated WebP with VP8L frame payloads', () async {
     final bytes = animatedVp8lWebp();
 
