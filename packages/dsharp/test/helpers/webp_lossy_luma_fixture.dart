@@ -88,6 +88,7 @@ void _writeYAcToken(
   _BoolWriter coeffs,
   int coefficient,
   int coefficientIndex, {
+  int initialContext = 0,
   int? secondCoefficient,
   int? secondCoefficientIndex,
   int? yAcBandOneEobProbability,
@@ -111,7 +112,7 @@ void _writeYAcToken(
       );
     }
   }
-  var context = 0;
+  var context = initialContext;
   for (var index = 1; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureYAcProbability(
       index,

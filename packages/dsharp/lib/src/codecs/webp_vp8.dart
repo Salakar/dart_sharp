@@ -63,7 +63,9 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   final probSkipFalse = mbNoSkipCoeff ? bits.readLiteral(8) : 0;
   final coeffs = Vp8BoolDecoder(chunk.sublist(firstEnd));
   final planes = _Vp8Planes(header.width, header.height);
+  final contexts = _Vp8TokenContexts(planes.mbCols);
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
+    contexts.resetLeft();
     for (var mbX = 0; mbX < planes.mbCols; mbX += 1) {
       final skipCoeff = mbNoSkipCoeff && bits.readBool(probSkipFalse) == 1;
       final yMode = bits.readTree(_kfYModeTree, _kfYModeProb);
@@ -75,7 +77,9 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
       final uvMode = bits.readTree(_kfUvModeTree, _kfUvModeProb);
       planes.predictMacroblock(mbX, mbY, yMode, uvMode);
       if (!skipCoeff) {
-        _readResidual(coeffs, planes, mbX, mbY, frame);
+        _readResidual(coeffs, planes, contexts, mbX, mbY, frame);
+      } else {
+        contexts.clearMacroblock(mbX);
       }
     }
   }

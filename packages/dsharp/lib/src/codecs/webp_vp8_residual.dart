@@ -12,6 +12,61 @@ const _dctCatThreeFourNode = 8;
 const _dctCatThreeNode = 9;
 const _dctCatFiveNode = 10;
 const _coefficientBands = <int>[0, 1, 2, 3, 6, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7];
+const _leftContextIndex = <int>[
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+  2,
+  2,
+  3,
+  3,
+  3,
+  3,
+  4,
+  4,
+  5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  8,
+];
+const _aboveContextIndex = <int>[
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  4,
+  5,
+  6,
+  7,
+  6,
+  7,
+  8,
+];
+const _y2BlockIndex = 24;
 const _zigZag = <int>[0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15];
 const _defaultYAcProbs = <List<List<int>>>[
   [
@@ -161,13 +216,19 @@ const _catSixExtraProbs = <int>[
 void _readResidual(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
+  _Vp8TokenContexts contexts,
   int mbX,
   int mbY,
   _Vp8FrameHeader frame,
 ) {
-  final lumaDc = _readY2Block(coeffs, frame);
+  final lumaDc = _readY2Block(
+    coeffs,
+    frame,
+    contexts.contextFor(mbX, _y2BlockIndex),
+  );
+  contexts.setHasCoefficients(mbX, _y2BlockIndex, lumaDc != null);
   for (var block = 0; block < 16; block += 1) {
-    _readLumaAcBlock(
+    final hasCoefficients = _readLumaAcBlock(
       coeffs,
       planes,
       mbX,
@@ -175,19 +236,47 @@ void _readResidual(
       block,
       frame,
       lumaDc?[block] ?? 0,
+      contexts.contextFor(mbX, block),
     );
+    contexts.setHasCoefficients(mbX, block, hasCoefficients);
   }
   for (var block = 0; block < 4; block += 1) {
-    _readChromaBlock(coeffs, planes, mbX, mbY, block, true, frame);
+    final blockIndex = 16 + block;
+    final hasCoefficients = _readChromaBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      true,
+      frame,
+      contexts.contextFor(mbX, blockIndex),
+    );
+    contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
   }
   for (var block = 0; block < 4; block += 1) {
-    _readChromaBlock(coeffs, planes, mbX, mbY, block, false, frame);
+    final blockIndex = 20 + block;
+    final hasCoefficients = _readChromaBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      false,
+      frame,
+      contexts.contextFor(mbX, blockIndex),
+    );
+    contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
   }
 }
 
-List<int>? _readY2Block(Vp8BoolDecoder coeffs, _Vp8FrameHeader frame) {
+List<int>? _readY2Block(
+  Vp8BoolDecoder coeffs,
+  _Vp8FrameHeader frame,
+  int initialContext,
+) {
   List<int>? coefficients;
-  var context = 0;
+  var context = initialContext;
   for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.y2Probs.probabilityAt(coefficientIndex, context, node);
@@ -210,7 +299,7 @@ List<int>? _readY2Block(Vp8BoolDecoder coeffs, _Vp8FrameHeader frame) {
   return coefficients == null ? null : _inverseWht(coefficients);
 }
 
-void _readLumaAcBlock(
+bool _readLumaAcBlock(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
   int mbX,
@@ -218,10 +307,12 @@ void _readLumaAcBlock(
   int block,
   _Vp8FrameHeader frame,
   int dcCoefficient,
+  int initialContext,
 ) {
   final quant = _yAcQuant(frame.yAcQuantIndex);
   List<int>? coefficients = dcCoefficient == 0 ? null : List<int>.filled(16, 0);
-  var context = 0;
+  var context = initialContext;
+  var hasTokenCoefficient = false;
   for (var coefficientIndex = 1; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.yAcProbs.probabilityAt(coefficientIndex, context, node);
@@ -237,15 +328,17 @@ void _readLumaAcBlock(
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
+    hasTokenCoefficient = true;
   }
   if (dcCoefficient != 0) {
     planes.addLumaDctWithDc(mbX, mbY, block, dcCoefficient, coefficients);
   } else if (coefficients != null) {
     planes.addLumaDct(mbX, mbY, block, coefficients);
   }
+  return hasTokenCoefficient;
 }
 
-void _readChromaBlock(
+bool _readChromaBlock(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
   int mbX,
@@ -253,9 +346,10 @@ void _readChromaBlock(
   int block,
   bool isU,
   _Vp8FrameHeader frame,
+  int initialContext,
 ) {
   List<int>? coefficients;
-  var context = 0;
+  var context = initialContext;
   for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.uvProbs.probabilityAt(coefficientIndex, context, node);
@@ -278,6 +372,7 @@ void _readChromaBlock(
   if (coefficients != null) {
     planes.addChromaDct(mbX, mbY, block, isU, coefficients);
   }
+  return coefficients != null;
 }
 
 int _readDctMagnitude(
@@ -364,6 +459,33 @@ final class _Vp8ChromaProbs {
 
   int probabilityAt(int coefficientIndex, int context, int node) {
     return _probabilities[_coefficientBands[coefficientIndex]][context][node];
+  }
+}
+
+final class _Vp8TokenContexts {
+  _Vp8TokenContexts(int mbCols) : _above = List<int>.filled(mbCols * 9, 0);
+
+  final List<int> _above;
+  final _left = List<int>.filled(9, 0);
+
+  void resetLeft() {
+    _left.fillRange(0, _left.length, 0);
+  }
+
+  void clearMacroblock(int mbX) {
+    _left.fillRange(0, _left.length, 0);
+    _above.fillRange(mbX * 9, (mbX + 1) * 9, 0);
+  }
+
+  int contextFor(int mbX, int block) {
+    return _left[_leftContextIndex[block]] +
+        _above[mbX * 9 + _aboveContextIndex[block]];
+  }
+
+  void setHasCoefficients(int mbX, int block, bool hasCoefficients) {
+    final value = hasCoefficients ? 1 : 0;
+    _left[_leftContextIndex[block]] = value;
+    _above[mbX * 9 + _aboveContextIndex[block]] = value;
   }
 }
 

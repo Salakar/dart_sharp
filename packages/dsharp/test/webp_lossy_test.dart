@@ -173,6 +173,20 @@ void main() {
     );
   });
 
+  test('tracks VP8 residual token contexts across macroblocks', () async {
+    final bytes = y2DcResidualVp8Webp(width: 17, height: 17);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.width, 17);
+    expect(image.height, 17);
+    final rgba = image.firstFrameBytes();
+    expect(rgba.take(4), <int>[129, 129, 129, 255]);
+    for (var i = 3; i < rgba.length; i += 4) {
+      expect(rgba[i], 255);
+    }
+  });
+
   test('applies supported VP8 chroma DC residuals', () async {
     final bytes = chromaDcResidualVp8Webp(width: 2, height: 2, qIndex: 12);
 

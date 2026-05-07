@@ -3,6 +3,61 @@ part of 'webp_lossy_fixture.dart';
 const _uvDcCatFiveProbabilityUpdate = 2 * 8 * 3 * 11 + 10;
 const _yAcBandOneEobProbabilityUpdate = 1 * 3 * 11;
 const _yAcBandTwoEobProbabilityUpdate = 2 * 3 * 11;
+const _fixtureY2BlockIndex = 24;
+const _fixtureLeftContextIndex = <int>[
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+  2,
+  2,
+  3,
+  3,
+  3,
+  3,
+  4,
+  4,
+  5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  8,
+];
+const _fixtureAboveContextIndex = <int>[
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  4,
+  5,
+  6,
+  7,
+  6,
+  7,
+  8,
+];
 const _fixtureCoefficientUpdateProbCodes =
     '\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff'
     '\u00ff\u00b0\u00f6\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00df\u00f1\u00fc\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00f9\u00fd\u00fd\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff'
@@ -184,11 +239,30 @@ Uint8List _residualVp8Payload({
   }
   final firstPartition = first.finish();
   final coeffs = _BoolWriter();
+  final contexts = _FixtureTokenContexts(mbCols);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
+    final mbX = i % mbCols;
+    if (mbX == 0) {
+      contexts.resetLeft();
+    }
     if (y2 && i == 0) {
-      _writeY2Token(coeffs, coefficient, y2CoefficientIndex);
+      _writeY2Token(
+        coeffs,
+        coefficient,
+        y2CoefficientIndex,
+        initialContext: contexts.contextFor(mbX, _fixtureY2BlockIndex),
+      );
+      contexts.setHasCoefficients(mbX, _fixtureY2BlockIndex, true);
     } else {
-      coeffs.prob(198, false);
+      coeffs.prob(
+        _fixtureY2Probability(
+          0,
+          contexts.contextFor(mbX, _fixtureY2BlockIndex),
+          0,
+        ),
+        false,
+      );
+      contexts.setHasCoefficients(mbX, _fixtureY2BlockIndex, false);
     }
     for (var block = 0; block < 16; block += 1) {
       if (lumaAc && i == 0 && block == 0) {
@@ -196,33 +270,50 @@ Uint8List _residualVp8Payload({
           coeffs,
           coefficient,
           lumaCoefficientIndex,
+          initialContext: contexts.contextFor(mbX, block),
           secondCoefficient: secondLumaCoefficient,
           secondCoefficientIndex: secondLumaCoefficientIndex,
           yAcBandOneEobProbability: yAcBandOneEobProbability,
           yAcBandTwoEobProbability: yAcBandTwoEobProbability,
         );
+        contexts.setHasCoefficients(mbX, block, true);
       } else {
-        coeffs.prob(253, false);
+        coeffs.prob(
+          _fixtureYAcProbability(
+            1,
+            contexts.contextFor(mbX, block),
+            0,
+            yAcBandOneEobProbability,
+            yAcBandTwoEobProbability,
+          ),
+          false,
+        );
+        contexts.setHasCoefficients(mbX, block, false);
       }
     }
-    if ((chromaDc || chromaAc) && i == 0) {
-      _writeUvToken(
-        coeffs,
-        coefficient,
-        chromaAc ? chromaCoefficientIndex : 0,
-        uvDcCatFiveProbability,
-      );
-    } else {
-      coeffs.prob(
-        _fixtureUvProbability(0, 0, 0, uvDcCatFiveProbability),
-        false,
-      );
-    }
-    for (var block = 1; block < 8; block += 1) {
-      coeffs.prob(
-        _fixtureUvProbability(0, 0, 0, uvDcCatFiveProbability),
-        false,
-      );
+    for (var block = 0; block < 8; block += 1) {
+      final blockIndex = 16 + block;
+      if ((chromaDc || chromaAc) && i == 0 && block == 0) {
+        _writeUvToken(
+          coeffs,
+          coefficient,
+          chromaAc ? chromaCoefficientIndex : 0,
+          uvDcCatFiveProbability,
+          initialContext: contexts.contextFor(mbX, blockIndex),
+        );
+        contexts.setHasCoefficients(mbX, blockIndex, true);
+      } else {
+        coeffs.prob(
+          _fixtureUvProbability(
+            0,
+            contexts.contextFor(mbX, blockIndex),
+            0,
+            uvDcCatFiveProbability,
+          ),
+          false,
+        );
+        contexts.setHasCoefficients(mbX, blockIndex, false);
+      }
     }
   }
   return (_ByteWriter()
@@ -235,6 +326,28 @@ Uint8List _residualVp8Payload({
         ..bytes(firstPartition)
         ..bytes(coeffs.finish()))
       .finish();
+}
+
+final class _FixtureTokenContexts {
+  _FixtureTokenContexts(int mbCols) : _above = List<int>.filled(mbCols * 9, 0);
+
+  final List<int> _above;
+  final _left = List<int>.filled(9, 0);
+
+  void resetLeft() {
+    _left.fillRange(0, _left.length, 0);
+  }
+
+  int contextFor(int mbX, int block) {
+    return _left[_fixtureLeftContextIndex[block]] +
+        _above[mbX * 9 + _fixtureAboveContextIndex[block]];
+  }
+
+  void setHasCoefficients(int mbX, int block, bool hasCoefficients) {
+    final value = hasCoefficients ? 1 : 0;
+    _left[_fixtureLeftContextIndex[block]] = value;
+    _above[mbX * 9 + _fixtureAboveContextIndex[block]] = value;
+  }
 }
 
 int _fixtureCoefficientUpdateProbabilityByIndex(int index) {
@@ -284,7 +397,12 @@ const _fixtureY2Probs = <List<List<int>>>[
   ],
 ];
 
-void _writeY2Token(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
+void _writeY2Token(
+  _BoolWriter coeffs,
+  int coefficient,
+  int coefficientIndex, {
+  int initialContext = 0,
+}) {
   final magnitude = coefficient.abs();
   if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
@@ -292,7 +410,7 @@ void _writeY2Token(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
   if (coefficientIndex < 0 || coefficientIndex > 15) {
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
-  var context = 0;
+  var context = initialContext;
   for (var index = 0; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureY2Probability(index, context, node);
     coeffs
@@ -366,8 +484,9 @@ void _writeUvToken(
   _BoolWriter coeffs,
   int coefficient,
   int coefficientIndex,
-  int? uvDcCatFiveProbability,
-) {
+  int? uvDcCatFiveProbability, {
+  int initialContext = 0,
+}) {
   final magnitude = coefficient.abs();
   if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
@@ -375,7 +494,7 @@ void _writeUvToken(
   if (coefficientIndex < 0 || coefficientIndex > 15) {
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
-  var context = 0;
+  var context = initialContext;
   for (var index = 0; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) =>
         _fixtureUvProbability(index, context, node, uvDcCatFiveProbability);
