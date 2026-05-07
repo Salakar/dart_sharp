@@ -5,6 +5,8 @@ Uint8List lumaAcResidualVp8Webp({
   required int height,
   int coefficient = 1,
   int coefficientIndex = 1,
+  int? secondCoefficient,
+  int? secondCoefficientIndex,
   int? yAcBandTwoEobProbability,
 }) => _simpleWebp(
   _residualVp8Payload(
@@ -13,6 +15,8 @@ Uint8List lumaAcResidualVp8Webp({
     lumaAc: true,
     coefficient: coefficient,
     lumaCoefficientIndex: coefficientIndex,
+    secondLumaCoefficient: secondCoefficient,
+    secondLumaCoefficientIndex: secondCoefficientIndex,
     yAcBandTwoEobProbability: yAcBandTwoEobProbability,
   ),
 );
@@ -82,6 +86,8 @@ void _writeYAcToken(
   _BoolWriter coeffs,
   int coefficient,
   int coefficientIndex, {
+  int? secondCoefficient,
+  int? secondCoefficientIndex,
   int? yAcBandTwoEobProbability,
 }) {
   final magnitude = coefficient.abs();
@@ -90,6 +96,17 @@ void _writeYAcToken(
   }
   if (coefficientIndex < 1 || coefficientIndex > 15) {
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
+  }
+  if (secondCoefficient != null) {
+    final secondIndex = secondCoefficientIndex;
+    if (secondIndex == null ||
+        secondIndex <= coefficientIndex ||
+        secondIndex > 15) {
+      throw ArgumentError.value(
+        secondCoefficientIndex,
+        'secondCoefficientIndex',
+      );
+    }
   }
   var context = 0;
   for (var index = 1; index < coefficientIndex; index += 1) {
@@ -113,11 +130,67 @@ void _writeYAcToken(
   final nextIndex = coefficientIndex + 1;
   final nextContext = magnitude == 1 ? 1 : 2;
   coeffs.bit(coefficient.isNegative);
-  if (nextIndex < 16) {
+  if (secondCoefficient != null && secondCoefficientIndex != null) {
+    _writeYAcTokenTail(
+      coeffs,
+      secondCoefficient,
+      secondCoefficientIndex,
+      nextIndex,
+      nextContext,
+      yAcBandTwoEobProbability,
+    );
+  } else if (nextIndex < 16) {
     coeffs.prob(
       _fixtureYAcProbability(
         nextIndex,
         nextContext,
+        0,
+        yAcBandTwoEobProbability,
+      ),
+      false,
+    );
+  }
+}
+
+void _writeYAcTokenTail(
+  _BoolWriter coeffs,
+  int coefficient,
+  int coefficientIndex,
+  int nextIndex,
+  int context,
+  int? yAcBandTwoEobProbability,
+) {
+  var currentContext = context;
+  for (var index = nextIndex; index < coefficientIndex; index += 1) {
+    int probabilityAt(int node) => _fixtureYAcProbability(
+      index,
+      currentContext,
+      node,
+      yAcBandTwoEobProbability,
+    );
+    coeffs
+      ..prob(probabilityAt(0), true)
+      ..prob(probabilityAt(1), false);
+    currentContext = 0;
+  }
+  final magnitude = coefficient.abs();
+  int probabilityAt(int node) => _fixtureYAcProbability(
+    coefficientIndex,
+    currentContext,
+    node,
+    yAcBandTwoEobProbability,
+  );
+  coeffs
+    ..prob(probabilityAt(0), true)
+    ..prob(probabilityAt(1), true);
+  _writeYAcMagnitude(coeffs, magnitude, probabilityAt);
+  coeffs.bit(coefficient.isNegative);
+  final finalIndex = coefficientIndex + 1;
+  if (finalIndex < 16) {
+    coeffs.prob(
+      _fixtureYAcProbability(
+        finalIndex,
+        magnitude == 1 ? 1 : 2,
         0,
         yAcBandTwoEobProbability,
       ),

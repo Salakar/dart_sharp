@@ -116,6 +116,28 @@ void main() {
       <int>[129, 128, 128, 127],
     );
   });
+
+  test('applies multiple VP8 luma AC coefficients in one block', () async {
+    final bytes = lumaAcResidualVp8Webp(
+      width: 4,
+      height: 4,
+      coefficient: 2,
+      secondCoefficient: -1,
+      secondCoefficientIndex: 2,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+    final expected = _expectedDctBlock({1: 2, 4: -1});
+
+    for (var row = 0; row < 4; row += 1) {
+      expect(
+        [for (var col = 0; col < 4; col += 1) rgba[(row * 4 + col) * 4]],
+        expected[row],
+        reason: 'row $row',
+      );
+    }
+  });
 }
 
 List<int> _expectedFirstAcRow(int coefficient) {
@@ -133,3 +155,58 @@ List<int> _expectedFirstAcRow(int coefficient) {
 }
 
 int _clipSample(int value) => value < 0 ? 0 : (value > 255 ? 255 : value);
+
+List<List<int>> _expectedDctBlock(Map<int, int> coefficients) {
+  const cospi8Sqrt2Minus1 = 20091;
+  const sinpi8Sqrt2 = 35468;
+  final coeffs = List<int>.filled(16, 0);
+  for (final entry in coefficients.entries) {
+    coeffs[entry.key] = entry.value * 4;
+  }
+  final tmp = List<int>.filled(16, 0);
+  for (var i = 0; i < 4; i += 1) {
+    final a1 = coeffs[i] + coeffs[8 + i];
+    final b1 = coeffs[i] - coeffs[8 + i];
+    final c1 =
+        ((coeffs[4 + i] * sinpi8Sqrt2) >> 16) -
+        coeffs[12 + i] -
+        ((coeffs[12 + i] * cospi8Sqrt2Minus1) >> 16);
+    final d1 =
+        coeffs[4 + i] +
+        ((coeffs[4 + i] * cospi8Sqrt2Minus1) >> 16) +
+        ((coeffs[12 + i] * sinpi8Sqrt2) >> 16);
+    tmp[i] = a1 + d1;
+    tmp[12 + i] = a1 - d1;
+    tmp[4 + i] = b1 + c1;
+    tmp[8 + i] = b1 - c1;
+  }
+  return [
+    for (var row = 0; row < 4; row += 1)
+      [
+        for (var col = 0; col < 4; col += 1)
+          _clipSample(128 + ((_dctRowSample(tmp, row, col) + 4) >> 3)),
+      ],
+  ];
+}
+
+int _dctRowSample(List<int> tmp, int row, int col) {
+  const cospi8Sqrt2Minus1 = 20091;
+  const sinpi8Sqrt2 = 35468;
+  final base = row * 4;
+  final a1 = tmp[base] + tmp[base + 2];
+  final b1 = tmp[base] - tmp[base + 2];
+  final c1 =
+      ((tmp[base + 1] * sinpi8Sqrt2) >> 16) -
+      tmp[base + 3] -
+      ((tmp[base + 3] * cospi8Sqrt2Minus1) >> 16);
+  final d1 =
+      tmp[base + 1] +
+      ((tmp[base + 1] * cospi8Sqrt2Minus1) >> 16) +
+      ((tmp[base + 3] * sinpi8Sqrt2) >> 16);
+  return switch (col) {
+    0 => a1 + d1,
+    1 => b1 + c1,
+    2 => b1 - c1,
+    _ => a1 - d1,
+  };
+}

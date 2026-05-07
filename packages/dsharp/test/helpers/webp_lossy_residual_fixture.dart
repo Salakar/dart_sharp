@@ -61,6 +61,8 @@ Uint8List _residualVp8Payload({
   int qIndex = 0,
   int coefficient = 1,
   int lumaCoefficientIndex = 1,
+  int? secondLumaCoefficient,
+  int? secondLumaCoefficientIndex,
   int? uvDcCatFiveProbability,
   int? yAcBandTwoEobProbability,
 }) {
@@ -110,6 +112,8 @@ Uint8List _residualVp8Payload({
           coeffs,
           coefficient,
           lumaCoefficientIndex,
+          secondCoefficient: secondLumaCoefficient,
+          secondCoefficientIndex: secondLumaCoefficientIndex,
           yAcBandTwoEobProbability: yAcBandTwoEobProbability,
         );
       } else {
