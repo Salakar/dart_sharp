@@ -63,8 +63,42 @@ Uint8List alphaSolidVp8Webp({
   return _riffWebp(chunks.finish());
 }
 
-/// Builds an extended lossy VP8 WebP with compressed ALPH marker bits.
-Uint8List compressedAlphaSolidVp8Webp({
+/// Builds an extended lossy VP8 WebP with a compressed ALPH chunk.
+Uint8List compressedAlphaVp8Webp({
+  required int width,
+  required int height,
+  required List<int> alpha,
+  int alphaFilter = 0,
+}) {
+  if (alpha.length != width * height) {
+    throw ArgumentError.value(alpha.length, 'alpha.length');
+  }
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(
+    chunks,
+    'ALPH',
+    Uint8List.fromList(<int>[
+      1 | ((alphaFilter & 0x03) << 2),
+      ..._compressedAlphaPayload(
+        _filteredAlphaValues(alpha, width, height, alphaFilter),
+      ),
+    ]),
+  );
+  _writeChunk(chunks, 'VP8 ', vp8);
+  return _riffWebp(chunks.finish());
+}
+
+/// Builds an extended lossy VP8 WebP with a truncated compressed ALPH chunk.
+Uint8List truncatedCompressedAlphaVp8Webp({
   required int width,
   required int height,
 }) {
@@ -78,9 +112,71 @@ Uint8List compressedAlphaSolidVp8Webp({
     ..byte(0)
     ..u24(width - 1)
     ..u24(height - 1);
-  _writeChunk(chunks, 'ALPH', Uint8List.fromList(<int>[1, 0]));
+  _writeChunk(chunks, 'ALPH', Uint8List.fromList(<int>[1]));
   _writeChunk(chunks, 'VP8 ', vp8);
   return _riffWebp(chunks.finish());
+}
+
+Uint8List _compressedAlphaPayload(List<int> values) {
+  final symbols = <int>[];
+  for (final value in values) {
+    if (!symbols.contains(value)) {
+      symbols.add(value);
+    }
+  }
+  if (symbols.length > 2) {
+    throw ArgumentError.value(symbols.length, 'alpha symbol count');
+  }
+  final bits = _AlphaBitWriter()
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  if (symbols.length == 1) {
+    _writeAlphaSingleSymbolCode(bits, symbols.single);
+  } else {
+    _writeAlphaTwoSymbolCode(bits, symbols[0], symbols[1]);
+  }
+  _writeAlphaSingleSymbolCode(bits, 11);
+  _writeAlphaSingleSymbolCode(bits, 22);
+  _writeAlphaSingleSymbolCode(bits, 33);
+  _writeAlphaSingleSymbolCode(bits, 0);
+  if (symbols.length == 2) {
+    for (final value in values) {
+      bits.write(value == symbols[0] ? 0 : 1, 1);
+    }
+  }
+  return bits.finish();
+}
+
+void _writeAlphaSingleSymbolCode(_AlphaBitWriter bits, int symbol) {
+  bits
+    ..write(1, 1)
+    ..write(0, 1);
+  if (symbol < 2) {
+    bits
+      ..write(0, 1)
+      ..write(symbol, 1);
+  } else {
+    bits
+      ..write(1, 1)
+      ..write(symbol, 8);
+  }
+}
+
+void _writeAlphaTwoSymbolCode(_AlphaBitWriter bits, int first, int second) {
+  bits
+    ..write(1, 1)
+    ..write(1, 1);
+  if (first < 2) {
+    bits
+      ..write(0, 1)
+      ..write(first, 1);
+  } else {
+    bits
+      ..write(1, 1)
+      ..write(first, 8);
+  }
+  bits.write(second, 8);
 }
 
 List<int> _filteredAlphaValues(
@@ -306,6 +402,31 @@ final class _BoolWriter {
     if (index >= 0) {
       _bytes[index] += 1;
     }
+  }
+}
+
+final class _AlphaBitWriter {
+  final List<int> _bytes = <int>[];
+  var _current = 0;
+  var _bits = 0;
+
+  void write(int value, int count) {
+    for (var i = 0; i < count; i += 1) {
+      _current |= ((value >> i) & 1) << _bits;
+      _bits += 1;
+      if (_bits == 8) {
+        _bytes.add(_current);
+        _current = 0;
+        _bits = 0;
+      }
+    }
+  }
+
+  Uint8List finish() {
+    if (_bits > 0) {
+      _bytes.add(_current);
+    }
+    return Uint8List.fromList(_bytes);
   }
 }
 

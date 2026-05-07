@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../api/exceptions.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
+import 'webp_lossless.dart';
 
 /// Applies a static extended WebP ALPH chunk to decoded VP8 pixels.
 RawPixels applyWebpAlpha(Uint8List bytes, RawPixels pixels) {
@@ -42,16 +43,19 @@ Uint8List decodeWebpAlphaChunk(
   final flags = chunk[0];
   final compression = flags & 0x03;
   final filter = (flags >> 2) & 0x03;
+  final expectedLength = width * height;
+  final data = chunk.sublist(1);
   if (compression == 1) {
-    throw const UnsupportedCodecException(
-      'Compressed WebP ALPH chunks are not implemented yet.',
+    return _unfilterAlpha(
+      decodeHeaderlessWebpLosslessGreen(data, width: width, height: height),
+      width,
+      height,
+      filter,
     );
   }
   if (compression != 0) {
     throw const InvalidImageException('Invalid WebP ALPH compression method.');
   }
-  final expectedLength = width * height;
-  final data = chunk.sublist(1);
   if (data.length != expectedLength) {
     throw const InvalidImageException('Invalid WebP ALPH payload length.');
   }

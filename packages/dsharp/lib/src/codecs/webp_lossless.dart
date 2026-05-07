@@ -29,6 +29,38 @@ RawPixels decodeWebpLosslessChunk(Uint8List chunk) {
   if (reader.readBits(3) != 0) {
     throw const InvalidImageException('Unsupported VP8L version.');
   }
+  final image = _decodeWebpLosslessImage(reader, width, height);
+  return RawPixels(
+    bytes: image.bytes,
+    width: width,
+    height: height,
+    channels: ChannelCount.four,
+  );
+}
+
+/// Decodes a headerless VP8L image stream and returns its green channel.
+Uint8List decodeHeaderlessWebpLosslessGreen(
+  Uint8List chunk, {
+  required int width,
+  required int height,
+}) {
+  final image = _decodeWebpLosslessImage(
+    _BitReader(chunk, byteOffset: 0),
+    width,
+    height,
+  );
+  final green = Uint8List(width * height);
+  for (var i = 0; i < green.length; i += 1) {
+    green[i] = image.bytes[i * 4 + 1];
+  }
+  return green;
+}
+
+_LosslessImage _decodeWebpLosslessImage(
+  _BitReader reader,
+  int width,
+  int height,
+) {
   final transforms = <_LosslessTransform>[];
   var dataWidth = width;
   while (reader.readBits(1) == 1) {
@@ -50,12 +82,7 @@ RawPixels decodeWebpLosslessChunk(Uint8List chunk) {
   if (image.width != width || image.height != height) {
     throw const InvalidImageException('Invalid VP8L transform dimensions.');
   }
-  return RawPixels(
-    bytes: image.bytes,
-    width: width,
-    height: height,
-    channels: ChannelCount.four,
-  );
+  return image;
 }
 
 Uint8List _decodeImageData(

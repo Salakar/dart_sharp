@@ -118,12 +118,61 @@ void main() {
     }
   });
 
-  test('rejects compressed WebP ALPH chunks explicitly', () async {
-    final bytes = compressedAlphaSolidVp8Webp(width: 2, height: 1);
+  test('decodes extended lossy WebP with compressed alpha', () async {
+    final bytes = compressedAlphaVp8Webp(
+      width: 4,
+      height: 1,
+      alpha: <int>[7, 201, 7, 201],
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      7,
+      128,
+      128,
+      128,
+      201,
+      128,
+      128,
+      128,
+      7,
+      128,
+      128,
+      128,
+      201,
+    ]);
+  });
+
+  test(
+    'applies WebP ALPH filters after lossless alpha decompression',
+    () async {
+      final bytes = compressedAlphaVp8Webp(
+        width: 3,
+        height: 1,
+        alpha: <int>[10, 20, 30],
+        alphaFilter: 1,
+      );
+
+      final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+      final rgba = image.firstFrameBytes();
+
+      expect(
+        [for (var i = 3; i < rgba.length; i += 4) rgba[i]],
+        <int>[10, 20, 30],
+      );
+    },
+  );
+
+  test('rejects truncated compressed WebP ALPH chunks', () async {
+    final bytes = truncatedCompressedAlphaVp8Webp(width: 2, height: 1);
 
     await expectLater(
       ImagePipeline.fromBytes(bytes).toPixelImage(),
-      throwsA(isA<UnsupportedCodecException>()),
+      throwsA(isA<InvalidImageException>()),
     );
   });
 
