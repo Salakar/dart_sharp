@@ -150,6 +150,29 @@ void main() {
     ]);
   });
 
+  test('applies supported VP8 Y2 AC residuals', () async {
+    final bytes = y2AcResidualVp8Webp(width: 16, height: 16);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(
+      [
+        for (var blockY = 0; blockY < 4; blockY += 1)
+          [
+            for (var blockX = 0; blockX < 4; blockX += 1)
+              rgba[((blockY * 4 * 16) + (blockX * 4)) * 4],
+          ],
+      ],
+      <List<int>>[
+        <int>[129, 129, 127, 127],
+        <int>[129, 129, 127, 127],
+        <int>[129, 129, 127, 127],
+        <int>[129, 129, 127, 127],
+      ],
+    );
+  });
+
   test('rejects VP8 residual coefficient values explicitly', () async {
     final bytes = nonEmptyResidualVp8Webp(width: 2, height: 2);
 

@@ -77,7 +77,26 @@ Uint8List y2DcResidualVp8Webp({
   final vp8 = _residualVp8Payload(
     width: width,
     height: height,
-    y2Dc: true,
+    y2: true,
+    qIndex: qIndex,
+    coefficient: coefficient,
+  );
+  return _simpleWebp(vp8);
+}
+
+/// Builds a VP8 WebP with a supported Y2 AC residual.
+Uint8List y2AcResidualVp8Webp({
+  required int width,
+  required int height,
+  int qIndex = 12,
+  int coefficient = 2,
+  int coefficientIndex = 1,
+}) {
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    y2: true,
+    y2CoefficientIndex: coefficientIndex,
     qIndex: qIndex,
     coefficient: coefficient,
   );
@@ -107,12 +126,13 @@ Uint8List _residualVp8Payload({
   required int width,
   required int height,
   bool nonEmpty = false,
-  bool y2Dc = false,
+  bool y2 = false,
   bool lumaAc = false,
   bool chromaDc = false,
   bool unsupportedChromaRun = false,
   int qIndex = 0,
   int coefficient = 1,
+  int y2CoefficientIndex = 0,
   int lumaCoefficientIndex = 1,
   int? secondLumaCoefficient,
   int? secondLumaCoefficientIndex,
@@ -165,8 +185,8 @@ Uint8List _residualVp8Payload({
   final firstPartition = first.finish();
   final coeffs = _BoolWriter();
   for (var i = 0; i < mbCols * mbRows; i += 1) {
-    if (y2Dc && i == 0) {
-      _writeY2DcToken(coeffs, coefficient);
+    if (y2 && i == 0) {
+      _writeY2Token(coeffs, coefficient, y2CoefficientIndex);
     } else {
       coeffs.prob(198, false);
     }
@@ -218,17 +238,83 @@ int _fixtureCoefficientUpdateProbabilityByIndex(int index) {
   return _fixtureCoefficientUpdateProbCodes.codeUnitAt(index);
 }
 
-void _writeY2DcToken(_BoolWriter coeffs, int coefficient) {
-  if (coefficient.abs() != 1) {
+const _fixtureY2Probs = <List<List<int>>>[
+  [
+    [198, 35, 237, 223, 193, 187, 162, 160, 145, 155, 62],
+    [131, 45, 198, 221, 172, 176, 220, 157, 252, 221, 1],
+    [68, 47, 146, 208, 149, 167, 221, 162, 255, 223, 128],
+  ],
+  [
+    [1, 149, 241, 255, 221, 224, 255, 255, 128, 128, 128],
+    [184, 141, 234, 253, 222, 220, 255, 199, 128, 128, 128],
+    [81, 99, 181, 242, 176, 190, 249, 202, 255, 255, 128],
+  ],
+  [
+    [1, 129, 232, 253, 214, 197, 242, 196, 255, 255, 128],
+    [99, 121, 210, 250, 201, 198, 255, 202, 128, 128, 128],
+    [23, 91, 163, 242, 170, 187, 247, 210, 255, 255, 128],
+  ],
+  [
+    [1, 200, 246, 255, 234, 255, 128, 128, 128, 128, 128],
+    [109, 178, 241, 255, 231, 245, 255, 255, 128, 128, 128],
+    [44, 130, 201, 253, 205, 192, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 132, 239, 251, 219, 209, 255, 165, 128, 128, 128],
+    [94, 136, 225, 251, 218, 190, 255, 255, 128, 128, 128],
+    [22, 100, 174, 245, 186, 161, 255, 199, 128, 128, 128],
+  ],
+  [
+    [1, 182, 249, 255, 232, 235, 128, 128, 128, 128, 128],
+    [124, 143, 241, 255, 227, 234, 128, 128, 128, 128, 128],
+    [35, 77, 181, 251, 193, 211, 255, 205, 128, 128, 128],
+  ],
+  [
+    [1, 157, 247, 255, 236, 231, 255, 255, 128, 128, 128],
+    [121, 141, 235, 255, 225, 227, 255, 255, 128, 128, 128],
+    [45, 99, 188, 251, 195, 217, 255, 224, 128, 128, 128],
+  ],
+  [
+    [1, 1, 251, 255, 213, 255, 128, 128, 128, 128, 128],
+    [203, 1, 248, 255, 255, 128, 128, 128, 128, 128, 128],
+    [137, 1, 177, 255, 224, 255, 128, 128, 128, 128, 128],
+  ],
+];
+
+void _writeY2Token(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
+  final magnitude = coefficient.abs();
+  if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
+  if (coefficientIndex < 0 || coefficientIndex > 15) {
+    throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
+  }
+  var context = 0;
+  for (var index = 0; index < coefficientIndex; index += 1) {
+    int probabilityAt(int node) => _fixtureY2Probability(index, context, node);
+    coeffs
+      ..prob(probabilityAt(0), true)
+      ..prob(probabilityAt(1), false);
+    context = 0;
+  }
+  int probabilityAt(int node) =>
+      _fixtureY2Probability(coefficientIndex, context, node);
   coeffs
-    ..prob(198, true)
-    ..prob(35, true)
-    ..prob(237, false)
-    ..bit(coefficient.isNegative)
-    ..prob(184, false);
+    ..prob(probabilityAt(0), true)
+    ..prob(probabilityAt(1), true);
+  _writeDctMagnitude(coeffs, magnitude, probabilityAt);
+  final nextIndex = coefficientIndex + 1;
+  coeffs.bit(coefficient.isNegative);
+  if (nextIndex < 16) {
+    coeffs.prob(
+      _fixtureY2Probability(nextIndex, magnitude == 1 ? 1 : 2, 0),
+      false,
+    );
+  }
 }
+
+int _fixtureY2Probability(int coefficientIndex, int context, int node) =>
+    _fixtureY2Probs[_fixtureCoefficientBands[coefficientIndex]][context][node];
 
 void _writeUnsupportedUvDcZeroToken(_BoolWriter coeffs) {
   coeffs

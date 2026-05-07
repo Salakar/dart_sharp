@@ -135,7 +135,7 @@ void _writeYAcToken(
   coeffs
     ..prob(probabilityAt(0), true)
     ..prob(probabilityAt(1), true);
-  _writeYAcMagnitude(coeffs, magnitude, probabilityAt);
+  _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   final nextIndex = coefficientIndex + 1;
   final nextContext = magnitude == 1 ? 1 : 2;
   coeffs.bit(coefficient.isNegative);
@@ -197,7 +197,7 @@ void _writeYAcTokenTail(
   coeffs
     ..prob(probabilityAt(0), true)
     ..prob(probabilityAt(1), true);
-  _writeYAcMagnitude(coeffs, magnitude, probabilityAt);
+  _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   coeffs.bit(coefficient.isNegative);
   final finalIndex = coefficientIndex + 1;
   if (finalIndex < 16) {
@@ -214,7 +214,7 @@ void _writeYAcTokenTail(
   }
 }
 
-void _writeYAcMagnitude(
+void _writeDctMagnitude(
   _BoolWriter coeffs,
   int magnitude,
   int Function(int node) probabilityAt,
