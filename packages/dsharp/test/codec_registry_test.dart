@@ -80,8 +80,10 @@ void main() {
     final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
 
     expect(encoded.info.format, ImageFormat.jpeg);
+    expect(sniffImageFormat(encoded.bytes), ImageFormat.jpeg);
     expect(decoded.width, 2);
     expect(decoded.height, 2);
+    expect(decoded.firstFrameBytes().take(3), everyElement(greaterThan(230)));
   });
 
   test('gif codec encodes decodable bytes', () async {
@@ -134,6 +136,7 @@ void main() {
       ImageFormat.rad,
       ImageFormat.vips,
       ImageFormat.deepZoom,
+      ImageFormat.webp,
     ]) {
       expect(
         () => registry.codecFor(format).decode(Uint8List.fromList(<int>[1])),

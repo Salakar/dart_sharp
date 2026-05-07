@@ -36,9 +36,10 @@ final class DsharpCapabilities {
         ),
         ImageFormat.webp: CodecSupport(
           format: ImageFormat.webp,
-          input: CodecAvailability.supported,
-          output: CodecAvailability.planned,
-          animation: CodecAvailability.supported,
+          input: CodecAvailability.unsupported,
+          output: CodecAvailability.unsupported,
+          animation: CodecAvailability.unsupported,
+          reason: 'No complete first-party WebP decoder is implemented yet.',
         ),
         ImageFormat.avif: CodecSupport(
           format: ImageFormat.avif,

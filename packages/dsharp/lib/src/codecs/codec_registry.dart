@@ -8,7 +8,7 @@ import 'codec.dart';
 import 'format_sniffer.dart';
 import 'gif_codec.dart';
 import 'image_format.dart';
-import 'marker_raster_codec.dart';
+import 'jpeg_codec.dart';
 import 'output.dart';
 import 'png_codec.dart';
 import 'raw_codec.dart';
@@ -28,10 +28,13 @@ final class CodecRegistry {
     return CodecRegistry(<ImageCodec>[
       const RawImageCodec(),
       const PngImageCodec(),
-      const MarkerRasterCodec(ImageFormat.jpeg),
+      const JpegImageCodec(),
       const GifImageCodec(),
       const TiffImageCodec(),
-      const MarkerRasterCodec(ImageFormat.webp, canEncode: false),
+      const UnsupportedImageCodec(
+        ImageFormat.webp,
+        reason: 'No complete first-party WebP decoder is implemented yet.',
+      ),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',

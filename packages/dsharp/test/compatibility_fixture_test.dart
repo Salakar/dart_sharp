@@ -25,4 +25,33 @@ void main() {
       expect(image.firstFrameBytes().length, 16);
     },
   );
+
+  test('optional upstream JPEG fixture decodes when present', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/320x240.jpg');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final image = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).toPixelImage();
+
+    expect(image.width, 320);
+    expect(image.height, 240);
+    expect(image.firstFrameBytes().length, 320 * 240 * 4);
+  });
+
+  test('optional upstream WebP fixture fails as unsupported', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/4.webp');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    await expectLater(
+      ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
 }

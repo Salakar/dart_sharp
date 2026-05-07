@@ -97,7 +97,8 @@ External references:
 - [x] **3.5 Implement initial compressed image codecs in-house**
   - Plan: [Dependency Strategy](../PLAN.md#45-dependency-strategy)
   - Ref: `sharp_clone/test/unit/{jpeg,png,gif,tiff,webp}.js`
-  - Add first-party codec paths for PNG, JPEG, GIF, TIFF, and WebP read support.
+  - Add first-party codec paths for PNG, JPEG, GIF, and TIFF support plus an
+    explicit WebP unsupported entry.
   - Keep conversion code in package-local private files.
   - Test tiny generated encoded fixtures for each enabled format.
 - [x] **3.6 Add unsupported advanced codec entries**
@@ -112,12 +113,12 @@ External references:
   - Create independent generated fixtures under `test/fixtures/generated/`.
   - Decode -> encode -> decode and assert dimensions, channels, and basic pixel expectations.
   - Use tolerances for lossy JPEG tests.
-- [ ] **3.8 Replace JPEG marker-raster path with interoperable codec support**
+- [x] **3.8 Replace JPEG marker-raster path with interoperable codec support**
   - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
   - Ref: `sharp_clone/test/unit/jpeg.js`
   - Implement first-party baseline JPEG encode/decode or explicitly revise the support matrix and public docs to remove JPEG support.
   - Add external JPEG fixture decode tests, generated JPEG round-trip tests, and lossy pixel tolerance tests.
-- [ ] **3.9 Replace WebP marker-raster path with interoperable decode support**
+- [x] **3.9 Replace WebP marker-raster path with explicit unsupported semantics**
   - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
   - Ref: `sharp_clone/test/unit/webp.js`
   - Implement first-party WebP decode support or explicitly revise the support matrix and public docs to remove WebP input support.

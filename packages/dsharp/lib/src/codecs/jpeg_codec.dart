@@ -1,0 +1,38 @@
+import 'dart:typed_data';
+
+import '../pixels/pixel_image.dart';
+import 'codec.dart';
+import 'image_format.dart';
+import 'jpeg_decoder.dart';
+import 'jpeg_encoder.dart';
+import 'output.dart';
+
+/// First-party baseline JPEG codec.
+final class JpegImageCodec implements ImageCodec {
+  /// Creates a JPEG codec.
+  const JpegImageCodec();
+
+  @override
+  ImageFormat get format => ImageFormat.jpeg;
+
+  @override
+  PixelImage decode(Uint8List bytes) {
+    return PixelImage.fromRawPixels(decodeJpegBytes(bytes));
+  }
+
+  @override
+  EncodedImage encode(PixelImage image) {
+    final raw = image.firstFrame.pixels;
+    final bytes = encodeJpegBytes(raw);
+    return EncodedImage(
+      bytes: bytes,
+      info: OutputInfo(
+        format: format,
+        size: bytes.length,
+        width: raw.width,
+        height: raw.height,
+        channels: 3,
+      ),
+    );
+  }
+}

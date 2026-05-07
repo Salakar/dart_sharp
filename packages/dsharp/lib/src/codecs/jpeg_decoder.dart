@@ -1,0 +1,285 @@
+import 'dart:typed_data';
+
+import '../api/exceptions.dart';
+import '../source/raw_pixels.dart';
+import 'binary_io.dart';
+import 'jpeg_bit_io.dart';
+import 'jpeg_models.dart';
+import 'jpeg_tables.dart';
+import 'jpeg_transform.dart';
+
+/// Decodes baseline sequential JPEG bytes to RGBA pixels.
+RawPixels decodeJpegBytes(Uint8List bytes) {
+  final state = _parse(bytes);
+  _decodeScan(state);
+  return RawPixels(
+    bytes: _composeRgba(state),
+    width: state.width,
+    height: state.height,
+    channels: ChannelCount.four,
+  );
+}
+
+JpegState _parse(Uint8List bytes) {
+  if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
+    throw const InvalidImageException('Invalid JPEG signature.');
+  }
+  final state = JpegState();
+  var offset = 2;
+  while (offset < bytes.length) {
+    while (offset < bytes.length && bytes[offset] == 0xff) {
+      offset += 1;
+    }
+    if (offset >= bytes.length) {
+      break;
+    }
+    final marker = bytes[offset++];
+    if (marker == 0xd9) {
+      break;
+    }
+    if (marker == 0xda) {
+      final length = readUint16Be(bytes, offset);
+      _readSos(state, bytes.sublist(offset + 2, offset + length));
+      state.scan = JpegScan(
+        components: state.scan!.components,
+        entropy: _entropyBytes(bytes, offset + length),
+      );
+      break;
+    }
+    final length = readUint16Be(bytes, offset);
+    final data = bytes.sublist(offset + 2, offset + length);
+    if (marker == 0xdb) {
+      _readDqt(state, data);
+    } else if (marker == 0xc4) {
+      _readDht(state, data);
+    } else if (marker == 0xc0) {
+      _readSof0(state, data);
+    } else if (marker >= 0xc1 && marker <= 0xcf) {
+      throw const UnsupportedCodecException(
+        'Only baseline sequential JPEG is supported.',
+      );
+    }
+    offset += length;
+  }
+  if (state.width <= 0 || state.scan == null) {
+    throw const InvalidImageException('Incomplete JPEG image.');
+  }
+  return state;
+}
+
+void _readDqt(JpegState state, Uint8List data) {
+  var offset = 0;
+  while (offset < data.length) {
+    final spec = data[offset++];
+    final precision = spec >> 4;
+    final id = spec & 0x0f;
+    final table = List<int>.filled(64, 0);
+    for (var i = 0; i < 64; i += 1) {
+      final value = precision == 0
+          ? data[offset++]
+          : readUint16Be(data, (offset += 2) - 2);
+      table[jpegZigZag[i]] = value;
+    }
+    state.quant[id] = table;
+  }
+}
+
+void _readDht(JpegState state, Uint8List data) {
+  var offset = 0;
+  while (offset < data.length) {
+    final spec = data[offset++];
+    final tableClass = spec >> 4;
+    final id = spec & 0x0f;
+    final counts = data.sublist(offset, offset + 16);
+    offset += 16;
+    final total = counts.fold<int>(0, (int sum, int value) => sum + value);
+    final symbols = data.sublist(offset, offset + total);
+    offset += total;
+    final tree = JpegHuffmanTree(counts, symbols);
+    if (tableClass == 0) {
+      state.dcTrees[id] = tree;
+    } else {
+      state.acTrees[id] = tree;
+    }
+  }
+}
+
+void _readSof0(JpegState state, Uint8List data) {
+  if (data[0] != 8) {
+    throw const UnsupportedCodecException('Only 8-bit JPEG is supported.');
+  }
+  state.height = readUint16Be(data, 1);
+  state.width = readUint16Be(data, 3);
+  final count = data[5];
+  var offset = 6;
+  for (var i = 0; i < count; i += 1) {
+    final id = data[offset++];
+    final sampling = data[offset++];
+    state.components.add(
+      JpegComponent(
+        id: id,
+        h: sampling >> 4,
+        v: sampling & 0x0f,
+        quantId: data[offset++],
+      ),
+    );
+  }
+}
+
+void _readSos(JpegState state, Uint8List data) {
+  final components = <JpegComponent>[];
+  var offset = 1;
+  for (var i = 0; i < data[0]; i += 1) {
+    final id = data[offset++];
+    final tables = data[offset++];
+    final component = state.components.firstWhere((item) => item.id == id);
+    component
+      ..dcTable = tables >> 4
+      ..acTable = tables & 0x0f;
+    components.add(component);
+  }
+  state.scan = JpegScan(components: components, entropy: Uint8List(0));
+}
+
+Uint8List _entropyBytes(Uint8List bytes, int offset) {
+  final out = <int>[];
+  var i = offset;
+  while (i < bytes.length) {
+    final value = bytes[i++];
+    if (value == 0xff) {
+      final next = bytes[i++];
+      if (next == 0x00) {
+        out.add(0xff);
+      } else if (next >= 0xd0 && next <= 0xd7) {
+        continue;
+      } else {
+        break;
+      }
+    } else {
+      out.add(value);
+    }
+  }
+  return Uint8List.fromList(out);
+}
+
+void _decodeScan(JpegState state) {
+  final maxH = state.components
+      .map((item) => item.h)
+      .reduce((a, b) => a > b ? a : b);
+  final maxV = state.components
+      .map((item) => item.v)
+      .reduce((a, b) => a > b ? a : b);
+  final mcuCols = (state.width + maxH * 8 - 1) ~/ (maxH * 8);
+  final mcuRows = (state.height + maxV * 8 - 1) ~/ (maxV * 8);
+  for (final component in state.components) {
+    component
+      ..width = (state.width * component.h + maxH - 1) ~/ maxH
+      ..height = (state.height * component.v + maxV - 1) ~/ maxV
+      ..samples = Uint8List(component.width * component.height);
+  }
+  final reader = JpegBitReader(state.scan!.entropy);
+  for (var my = 0; my < mcuRows; my += 1) {
+    for (var mx = 0; mx < mcuCols; mx += 1) {
+      for (final component in state.scan!.components) {
+        for (var vy = 0; vy < component.v; vy += 1) {
+          for (var hx = 0; hx < component.h; hx += 1) {
+            _decodeBlock(
+              state,
+              reader,
+              component,
+              mx * component.h + hx,
+              my * component.v + vy,
+            );
+          }
+        }
+      }
+    }
+  }
+}
+
+void _decodeBlock(
+  JpegState state,
+  JpegBitReader reader,
+  JpegComponent component,
+  int blockX,
+  int blockY,
+) {
+  final coeffs = List<int>.filled(64, 0);
+  final quant = state.quant[component.quantId]!;
+  final dcTree = state.dcTrees[component.dcTable]!;
+  final acTree = state.acTrees[component.acTable]!;
+  final dcSize = dcTree.read(reader);
+  component.predictor += jpegExtend(reader.readBits(dcSize), dcSize);
+  coeffs[0] = component.predictor * quant[0];
+  var k = 1;
+  while (k < 64) {
+    final symbol = acTree.read(reader);
+    final run = symbol >> 4;
+    final size = symbol & 0x0f;
+    if (size == 0) {
+      if (run == 15) {
+        k += 16;
+        continue;
+      }
+      break;
+    }
+    k += run;
+    if (k < 64) {
+      final index = jpegZigZag[k++];
+      coeffs[index] = jpegExtend(reader.readBits(size), size) * quant[index];
+    }
+  }
+  _writeSamples(component, blockX, blockY, jpegIdct(coeffs));
+}
+
+void _writeSamples(
+  JpegComponent component,
+  int blockX,
+  int blockY,
+  List<int> block,
+) {
+  for (var y = 0; y < 8; y += 1) {
+    final targetY = blockY * 8 + y;
+    if (targetY >= component.height) {
+      continue;
+    }
+    for (var x = 0; x < 8; x += 1) {
+      final targetX = blockX * 8 + x;
+      if (targetX < component.width) {
+        component.samples[targetY * component.width + targetX] =
+            block[y * 8 + x];
+      }
+    }
+  }
+}
+
+Uint8List _composeRgba(JpegState state) {
+  final rgba = Uint8List(state.width * state.height * 4);
+  final y = state.components[0];
+  final cb = state.components.length > 1 ? state.components[1] : null;
+  final cr = state.components.length > 2 ? state.components[2] : null;
+  for (var py = 0; py < state.height; py += 1) {
+    for (var px = 0; px < state.width; px += 1) {
+      final yy = _sample(y, px, py, state.width, state.height);
+      final rgb = cb == null || cr == null
+          ? (r: yy, g: yy, b: yy)
+          : jpegYcbcrToRgb(
+              yy,
+              _sample(cb, px, py, state.width, state.height),
+              _sample(cr, px, py, state.width, state.height),
+            );
+      final out = (py * state.width + px) * 4;
+      rgba[out] = rgb.r;
+      rgba[out + 1] = rgb.g;
+      rgba[out + 2] = rgb.b;
+      rgba[out + 3] = 255;
+    }
+  }
+  return rgba;
+}
+
+int _sample(JpegComponent component, int x, int y, int width, int height) {
+  final sx = x * component.width ~/ width;
+  final sy = y * component.height ~/ height;
+  return component.samples[sy * component.width + sx];
+}

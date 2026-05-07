@@ -121,7 +121,7 @@ All complete → output: <promise>ALL_DONE</promise>
   - Phase TODO: [phases/phase10-documentation-ci-polish-and-release-readiness.md](phases/phase10-documentation-ci-polish-and-release-readiness.md)
   - Plan: [Documentation and Release Polish](PLAN.md#510-documentation-and-release-polish)
   - Complete every unchecked task in the phase file, then mark this phase complete.
-- [ ] **Strict codec parity follow-up: first-party interoperable JPEG/WebP**
+- [x] **Strict codec parity follow-up: first-party interoperable JPEG/WebP**
   - Phase TODO: [phases/phase03-codec-registry-and-initial-pure-dart-codecs.md](phases/phase03-codec-registry-and-initial-pure-dart-codecs.md)
   - Plan: [Codec Foundation](PLAN.md#52-codec-foundation)
   - Replace marker-raster JPEG/WebP placeholders with interoperable in-house codec implementations or update the support matrix to explicitly drop that support.

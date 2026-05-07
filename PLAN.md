@@ -119,8 +119,9 @@ Dart target support matrix:
 - Tier 2: WebP write, APNG, ICC/EXIF/XMP preservation, animated frame timing/looping, deep zoom tile packaging, and color-management accuracy.
 - Tier 3 unsupported until pure Dart implementations exist: AVIF, HEIF/HEIC, JP2/JPEG 2000, JXL/JPEG XL, PDF rasterization, OpenSlide, Magick, DCRAW/RAW camera formats, FITS, RAD, and complete SVG rasterization.
 - The public API must expose `CodecSupport` and `FormatRegistry` so unsupported formats fail predictably with `UnsupportedCodecException` rather than pretending support exists.
-- Runtime codec dependencies are not permitted. PNG, GIF, TIFF, JPEG marker-raster,
-  and WebP marker-raster behavior must stay behind first-party codec interfaces.
+- Runtime codec dependencies are not permitted. PNG, baseline JPEG, GIF, and
+  TIFF behavior must stay behind first-party codec interfaces. WebP remains
+  explicitly unsupported until a complete first-party decoder exists.
 
 ### 3.3 Metadata and Statistics
 
@@ -441,8 +442,9 @@ Rules:
 - Implement `ImageFormat` sniffing from magic bytes and optional metadata.
 - Implement `Codec` and `CodecRegistry` with static capability data.
 - Add raw pixel codec first because it is deterministic and does not depend on compressed formats.
-- Implement first-party raw, PNG, JPEG, GIF, TIFF, and WebP codec paths without
-  runtime dependencies.
+- Implement first-party raw, PNG, baseline JPEG, GIF, and TIFF codec paths
+  without runtime dependencies. Keep WebP registered as unsupported until a
+  complete first-party decoder exists.
 - Add unsupported codec implementations for AVIF, HEIF, JP2, JXL, PDF, OpenSlide, Magick, DCRAW, FITS, RAD, SVG rasterization, and deep zoom until pure Dart support exists.
 - Add malformed input tests and input size limits before enabling decode APIs.
 
@@ -572,7 +574,8 @@ Rules:
 
 1. Foundation and package correctness.
 2. Core source, byte, raw pixel, format, and capability models.
-3. First-party raw/PNG/JPEG/GIF/TIFF/WebP codec paths.
+3. First-party raw/PNG/baseline JPEG/GIF/TIFF codec paths plus explicit WebP
+   unsupported semantics.
 4. Pixel image model, metadata, and stats.
 5. Resize geometry and resampling.
 6. Transform, color, channel, alpha, and filter operations.
