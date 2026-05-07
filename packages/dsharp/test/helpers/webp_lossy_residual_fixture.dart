@@ -18,6 +18,11 @@ Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
   return _simpleWebp(vp8);
 }
 
+Uint8List lumaAcResidualVp8Webp({required int width, required int height}) =>
+    _simpleWebp(
+      _residualVp8Payload(width: width, height: height, lumaAc: true),
+    );
+
 /// Builds a VP8 WebP with a chroma DC coefficient run this decoder rejects.
 Uint8List unsupportedChromaDcRunVp8Webp({
   required int width,
@@ -54,6 +59,7 @@ Uint8List _residualVp8Payload({
   required int width,
   required int height,
   bool nonEmpty = false,
+  bool lumaAc = false,
   bool chromaDc = false,
   bool unsupportedChromaRun = false,
   int qIndex = 0,
@@ -95,7 +101,11 @@ Uint8List _residualVp8Payload({
   for (var i = 0; i < mbCols * mbRows; i += 1) {
     coeffs.prob(198, nonEmpty && i == 0);
     for (var block = 0; block < 16; block += 1) {
-      coeffs.prob(253, false);
+      if (lumaAc && i == 0 && block == 0) {
+        _writeYAcToken(coeffs);
+      } else {
+        coeffs.prob(253, false);
+      }
     }
     if (unsupportedChromaRun && i == 0) {
       _writeUnsupportedUvDcRunToken(coeffs);
@@ -124,9 +134,17 @@ Uint8List _residualVp8Payload({
       .finish();
 }
 
-void _writeUnsupportedUvDcRunToken(_BoolWriter coeffs) {
-  _writeUvDcToken(coeffs, 1, hasMore: true);
+void _writeYAcToken(_BoolWriter coeffs) {
+  coeffs
+    ..prob(253, true)
+    ..prob(136, true)
+    ..prob(254, false)
+    ..bit(false)
+    ..prob(181, false);
 }
+
+void _writeUnsupportedUvDcRunToken(_BoolWriter coeffs) =>
+    _writeUvDcToken(coeffs, 1, hasMore: true);
 
 void _writeUvDcToken(
   _BoolWriter coeffs,

@@ -49,6 +49,14 @@ final class _Vp8Planes {
     }
   }
 
+  void addLumaDct(int mbX, int mbY, int block, int coefficient, int quant) {
+    final bx = mbX * 16 + (block & 3) * 4;
+    final by = mbY * 16 + (block >> 2) * 4;
+    final coeffs = List<int>.filled(16, 0);
+    coeffs[1] = coefficient * quant;
+    _addDctBlock(y, yWidth, bx, by, coeffs);
+  }
+
   Uint8List composeRgba() {
     final rgba = Uint8List(width * height * 4);
     for (var py = 0; py < height; py += 1) {
@@ -66,6 +74,53 @@ final class _Vp8Planes {
       }
     }
     return rgba;
+  }
+}
+
+void _addDctBlock(Uint8List plane, int stride, int x, int y, List<int> coeffs) {
+  const cospi8Sqrt2Minus1 = 20091;
+  const sinpi8Sqrt2 = 35468;
+  final tmp = List<int>.filled(16, 0);
+  for (var i = 0; i < 4; i += 1) {
+    final a1 = coeffs[i] + coeffs[8 + i];
+    final b1 = coeffs[i] - coeffs[8 + i];
+    final c1 =
+        ((coeffs[4 + i] * sinpi8Sqrt2) >> 16) -
+        coeffs[12 + i] -
+        ((coeffs[12 + i] * cospi8Sqrt2Minus1) >> 16);
+    final d1 =
+        coeffs[4 + i] +
+        ((coeffs[4 + i] * cospi8Sqrt2Minus1) >> 16) +
+        ((coeffs[12 + i] * sinpi8Sqrt2) >> 16);
+    tmp[i] = a1 + d1;
+    tmp[12 + i] = a1 - d1;
+    tmp[4 + i] = b1 + c1;
+    tmp[8 + i] = b1 - c1;
+  }
+  for (var row = 0; row < 4; row += 1) {
+    final base = row * 4;
+    final a1 = tmp[base] + tmp[base + 2];
+    final b1 = tmp[base] - tmp[base + 2];
+    final c1 =
+        ((tmp[base + 1] * sinpi8Sqrt2) >> 16) -
+        tmp[base + 3] -
+        ((tmp[base + 3] * cospi8Sqrt2Minus1) >> 16);
+    final d1 =
+        tmp[base + 1] +
+        ((tmp[base + 1] * cospi8Sqrt2Minus1) >> 16) +
+        ((tmp[base + 3] * sinpi8Sqrt2) >> 16);
+    plane[(y + row) * stride + x] = _clip(
+      plane[(y + row) * stride + x] + ((a1 + d1 + 4) >> 3),
+    );
+    plane[(y + row) * stride + x + 3] = _clip(
+      plane[(y + row) * stride + x + 3] + ((a1 - d1 + 4) >> 3),
+    );
+    plane[(y + row) * stride + x + 1] = _clip(
+      plane[(y + row) * stride + x + 1] + ((b1 + c1 + 4) >> 3),
+    );
+    plane[(y + row) * stride + x + 2] = _clip(
+      plane[(y + row) * stride + x + 2] + ((b1 - c1 + 4) >> 3),
+    );
   }
 }
 

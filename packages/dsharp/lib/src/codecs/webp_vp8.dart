@@ -133,6 +133,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     }
   }
   return _Vp8FrameHeader(
+    yAcQuantIndex: qIndex,
     uvDcQuantIndex: qIndex + uvDcDelta,
     uvDcProbs: uvDcProbs,
   );
@@ -183,10 +184,12 @@ final class _Vp8Header {
 
 final class _Vp8FrameHeader {
   const _Vp8FrameHeader({
+    required this.yAcQuantIndex,
     required this.uvDcQuantIndex,
     required this.uvDcProbs,
   });
 
+  final int yAcQuantIndex;
   final int uvDcQuantIndex;
   final _Vp8ChromaDcProbs uvDcProbs;
 }

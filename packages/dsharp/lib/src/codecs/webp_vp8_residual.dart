@@ -2,6 +2,9 @@ part of 'webp_vp8.dart';
 
 const _y2EobProb = 198;
 const _yAcEobProb = 253;
+const _yAcZeroProb = 136;
+const _yAcOneProb = 254;
+const _yAcPostOneEobProb = 181;
 const _uvEobNode = 0;
 const _uvZeroNode = 1;
 const _uvOneNode = 2;
@@ -54,8 +57,8 @@ void _readResidual(
   _Vp8FrameHeader frame,
 ) {
   _readEobOnlyBlock(coeffs, _y2EobProb);
-  for (var i = 0; i < 16; i += 1) {
-    _readEobOnlyBlock(coeffs, _yAcEobProb);
+  for (var block = 0; block < 16; block += 1) {
+    _readLumaAcBlock(coeffs, planes, mbX, mbY, block, frame);
   }
   for (var block = 0; block < 4; block += 1) {
     final coefficient = _readUvDcCoefficient(coeffs, frame.uvDcProbs);
@@ -83,6 +86,37 @@ void _readResidual(
       );
     }
   }
+}
+
+void _readLumaAcBlock(
+  Vp8BoolDecoder coeffs,
+  _Vp8Planes planes,
+  int mbX,
+  int mbY,
+  int block,
+  _Vp8FrameHeader frame,
+) {
+  if (coeffs.readBool(_yAcEobProb) == 0) {
+    return;
+  }
+  if (coeffs.readBool(_yAcZeroProb) == 0 || coeffs.readBool(_yAcOneProb) != 0) {
+    throw const UnsupportedCodecException(
+      'VP8 luma AC residual coefficients are not implemented yet.',
+    );
+  }
+  final coefficient = coeffs.readBit() == 1 ? -1 : 1;
+  if (coeffs.readBool(_yAcPostOneEobProb) != 0) {
+    throw const UnsupportedCodecException(
+      'VP8 residual coefficient runs are not implemented yet.',
+    );
+  }
+  planes.addLumaDct(
+    mbX,
+    mbY,
+    block,
+    coefficient,
+    _yAcQuant(frame.yAcQuantIndex),
+  );
 }
 
 void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
