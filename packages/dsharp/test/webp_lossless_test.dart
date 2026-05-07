@@ -37,6 +37,55 @@ void main() {
     );
   });
 
+  test('malformed VP8L payloads fail clearly', () async {
+    final invalidSignature = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    invalidSignature[20] = 0;
+
+    await expectLater(
+      ImagePipeline.fromBytes(invalidSignature).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+
+    final truncated = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    ).sublist(0, 20);
+
+    await expectLater(
+      ImagePipeline.fromBytes(truncated).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+
+    final oversizedChunk = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    oversizedChunk[16] = 0xff;
+    oversizedChunk[17] = 0xff;
+    oversizedChunk[18] = 0xff;
+    oversizedChunk[19] = 0xff;
+
+    await expectLater(
+      ImagePipeline.fromBytes(oversizedChunk).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('decodes simple two-symbol VP8L prefix codes', () async {
     final bytes = twoGreenVp8lWebp(
       width: 4,
