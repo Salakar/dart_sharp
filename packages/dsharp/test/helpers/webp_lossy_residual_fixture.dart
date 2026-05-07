@@ -16,6 +16,19 @@ Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
   return _simpleWebp(vp8);
 }
 
+/// Builds a VP8 WebP with a chroma DC category this decoder rejects.
+Uint8List unsupportedChromaDcCategoryVp8Webp({
+  required int width,
+  required int height,
+}) {
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    unsupportedChromaCategory: true,
+  );
+  return _simpleWebp(vp8);
+}
+
 /// Builds a VP8 WebP with a supported chroma DC residual.
 Uint8List chromaDcResidualVp8Webp({
   required int width,
@@ -38,6 +51,7 @@ Uint8List _residualVp8Payload({
   required int height,
   bool nonEmpty = false,
   bool chromaDc = false,
+  bool unsupportedChromaCategory = false,
   int qIndex = 0,
   int coefficient = 1,
 }) {
@@ -72,7 +86,9 @@ Uint8List _residualVp8Payload({
     for (var block = 0; block < 16; block += 1) {
       coeffs.prob(253, false);
     }
-    if (chromaDc && i == 0) {
+    if (unsupportedChromaCategory && i == 0) {
+      _writeUnsupportedUvDcCategoryToken(coeffs);
+    } else if (chromaDc && i == 0) {
       _writeUvDcToken(coeffs, coefficient);
     } else {
       coeffs.prob(202, false);
@@ -93,9 +109,18 @@ Uint8List _residualVp8Payload({
       .finish();
 }
 
+void _writeUnsupportedUvDcCategoryToken(_BoolWriter coeffs) {
+  coeffs
+    ..prob(202, true)
+    ..prob(24, true)
+    ..prob(213, true)
+    ..prob(235, true)
+    ..prob(220, true);
+}
+
 void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
   final magnitude = coefficient.abs();
-  if (magnitude < 1 || magnitude > 6) {
+  if (magnitude < 1 || magnitude > 10) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
   coeffs
@@ -114,13 +139,22 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
         ..prob(186, true)
         ..prob(191, magnitude == 4);
     }
-  } else {
+  } else if (magnitude <= 6) {
     coeffs
       ..prob(213, true)
       ..prob(235, true)
       ..prob(220, false)
       ..prob(160, false)
       ..prob(159, magnitude == 6);
+  } else {
+    final offset = magnitude - 7;
+    coeffs
+      ..prob(213, true)
+      ..prob(235, true)
+      ..prob(220, false)
+      ..prob(160, true)
+      ..prob(165, offset >= 2)
+      ..prob(145, offset.isOdd);
   }
   coeffs
     ..bit(coefficient.isNegative)
