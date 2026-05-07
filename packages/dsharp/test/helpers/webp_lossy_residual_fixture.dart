@@ -116,13 +116,12 @@ void _writeUnsupportedUvDcCategoryToken(_BoolWriter coeffs) {
     ..prob(213, true)
     ..prob(235, true)
     ..prob(220, true)
-    ..prob(240, false)
-    ..prob(175, true);
+    ..prob(240, true);
 }
 
 void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
   final magnitude = coefficient.abs();
-  if (magnitude < 1 || magnitude > 18) {
+  if (magnitude < 1 || magnitude > 34) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
   coeffs
@@ -157,7 +156,7 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
       ..prob(160, true)
       ..prob(165, offset >= 2)
       ..prob(145, offset.isOdd);
-  } else {
+  } else if (magnitude <= 18) {
     final offset = magnitude - 11;
     coeffs
       ..prob(213, true)
@@ -168,6 +167,18 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
       ..prob(173, (offset & 4) != 0)
       ..prob(148, (offset & 2) != 0)
       ..prob(140, offset.isOdd);
+  } else {
+    final offset = magnitude - 19;
+    coeffs
+      ..prob(213, true)
+      ..prob(235, true)
+      ..prob(220, true)
+      ..prob(240, false)
+      ..prob(175, true)
+      ..prob(176, (offset & 8) != 0)
+      ..prob(155, (offset & 4) != 0)
+      ..prob(140, (offset & 2) != 0)
+      ..prob(135, offset.isOdd);
   }
   coeffs
     ..bit(coefficient.isNegative)
