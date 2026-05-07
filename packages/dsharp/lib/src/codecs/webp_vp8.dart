@@ -149,11 +149,11 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   final y2DcDelta = _readOptionalSigned(bits, 4);
   final y2AcDelta = _readOptionalSigned(bits, 4);
   final uvDcDelta = _readOptionalSigned(bits, 4);
-  _readOptionalSigned(bits, 4);
+  final uvAcDelta = _readOptionalSigned(bits, 4);
   bits.readBit();
   final yAcProbs = _Vp8LumaAcProbs.defaults();
   final y2Probs = _Vp8Y2Probs.defaults();
-  final uvDcProbs = _Vp8ChromaDcProbs.defaults();
+  final uvProbs = _Vp8ChromaProbs.defaults();
   for (var plane = 0; plane < 4; plane += 1) {
     for (var band = 0; band < 8; band += 1) {
       for (var context = 0; context < 3; context += 1) {
@@ -169,8 +169,8 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
             if (plane == 1) {
               y2Probs[band][context][node] = probability;
             }
-            if (plane == 2 && band == 0 && context == 0) {
-              uvDcProbs[node] = probability;
+            if (plane == 2) {
+              uvProbs[band][context][node] = probability;
             }
           }
         }
@@ -182,9 +182,10 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     y2DcQuantIndex: qIndex + y2DcDelta,
     y2AcQuantIndex: qIndex + y2AcDelta,
     uvDcQuantIndex: qIndex + uvDcDelta,
+    uvAcQuantIndex: qIndex + uvAcDelta,
     yAcProbs: yAcProbs,
     y2Probs: y2Probs,
-    uvDcProbs: uvDcProbs,
+    uvProbs: uvProbs,
   );
 }
 
@@ -243,16 +244,18 @@ final class _Vp8FrameHeader {
     required this.y2DcQuantIndex,
     required this.y2AcQuantIndex,
     required this.uvDcQuantIndex,
+    required this.uvAcQuantIndex,
     required this.yAcProbs,
     required this.y2Probs,
-    required this.uvDcProbs,
+    required this.uvProbs,
   });
 
   final int yAcQuantIndex;
   final int y2DcQuantIndex;
   final int y2AcQuantIndex;
   final int uvDcQuantIndex;
+  final int uvAcQuantIndex;
   final _Vp8LumaAcProbs yAcProbs;
   final _Vp8Y2Probs y2Probs;
-  final _Vp8ChromaDcProbs uvDcProbs;
+  final _Vp8ChromaProbs uvProbs;
 }

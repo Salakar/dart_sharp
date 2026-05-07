@@ -48,25 +48,6 @@ Uint8List eobResidualVp8Webp({
   return _simpleWebp(vp8);
 }
 
-/// Builds a VP8 WebP with a residual token that this decoder rejects.
-Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
-  final vp8 = _residualVp8Payload(width: width, height: height, nonEmpty: true);
-  return _simpleWebp(vp8);
-}
-
-/// Builds a VP8 WebP with a chroma DC coefficient run this decoder rejects.
-Uint8List unsupportedChromaDcRunVp8Webp({
-  required int width,
-  required int height,
-}) {
-  final vp8 = _residualVp8Payload(
-    width: width,
-    height: height,
-    unsupportedChromaRun: true,
-  );
-  return _simpleWebp(vp8);
-}
-
 /// Builds a VP8 WebP with a supported Y2 DC residual.
 Uint8List y2DcResidualVp8Webp({
   required int width,
@@ -122,18 +103,37 @@ Uint8List chromaDcResidualVp8Webp({
   return _simpleWebp(vp8);
 }
 
+/// Builds a VP8 WebP with a supported chroma AC residual.
+Uint8List chromaAcResidualVp8Webp({
+  required int width,
+  required int height,
+  int qIndex = 12,
+  int coefficient = 2,
+  int coefficientIndex = 1,
+}) {
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    chromaAc: true,
+    qIndex: qIndex,
+    coefficient: coefficient,
+    chromaCoefficientIndex: coefficientIndex,
+  );
+  return _simpleWebp(vp8);
+}
+
 Uint8List _residualVp8Payload({
   required int width,
   required int height,
-  bool nonEmpty = false,
   bool y2 = false,
   bool lumaAc = false,
   bool chromaDc = false,
-  bool unsupportedChromaRun = false,
+  bool chromaAc = false,
   int qIndex = 0,
   int coefficient = 1,
   int y2CoefficientIndex = 0,
   int lumaCoefficientIndex = 1,
+  int chromaCoefficientIndex = 0,
   int? secondLumaCoefficient,
   int? secondLumaCoefficientIndex,
   int? uvDcCatFiveProbability,
@@ -205,21 +205,24 @@ Uint8List _residualVp8Payload({
         coeffs.prob(253, false);
       }
     }
-    if (nonEmpty && i == 0) {
-      _writeUnsupportedUvDcZeroToken(coeffs);
-    } else if (unsupportedChromaRun && i == 0) {
-      _writeUnsupportedUvDcRunToken(coeffs);
-    } else if (chromaDc && i == 0) {
-      _writeUvDcToken(
+    if ((chromaDc || chromaAc) && i == 0) {
+      _writeUvToken(
         coeffs,
         coefficient,
-        catFiveProbability: uvDcCatFiveProbability ?? 255,
+        chromaAc ? chromaCoefficientIndex : 0,
+        uvDcCatFiveProbability,
       );
     } else {
-      coeffs.prob(202, false);
+      coeffs.prob(
+        _fixtureUvProbability(0, 0, 0, uvDcCatFiveProbability),
+        false,
+      );
     }
     for (var block = 1; block < 8; block += 1) {
-      coeffs.prob(202, false);
+      coeffs.prob(
+        _fixtureUvProbability(0, 0, 0, uvDcCatFiveProbability),
+        false,
+      );
     }
   }
   return (_ByteWriter()
@@ -316,114 +319,107 @@ void _writeY2Token(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
 int _fixtureY2Probability(int coefficientIndex, int context, int node) =>
     _fixtureY2Probs[_fixtureCoefficientBands[coefficientIndex]][context][node];
 
-void _writeUnsupportedUvDcZeroToken(_BoolWriter coeffs) {
-  coeffs
-    ..prob(202, true)
-    ..prob(24, false);
-}
+const _fixtureUvProbs = <List<List<int>>>[
+  [
+    [253, 9, 248, 251, 207, 208, 255, 192, 128, 128, 128],
+    [175, 13, 224, 243, 193, 185, 249, 198, 255, 255, 128],
+    [73, 17, 171, 221, 161, 179, 236, 167, 255, 234, 128],
+  ],
+  [
+    [1, 95, 247, 253, 212, 183, 255, 255, 128, 128, 128],
+    [239, 90, 244, 250, 211, 209, 255, 255, 128, 128, 128],
+    [155, 77, 195, 248, 188, 195, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 24, 239, 251, 218, 219, 255, 205, 128, 128, 128],
+    [201, 51, 219, 255, 196, 186, 128, 128, 128, 128, 128],
+    [69, 46, 190, 239, 201, 218, 255, 228, 128, 128, 128],
+  ],
+  [
+    [1, 191, 251, 255, 255, 128, 128, 128, 128, 128, 128],
+    [223, 165, 249, 255, 213, 255, 128, 128, 128, 128, 128],
+    [141, 124, 248, 255, 255, 128, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 16, 248, 255, 255, 128, 128, 128, 128, 128, 128],
+    [190, 36, 230, 255, 236, 255, 128, 128, 128, 128, 128],
+    [149, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 226, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [247, 192, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [240, 128, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 134, 252, 255, 255, 128, 128, 128, 128, 128, 128],
+    [213, 62, 250, 255, 255, 128, 128, 128, 128, 128, 128],
+    [55, 93, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+  [
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+];
 
-void _writeUnsupportedUvDcRunToken(_BoolWriter coeffs) =>
-    _writeUvDcToken(coeffs, 1, hasMore: true);
-
-void _writeUvDcToken(
+void _writeUvToken(
   _BoolWriter coeffs,
-  int coefficient, {
-  bool hasMore = false,
-  int catFiveProbability = 255,
-}) {
+  int coefficient,
+  int coefficientIndex,
+  int? uvDcCatFiveProbability,
+) {
   final magnitude = coefficient.abs();
   if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
-  coeffs
-    ..prob(202, true)
-    ..prob(24, true);
-  if (magnitude == 1) {
-    coeffs.prob(213, false);
-  } else if (magnitude <= 4) {
-    coeffs
-      ..prob(213, true)
-      ..prob(235, false);
-    if (magnitude == 2) {
-      coeffs.prob(186, false);
-    } else {
-      coeffs
-        ..prob(186, true)
-        ..prob(191, magnitude == 4);
-    }
-  } else if (magnitude <= 6) {
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, false)
-      ..prob(160, false)
-      ..prob(159, magnitude == 6);
-  } else if (magnitude <= 10) {
-    final offset = magnitude - 7;
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, false)
-      ..prob(160, true)
-      ..prob(165, offset >= 2)
-      ..prob(145, offset.isOdd);
-  } else if (magnitude <= 18) {
-    final offset = magnitude - 11;
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, true)
-      ..prob(240, false)
-      ..prob(175, false)
-      ..prob(173, (offset & 4) != 0)
-      ..prob(148, (offset & 2) != 0)
-      ..prob(140, offset.isOdd);
-  } else if (magnitude <= 34) {
-    final offset = magnitude - 19;
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, true)
-      ..prob(240, false)
-      ..prob(175, true)
-      ..prob(176, (offset & 8) != 0)
-      ..prob(155, (offset & 4) != 0)
-      ..prob(140, (offset & 2) != 0)
-      ..prob(135, offset.isOdd);
-  } else if (magnitude <= 66) {
-    final offset = magnitude - 35;
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, true)
-      ..prob(240, true)
-      ..prob(catFiveProbability, false)
-      ..prob(180, (offset & 16) != 0)
-      ..prob(157, (offset & 8) != 0)
-      ..prob(141, (offset & 4) != 0)
-      ..prob(134, (offset & 2) != 0)
-      ..prob(130, offset.isOdd);
-  } else {
-    final offset = magnitude - 67;
-    coeffs
-      ..prob(213, true)
-      ..prob(235, true)
-      ..prob(220, true)
-      ..prob(240, true)
-      ..prob(catFiveProbability, true)
-      ..prob(254, (offset & 1024) != 0)
-      ..prob(254, (offset & 512) != 0)
-      ..prob(243, (offset & 256) != 0)
-      ..prob(230, (offset & 128) != 0)
-      ..prob(196, (offset & 64) != 0)
-      ..prob(177, (offset & 32) != 0)
-      ..prob(153, (offset & 16) != 0)
-      ..prob(140, (offset & 8) != 0)
-      ..prob(133, (offset & 4) != 0)
-      ..prob(130, (offset & 2) != 0)
-      ..prob(129, offset.isOdd);
+  if (coefficientIndex < 0 || coefficientIndex > 15) {
+    throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
+  var context = 0;
+  for (var index = 0; index < coefficientIndex; index += 1) {
+    int probabilityAt(int node) =>
+        _fixtureUvProbability(index, context, node, uvDcCatFiveProbability);
+    coeffs
+      ..prob(probabilityAt(0), true)
+      ..prob(probabilityAt(1), false);
+    context = 0;
+  }
+  int probabilityAt(int node) => _fixtureUvProbability(
+    coefficientIndex,
+    context,
+    node,
+    uvDcCatFiveProbability,
+  );
   coeffs
-    ..bit(coefficient.isNegative)
-    ..prob(166, hasMore);
+    ..prob(probabilityAt(0), true)
+    ..prob(probabilityAt(1), true);
+  _writeDctMagnitude(coeffs, magnitude, probabilityAt);
+  final nextIndex = coefficientIndex + 1;
+  coeffs.bit(coefficient.isNegative);
+  if (nextIndex < 16) {
+    coeffs.prob(
+      _fixtureUvProbability(
+        nextIndex,
+        magnitude == 1 ? 1 : 2,
+        0,
+        uvDcCatFiveProbability,
+      ),
+      false,
+    );
+  }
+}
+
+int _fixtureUvProbability(
+  int coefficientIndex,
+  int context,
+  int node,
+  int? uvDcCatFiveProbability,
+) {
+  if (coefficientIndex == 0 &&
+      context == 0 &&
+      node == 10 &&
+      uvDcCatFiveProbability != null) {
+    return uvDcCatFiveProbability;
+  }
+  return _fixtureUvProbs[_fixtureCoefficientBands[coefficientIndex]][context][node];
 }

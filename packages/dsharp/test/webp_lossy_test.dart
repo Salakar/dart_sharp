@@ -173,27 +173,6 @@ void main() {
     );
   });
 
-  test('rejects VP8 residual coefficient values explicitly', () async {
-    final bytes = nonEmptyResidualVp8Webp(width: 2, height: 2);
-
-    await expectLater(
-      ImagePipeline.fromBytes(bytes).toPixelImage(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
-  });
-
-  test(
-    'rejects unsupported VP8 chroma DC coefficient runs explicitly',
-    () async {
-      final bytes = unsupportedChromaDcRunVp8Webp(width: 2, height: 2);
-
-      await expectLater(
-        ImagePipeline.fromBytes(bytes).toPixelImage(),
-        throwsA(isA<UnsupportedCodecException>()),
-      );
-    },
-  );
-
   test('applies supported VP8 chroma DC residuals', () async {
     final bytes = chromaDcResidualVp8Webp(width: 2, height: 2, qIndex: 12);
 
@@ -217,6 +196,27 @@ void main() {
       131,
       255,
     ]);
+  });
+
+  test('applies supported VP8 chroma AC residuals', () async {
+    final bytes = chromaAcResidualVp8Webp(width: 8, height: 2);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(
+      [for (var col = 0; col < 8; col += 1) rgba.sublist(col * 4, col * 4 + 4)],
+      <List<int>>[
+        <int>[128, 127, 136, 255],
+        <int>[128, 127, 136, 255],
+        <int>[128, 128, 131, 255],
+        <int>[128, 128, 131, 255],
+        <int>[128, 129, 124, 255],
+        <int>[128, 129, 124, 255],
+        <int>[128, 130, 119, 255],
+        <int>[128, 130, 119, 255],
+      ],
+    );
   });
 
   test('caps supported VP8 chroma DC residual quantizers', () async {

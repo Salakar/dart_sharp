@@ -276,6 +276,8 @@ int _uvDcQuant(int index) {
   return quant > 132 ? 132 : quant;
 }
 
+int _uvAcQuant(int index) => _acQuantLookup[_clampQuantIndex(index)];
+
 int _clampQuantIndex(int index) {
   if (index < 0) {
     return 0;
