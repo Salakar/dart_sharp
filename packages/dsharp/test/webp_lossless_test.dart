@@ -29,15 +29,7 @@ void main() {
   });
 
   test('unsupported VP8L transforms fail clearly', () async {
-    final bytes = solidVp8lWebp(
-      width: 1,
-      height: 1,
-      red: 1,
-      green: 2,
-      blue: 3,
-      alpha: 255,
-    );
-    bytes[25] |= 0x07;
+    final bytes = packedColorIndexingVp8lWebp();
 
     await expectLater(
       ImagePipeline.fromBytes(bytes).toPixelImage(),
@@ -156,5 +148,20 @@ void main() {
       90,
       255,
     ]);
+  });
+
+  test('decodes an unpacked VP8L color-indexing transform', () async {
+    final bytes = colorIndexingVp8lWebp(
+      width: 2,
+      height: 1,
+      red: 80,
+      green: 90,
+      blue: 100,
+      alpha: 255,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[80, 90, 100, 255, 80, 90, 100, 255]);
   });
 }

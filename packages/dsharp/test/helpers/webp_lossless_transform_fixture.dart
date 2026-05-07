@@ -103,6 +103,56 @@ Uint8List predictorVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP using an unpacked color-indexing transform.
+Uint8List colorIndexingVp8lWebp({
+  required int width,
+  required int height,
+  required int red,
+  required int green,
+  required int blue,
+  required int alpha,
+}) {
+  final bits = _BitWriter()
+    ..write(width - 1, 14)
+    ..write(height - 1, 14)
+    ..write(alpha == 255 ? 0 : 1, 1)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(3, 2)
+    ..write(16, 8);
+  _writeSolidImageData(
+    bits,
+    red: red,
+    green: green,
+    blue: blue,
+    alpha: alpha,
+    writeMetaPrefix: false,
+  );
+  bits.write(0, 1);
+  _writeSolidImageData(
+    bits,
+    red: 0,
+    green: 0,
+    blue: 0,
+    alpha: 255,
+    writeMetaPrefix: true,
+  );
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
+/// Builds a VP8L WebP that uses the unsupported packed color-indexing form.
+Uint8List packedColorIndexingVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(3, 2)
+    ..write(0, 8);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 void _writeSolidImageData(
   _BitWriter bits, {
   required int red,
