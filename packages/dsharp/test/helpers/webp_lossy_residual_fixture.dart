@@ -21,12 +21,14 @@ Uint8List chromaDcResidualVp8Webp({
   required int width,
   required int height,
   int qIndex = 0,
+  int coefficient = 1,
 }) {
   final vp8 = _residualVp8Payload(
     width: width,
     height: height,
     chromaDc: true,
     qIndex: qIndex,
+    coefficient: coefficient,
   );
   return _simpleWebp(vp8);
 }
@@ -37,6 +39,7 @@ Uint8List _residualVp8Payload({
   bool nonEmpty = false,
   bool chromaDc = false,
   int qIndex = 0,
+  int coefficient = 1,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -70,7 +73,7 @@ Uint8List _residualVp8Payload({
       coeffs.prob(253, false);
     }
     if (chromaDc && i == 0) {
-      _writeUvDcOne(coeffs);
+      _writeUvDcToken(coeffs, coefficient);
     } else {
       coeffs.prob(202, false);
     }
@@ -90,11 +93,29 @@ Uint8List _residualVp8Payload({
       .finish();
 }
 
-void _writeUvDcOne(_BoolWriter coeffs) {
+void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
+  final magnitude = coefficient.abs();
+  if (magnitude < 1 || magnitude > 4) {
+    throw ArgumentError.value(coefficient, 'coefficient');
+  }
   coeffs
     ..prob(202, true)
-    ..prob(24, true)
-    ..prob(213, false)
-    ..bit(false)
+    ..prob(24, true);
+  if (magnitude == 1) {
+    coeffs.prob(213, false);
+  } else {
+    coeffs
+      ..prob(213, true)
+      ..prob(235, false);
+    if (magnitude == 2) {
+      coeffs.prob(186, false);
+    } else {
+      coeffs
+        ..prob(186, true)
+        ..prob(191, magnitude == 4);
+    }
+  }
+  coeffs
+    ..bit(coefficient.isNegative)
     ..prob(166, false);
 }

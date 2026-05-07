@@ -166,4 +166,29 @@ void main() {
 
     expect(image.firstFrameBytes().take(4), <int>[128, 123, 158, 255]);
   });
+
+  test('applies supported VP8 chroma DC token magnitudes and signs', () async {
+    final cases = <(int, List<int>)>[
+      (2, <int>[128, 128, 129, 255]),
+      (3, <int>[128, 128, 131, 255]),
+      (4, <int>[128, 128, 131, 255]),
+      (-4, <int>[128, 129, 124, 255]),
+    ];
+
+    for (final (coefficient, rgba) in cases) {
+      final bytes = chromaDcResidualVp8Webp(
+        width: 2,
+        height: 2,
+        coefficient: coefficient,
+      );
+
+      final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+      expect(
+        image.firstFrameBytes().take(4),
+        rgba,
+        reason: 'coefficient $coefficient',
+      );
+    }
+  });
 }
