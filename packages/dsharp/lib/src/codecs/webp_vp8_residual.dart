@@ -10,8 +10,11 @@ const _uvTwoProb = 186;
 const _uvThreeProb = 191;
 const _uvHighLowProb = 220;
 const _uvCatOneProb = 160;
+const _uvCatThreeFourProb = 240;
+const _uvCatThreeProb = 175;
 const _catOneExtraProb = 159;
 const _catTwoExtraProbs = <int>[165, 145];
+const _catThreeExtraProbs = <int>[173, 148, 140];
 const _uvPostOneEobProb = 166;
 
 void _readResidual(
@@ -94,15 +97,20 @@ int _readUvDcMagnitude(Vp8BoolDecoder coeffs) {
 }
 
 int _readUvDcCategory(Vp8BoolDecoder coeffs) {
-  if (coeffs.readBool(_uvHighLowProb) != 0) {
+  if (coeffs.readBool(_uvHighLowProb) == 0) {
+    if (coeffs.readBool(_uvCatOneProb) == 0) {
+      return 5 + coeffs.readBool(_catOneExtraProb);
+    }
+    return 7 + _readCategoryExtra(coeffs, _catTwoExtraProbs);
+  }
+
+  if (coeffs.readBool(_uvCatThreeFourProb) != 0 ||
+      coeffs.readBool(_uvCatThreeProb) != 0) {
     throw const UnsupportedCodecException(
       'VP8 residual coefficient categories are not implemented yet.',
     );
   }
-  if (coeffs.readBool(_uvCatOneProb) == 0) {
-    return 5 + coeffs.readBool(_catOneExtraProb);
-  }
-  return 7 + _readCategoryExtra(coeffs, _catTwoExtraProbs);
+  return 11 + _readCategoryExtra(coeffs, _catThreeExtraProbs);
 }
 
 int _readCategoryExtra(Vp8BoolDecoder coeffs, List<int> probabilities) {
