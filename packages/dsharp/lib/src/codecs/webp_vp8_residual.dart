@@ -1,25 +1,32 @@
 part of 'webp_vp8.dart';
 
 const _y2EobProb = 198;
-const _yAcEobProb = 253;
-const _yAcZeroProb = 136;
-const _yAcOneProb = 254;
-const _yAcSmallProb = 255;
-const _yAcTwoProb = 228;
-const _yAcThreeProb = 219;
 const _yAcPostOneEobProb = 181;
 const _yAcPostLargeEobProb = 78;
-const _uvEobNode = 0;
-const _uvZeroNode = 1;
-const _uvOneNode = 2;
-const _uvSmallNode = 3;
-const _uvTwoNode = 4;
-const _uvThreeNode = 5;
-const _uvHighLowNode = 6;
-const _uvCatOneNode = 7;
-const _uvCatThreeFourNode = 8;
-const _uvCatThreeNode = 9;
-const _uvCatFiveNode = 10;
+const _dctEobNode = 0;
+const _dctZeroNode = 1;
+const _dctOneNode = 2;
+const _dctSmallNode = 3;
+const _dctTwoNode = 4;
+const _dctThreeNode = 5;
+const _dctHighLowNode = 6;
+const _dctCatOneNode = 7;
+const _dctCatThreeFourNode = 8;
+const _dctCatThreeNode = 9;
+const _dctCatFiveNode = 10;
+const _defaultYAcProbs = <int>[
+  253,
+  136,
+  254,
+  255,
+  228,
+  219,
+  128,
+  128,
+  128,
+  128,
+  128,
+];
 const _defaultUvDcProbs = <int>[
   202,
   24,
@@ -100,15 +107,15 @@ void _readLumaAcBlock(
   int block,
   _Vp8FrameHeader frame,
 ) {
-  if (coeffs.readBool(_yAcEobProb) == 0) {
+  if (coeffs.readBool(_defaultYAcProbability(_dctEobNode)) == 0) {
     return;
   }
-  if (coeffs.readBool(_yAcZeroProb) == 0) {
+  if (coeffs.readBool(_defaultYAcProbability(_dctZeroNode)) == 0) {
     throw const UnsupportedCodecException(
       'VP8 luma AC residual coefficients are not implemented yet.',
     );
   }
-  final magnitude = _readYAcMagnitude(coeffs);
+  final magnitude = _readDctMagnitude(coeffs, _defaultYAcProbability);
   final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
   final nextEobProb = magnitude == 1
       ? _yAcPostOneEobProb
@@ -127,21 +134,6 @@ void _readLumaAcBlock(
   );
 }
 
-int _readYAcMagnitude(Vp8BoolDecoder coeffs) {
-  if (coeffs.readBool(_yAcOneProb) == 0) {
-    return 1;
-  }
-  if (coeffs.readBool(_yAcSmallProb) != 0) {
-    throw const UnsupportedCodecException(
-      'VP8 luma AC residual categories are not implemented yet.',
-    );
-  }
-  if (coeffs.readBool(_yAcTwoProb) == 0) {
-    return 2;
-  }
-  return coeffs.readBool(_yAcThreeProb) == 0 ? 3 : 4;
-}
-
 void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
   if (coeffs.readBool(eobProbability) != 0) {
     throw const UnsupportedCodecException(
@@ -154,15 +146,15 @@ int _readUvDcCoefficient(
   Vp8BoolDecoder coeffs,
   _Vp8ChromaDcProbs probabilities,
 ) {
-  if (coeffs.readBool(probabilities[_uvEobNode]) == 0) {
+  if (coeffs.readBool(probabilities[_dctEobNode]) == 0) {
     return 0;
   }
-  if (coeffs.readBool(probabilities[_uvZeroNode]) == 0) {
+  if (coeffs.readBool(probabilities[_dctZeroNode]) == 0) {
     throw const UnsupportedCodecException(
       'VP8 residual coefficient values are not implemented yet.',
     );
   }
-  final magnitude = _readUvDcMagnitude(coeffs, probabilities);
+  final magnitude = _readDctMagnitude(coeffs, probabilities.probabilityAt);
   final sign = coeffs.readBit() == 1;
   if (coeffs.readBool(_uvPostOneEobProb) != 0) {
     throw const UnsupportedCodecException(
@@ -172,38 +164,46 @@ int _readUvDcCoefficient(
   return sign ? -magnitude : magnitude;
 }
 
-int _readUvDcMagnitude(Vp8BoolDecoder coeffs, _Vp8ChromaDcProbs probabilities) {
-  if (coeffs.readBool(probabilities[_uvOneNode]) == 0) {
+int _readDctMagnitude(
+  Vp8BoolDecoder coeffs,
+  int Function(int node) probabilityAt,
+) {
+  if (coeffs.readBool(probabilityAt(_dctOneNode)) == 0) {
     return 1;
   }
-  if (coeffs.readBool(probabilities[_uvSmallNode]) != 0) {
-    return _readUvDcCategory(coeffs, probabilities);
+  if (coeffs.readBool(probabilityAt(_dctSmallNode)) != 0) {
+    return _readDctCategory(coeffs, probabilityAt);
   }
-  if (coeffs.readBool(probabilities[_uvTwoNode]) == 0) {
+  if (coeffs.readBool(probabilityAt(_dctTwoNode)) == 0) {
     return 2;
   }
-  return coeffs.readBool(probabilities[_uvThreeNode]) == 0 ? 3 : 4;
+  return coeffs.readBool(probabilityAt(_dctThreeNode)) == 0 ? 3 : 4;
 }
 
-int _readUvDcCategory(Vp8BoolDecoder coeffs, _Vp8ChromaDcProbs probabilities) {
-  if (coeffs.readBool(probabilities[_uvHighLowNode]) == 0) {
-    if (coeffs.readBool(probabilities[_uvCatOneNode]) == 0) {
+int _readDctCategory(
+  Vp8BoolDecoder coeffs,
+  int Function(int node) probabilityAt,
+) {
+  if (coeffs.readBool(probabilityAt(_dctHighLowNode)) == 0) {
+    if (coeffs.readBool(probabilityAt(_dctCatOneNode)) == 0) {
       return 5 + coeffs.readBool(_catOneExtraProb);
     }
     return 7 + _readCategoryExtra(coeffs, _catTwoExtraProbs);
   }
 
-  if (coeffs.readBool(probabilities[_uvCatThreeFourNode]) != 0) {
-    if (coeffs.readBool(probabilities[_uvCatFiveNode]) == 0) {
+  if (coeffs.readBool(probabilityAt(_dctCatThreeFourNode)) != 0) {
+    if (coeffs.readBool(probabilityAt(_dctCatFiveNode)) == 0) {
       return 35 + _readCategoryExtra(coeffs, _catFiveExtraProbs);
     }
     return 67 + _readCategoryExtra(coeffs, _catSixExtraProbs);
   }
-  if (coeffs.readBool(probabilities[_uvCatThreeNode]) == 0) {
+  if (coeffs.readBool(probabilityAt(_dctCatThreeNode)) == 0) {
     return 11 + _readCategoryExtra(coeffs, _catThreeExtraProbs);
   }
   return 19 + _readCategoryExtra(coeffs, _catFourExtraProbs);
 }
+
+int _defaultYAcProbability(int node) => _defaultYAcProbs[node];
 
 final class _Vp8ChromaDcProbs {
   _Vp8ChromaDcProbs.defaults()
@@ -212,6 +212,8 @@ final class _Vp8ChromaDcProbs {
   final List<int> _probabilities;
 
   int operator [](int index) => _probabilities[index];
+
+  int probabilityAt(int index) => _probabilities[index];
 
   void operator []=(int index, int value) {
     _probabilities[index] = value;
