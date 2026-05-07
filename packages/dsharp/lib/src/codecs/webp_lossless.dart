@@ -6,6 +6,7 @@ import 'binary_io.dart';
 
 part 'webp_lossless_bits.dart';
 part 'webp_lossless_color_cache.dart';
+part 'webp_lossless_color_indexing.dart';
 part 'webp_lossless_distance.dart';
 part 'webp_lossless_prefix.dart';
 part 'webp_lossless_transform.dart';
@@ -24,19 +25,28 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
     throw const InvalidImageException('Unsupported VP8L version.');
   }
   final transforms = <_LosslessTransform>[];
+  var dataWidth = width;
   while (reader.readBits(1) == 1) {
-    final transform = _LosslessTransform.read(reader, width, height);
+    final transform = _LosslessTransform.read(reader, dataWidth, height);
     if (transforms.any((item) => item.type == transform.type)) {
       throw const InvalidImageException('Duplicate VP8L transform.');
     }
     transforms.add(transform);
+    dataWidth = transform.encodedWidth(dataWidth);
   }
-  final out = _decodeImageData(reader, width, height, readMetaPrefix: true);
+  var image = _LosslessImage(
+    _decodeImageData(reader, dataWidth, height, readMetaPrefix: true),
+    dataWidth,
+    height,
+  );
   for (final transform in transforms.reversed) {
-    transform.apply(out, width, height);
+    image = transform.apply(image);
+  }
+  if (image.width != width || image.height != height) {
+    throw const InvalidImageException('Invalid VP8L transform dimensions.');
   }
   return RawPixels(
-    bytes: out,
+    bytes: image.bytes,
     width: width,
     height: height,
     channels: ChannelCount.four,

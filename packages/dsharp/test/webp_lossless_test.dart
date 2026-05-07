@@ -28,12 +28,12 @@ void main() {
     ]);
   });
 
-  test('unsupported VP8L transforms fail clearly', () async {
-    final bytes = packedColorIndexingVp8lWebp();
+  test('duplicate VP8L transforms fail clearly', () async {
+    final bytes = duplicateTransformVp8lWebp();
 
     await expectLater(
       ImagePipeline.fromBytes(bytes).toPixelImage(),
-      throwsA(isA<UnsupportedCodecException>()),
+      throwsA(isA<InvalidImageException>()),
     );
   });
 
@@ -163,5 +163,30 @@ void main() {
     final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
 
     expect(image.firstFrameBytes(), <int>[80, 90, 100, 255, 80, 90, 100, 255]);
+  });
+
+  test('decodes a packed VP8L color-indexing transform', () async {
+    final bytes = packedColorIndexingVp8lWebp();
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      20,
+      40,
+      60,
+      255,
+      200,
+      80,
+      10,
+      255,
+      20,
+      40,
+      60,
+      255,
+      200,
+      80,
+      10,
+      255,
+    ]);
   });
 }

@@ -140,16 +140,53 @@ Uint8List colorIndexingVp8lWebp({
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
-/// Builds a VP8L WebP that uses the unsupported packed color-indexing form.
+/// Builds a VP8L WebP using a 1-bit packed color-indexing transform.
 Uint8List packedColorIndexingVp8lWebp() {
+  const first = (red: 20, green: 40, blue: 60, alpha: 255);
+  const second = (red: 200, green: 80, blue: 10, alpha: 255);
+  final bits = _BitWriter()
+    ..write(3, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(3, 2)
+    ..write(1, 8);
+  _writeTwoPixelImageData(
+    bits,
+    firstRed: first.red,
+    firstGreen: first.green,
+    firstBlue: first.blue,
+    firstAlpha: first.alpha,
+    secondRed: (second.red - first.red) & 0xff,
+    secondGreen: (second.green - first.green) & 0xff,
+    secondBlue: (second.blue - first.blue) & 0xff,
+    secondAlpha: (second.alpha - first.alpha) & 0xff,
+    writeMetaPrefix: false,
+  );
+  bits.write(0, 1);
+  _writeSolidImageData(
+    bits,
+    red: 0,
+    green: 0x0a,
+    blue: 0,
+    alpha: 255,
+    writeMetaPrefix: true,
+  );
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
+/// Builds a VP8L WebP with duplicate transform markers.
+Uint8List duplicateTransformVp8lWebp() {
   final bits = _BitWriter()
     ..write(0, 14)
     ..write(0, 14)
     ..write(0, 1)
     ..write(0, 3)
     ..write(1, 1)
-    ..write(3, 2)
-    ..write(0, 8);
+    ..write(2, 2)
+    ..write(1, 1)
+    ..write(2, 2);
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
@@ -170,6 +207,38 @@ void _writeSolidImageData(
   _writeSingleSymbolCode(bits, blue);
   _writeSingleSymbolCode(bits, alpha);
   _writeSingleSymbolCode(bits, 0);
+}
+
+void _writeTwoPixelImageData(
+  _BitWriter bits, {
+  required int firstRed,
+  required int firstGreen,
+  required int firstBlue,
+  required int firstAlpha,
+  required int secondRed,
+  required int secondGreen,
+  required int secondBlue,
+  required int secondAlpha,
+  required bool writeMetaPrefix,
+}) {
+  bits.write(0, 1);
+  if (writeMetaPrefix) {
+    bits.write(0, 1);
+  }
+  _writeTwoSymbolCode(bits, firstGreen, secondGreen);
+  _writeTwoSymbolCode(bits, firstRed, secondRed);
+  _writeTwoSymbolCode(bits, firstBlue, secondBlue);
+  _writeTwoSymbolCode(bits, firstAlpha, secondAlpha);
+  _writeSingleSymbolCode(bits, 0);
+  bits
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(1, 1)
+    ..write(1, 1)
+    ..write(1, 1)
+    ..write(1, 1);
 }
 
 int _colorTransformDelta(int transform, int channel) {
