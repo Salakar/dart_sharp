@@ -95,4 +95,21 @@ void main() {
 
     expect(image.firstFrameBytes(), <int>[91, 20, 33, 244, 91, 20, 33, 244]);
   });
+
+  test('decodes the VP8L subtract-green transform', () async {
+    final bytes = subtractGreenVp8lWebp(
+      width: 2,
+      height: 1,
+      red: 250,
+      green: 20,
+      blue: 10,
+      alpha: 255,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      for (var i = 0; i < 2; i += 1) ...<int>[250, 20, 10, 255],
+    ]);
+  });
 }

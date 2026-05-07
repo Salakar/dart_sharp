@@ -8,6 +8,7 @@ part 'webp_lossless_bits.dart';
 part 'webp_lossless_color_cache.dart';
 part 'webp_lossless_distance.dart';
 part 'webp_lossless_prefix.dart';
+part 'webp_lossless_transform.dart';
 
 /// Decodes the supported VP8L subset of WebP lossless images.
 RawPixels decodeWebpLossless(Uint8List bytes) {
@@ -22,10 +23,13 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
   if (reader.readBits(3) != 0) {
     throw const InvalidImageException('Unsupported VP8L version.');
   }
-  if (reader.readBits(1) == 1) {
-    throw const UnsupportedCodecException(
-      'VP8L transforms are not implemented yet.',
-    );
+  final transforms = <_LosslessTransform>[];
+  while (reader.readBits(1) == 1) {
+    final transform = _LosslessTransform.read(reader);
+    if (transforms.any((item) => item.type == transform.type)) {
+      throw const InvalidImageException('Duplicate VP8L transform.');
+    }
+    transforms.add(transform);
   }
   final colorCache = _ColorCache.read(reader);
   if (reader.readBits(1) == 1) {
@@ -79,6 +83,9 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
     _writeArgbToRgba(out, pixel, argb);
     colorCache.insert(argb);
     pixel += 1;
+  }
+  for (final transform in transforms.reversed) {
+    transform.apply(out, width, height);
   }
   return RawPixels(
     bytes: out,
