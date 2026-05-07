@@ -59,6 +59,7 @@ Uint8List _residualVp8Payload({
   bool unsupportedChromaRun = false,
   int qIndex = 0,
   int coefficient = 1,
+  int lumaCoefficientIndex = 1,
   int? uvDcCatFiveProbability,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -97,7 +98,7 @@ Uint8List _residualVp8Payload({
     coeffs.prob(198, nonEmpty && i == 0);
     for (var block = 0; block < 16; block += 1) {
       if (lumaAc && i == 0 && block == 0) {
-        _writeYAcToken(coeffs, coefficient);
+        _writeYAcToken(coeffs, coefficient, lumaCoefficientIndex);
       } else {
         coeffs.prob(253, false);
       }

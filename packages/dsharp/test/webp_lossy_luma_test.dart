@@ -75,6 +75,26 @@ void main() {
       );
     }
   });
+
+  test('applies VP8 luma AC zero runs before coefficients', () async {
+    final bytes = lumaAcResidualVp8Webp(
+      width: 4,
+      height: 4,
+      coefficientIndex: 2,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(
+      [for (var i = 0; i < 4; i++) rgba[i * 4]],
+      <int>[129, 129, 129, 129],
+    );
+    expect(
+      [for (var row = 0; row < 4; row++) rgba[row * 16]],
+      <int>[129, 128, 128, 127],
+    );
+  });
 }
 
 List<int> _expectedFirstAcRow(int coefficient) {

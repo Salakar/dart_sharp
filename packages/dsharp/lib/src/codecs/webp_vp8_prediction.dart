@@ -49,12 +49,10 @@ final class _Vp8Planes {
     }
   }
 
-  void addLumaDct(int mbX, int mbY, int block, int coefficient, int quant) {
+  void addLumaDct(int mbX, int mbY, int block, List<int> coefficients) {
     final bx = mbX * 16 + (block & 3) * 4;
     final by = mbY * 16 + (block >> 2) * 4;
-    final coeffs = List<int>.filled(16, 0);
-    coeffs[1] = coefficient * quant;
-    _addDctBlock(y, yWidth, bx, by, coeffs);
+    _addDctBlock(y, yWidth, bx, by, coefficients);
   }
 
   Uint8List composeRgba() {

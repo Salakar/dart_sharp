@@ -1,8 +1,6 @@
 part of 'webp_vp8.dart';
 
 const _y2EobProb = 198;
-const _yAcPostOneEobProb = 181;
-const _yAcPostLargeEobProb = 78;
 const _dctEobNode = 0;
 const _dctZeroNode = 1;
 const _dctOneNode = 2;
@@ -14,18 +12,49 @@ const _dctCatOneNode = 7;
 const _dctCatThreeFourNode = 8;
 const _dctCatThreeNode = 9;
 const _dctCatFiveNode = 10;
-const _defaultYAcProbs = <int>[
-  253,
-  136,
-  254,
-  255,
-  228,
-  219,
-  128,
-  128,
-  128,
-  128,
-  128,
+const _coefficientBands = <int>[0, 1, 2, 3, 6, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7];
+const _zigZag = <int>[0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15];
+const _defaultYAcProbs = <List<List<int>>>[
+  [
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+    [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+  [
+    [253, 136, 254, 255, 228, 219, 128, 128, 128, 128, 128],
+    [189, 129, 242, 255, 227, 213, 255, 219, 128, 128, 128],
+    [106, 126, 227, 252, 214, 209, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 98, 248, 255, 236, 226, 255, 255, 128, 128, 128],
+    [181, 133, 238, 254, 221, 234, 255, 154, 128, 128, 128],
+    [78, 134, 202, 247, 198, 180, 255, 219, 128, 128, 128],
+  ],
+  [
+    [1, 185, 249, 255, 243, 255, 128, 128, 128, 128, 128],
+    [184, 150, 247, 255, 236, 224, 128, 128, 128, 128, 128],
+    [77, 110, 216, 255, 236, 230, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 101, 251, 255, 241, 255, 128, 128, 128, 128, 128],
+    [170, 139, 241, 252, 236, 209, 255, 255, 128, 128, 128],
+    [37, 116, 196, 243, 228, 255, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 204, 254, 255, 245, 255, 128, 128, 128, 128, 128],
+    [207, 160, 250, 255, 238, 128, 128, 128, 128, 128, 128],
+    [102, 103, 231, 255, 211, 171, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 152, 252, 255, 240, 255, 128, 128, 128, 128, 128],
+    [177, 135, 243, 255, 234, 225, 128, 128, 128, 128, 128],
+    [80, 129, 211, 255, 194, 224, 128, 128, 128, 128, 128],
+  ],
+  [
+    [1, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [246, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [255, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
 ];
 const _defaultUvDcProbs = <int>[
   202,
@@ -107,31 +136,28 @@ void _readLumaAcBlock(
   int block,
   _Vp8FrameHeader frame,
 ) {
-  if (coeffs.readBool(_defaultYAcProbability(_dctEobNode)) == 0) {
-    return;
+  final quant = _yAcQuant(frame.yAcQuantIndex);
+  List<int>? coefficients;
+  var context = 0;
+  for (var coefficientIndex = 1; coefficientIndex < 16; coefficientIndex += 1) {
+    int probabilityAt(int node) =>
+        _defaultYAcProbability(coefficientIndex, context, node);
+    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+      break;
+    }
+    if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
+      context = 0;
+      continue;
+    }
+    final magnitude = _readDctMagnitude(coeffs, probabilityAt);
+    final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
+    coefficients ??= List<int>.filled(16, 0);
+    coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
+    context = magnitude == 1 ? 1 : 2;
   }
-  if (coeffs.readBool(_defaultYAcProbability(_dctZeroNode)) == 0) {
-    throw const UnsupportedCodecException(
-      'VP8 luma AC residual coefficients are not implemented yet.',
-    );
+  if (coefficients != null) {
+    planes.addLumaDct(mbX, mbY, block, coefficients);
   }
-  final magnitude = _readDctMagnitude(coeffs, _defaultYAcProbability);
-  final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
-  final nextEobProb = magnitude == 1
-      ? _yAcPostOneEobProb
-      : _yAcPostLargeEobProb;
-  if (coeffs.readBool(nextEobProb) != 0) {
-    throw const UnsupportedCodecException(
-      'VP8 residual coefficient runs are not implemented yet.',
-    );
-  }
-  planes.addLumaDct(
-    mbX,
-    mbY,
-    block,
-    coefficient,
-    _yAcQuant(frame.yAcQuantIndex),
-  );
 }
 
 void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
@@ -203,7 +229,9 @@ int _readDctCategory(
   return 19 + _readCategoryExtra(coeffs, _catFourExtraProbs);
 }
 
-int _defaultYAcProbability(int node) => _defaultYAcProbs[node];
+int _defaultYAcProbability(int coefficientIndex, int context, int node) {
+  return _defaultYAcProbs[_coefficientBands[coefficientIndex]][context][node];
+}
 
 final class _Vp8ChromaDcProbs {
   _Vp8ChromaDcProbs.defaults()
