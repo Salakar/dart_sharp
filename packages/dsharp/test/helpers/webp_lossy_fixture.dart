@@ -53,7 +53,7 @@ Uint8List _solidVp8Payload({
   }
   first.bit(false);
   for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
-    first.bit(false);
+    first.prob(_fixtureCoefficientUpdateProbabilityByIndex(i), false);
   }
   first
     ..bit(true)

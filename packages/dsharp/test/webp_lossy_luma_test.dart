@@ -97,6 +97,22 @@ void main() {
   });
 
   test('applies VP8 luma AC coefficient probability updates', () async {
+    final firstBandBytes = lumaAcResidualVp8Webp(
+      width: 4,
+      height: 4,
+      yAcBandOneEobProbability: 128,
+    );
+
+    final firstBandImage = await ImagePipeline.fromBytes(
+      firstBandBytes,
+    ).toPixelImage();
+    final firstBandRgba = firstBandImage.firstFrameBytes();
+
+    expect(
+      [for (var i = 0; i < 4; i++) firstBandRgba[i * 4]],
+      <int>[129, 128, 128, 127],
+    );
+
     final bytes = lumaAcResidualVp8Webp(
       width: 4,
       height: 4,

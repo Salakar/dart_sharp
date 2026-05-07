@@ -7,6 +7,7 @@ Uint8List lumaAcResidualVp8Webp({
   int coefficientIndex = 1,
   int? secondCoefficient,
   int? secondCoefficientIndex,
+  int? yAcBandOneEobProbability,
   int? yAcBandTwoEobProbability,
 }) => _simpleWebp(
   _residualVp8Payload(
@@ -17,6 +18,7 @@ Uint8List lumaAcResidualVp8Webp({
     lumaCoefficientIndex: coefficientIndex,
     secondLumaCoefficient: secondCoefficient,
     secondLumaCoefficientIndex: secondCoefficientIndex,
+    yAcBandOneEobProbability: yAcBandOneEobProbability,
     yAcBandTwoEobProbability: yAcBandTwoEobProbability,
   ),
 );
@@ -88,6 +90,7 @@ void _writeYAcToken(
   int coefficientIndex, {
   int? secondCoefficient,
   int? secondCoefficientIndex,
+  int? yAcBandOneEobProbability,
   int? yAcBandTwoEobProbability,
 }) {
   final magnitude = coefficient.abs();
@@ -110,8 +113,13 @@ void _writeYAcToken(
   }
   var context = 0;
   for (var index = 1; index < coefficientIndex; index += 1) {
-    int probabilityAt(int node) =>
-        _fixtureYAcProbability(index, context, node, yAcBandTwoEobProbability);
+    int probabilityAt(int node) => _fixtureYAcProbability(
+      index,
+      context,
+      node,
+      yAcBandOneEobProbability,
+      yAcBandTwoEobProbability,
+    );
     coeffs
       ..prob(probabilityAt(0), true)
       ..prob(probabilityAt(1), false);
@@ -121,6 +129,7 @@ void _writeYAcToken(
     coefficientIndex,
     context,
     node,
+    yAcBandOneEobProbability,
     yAcBandTwoEobProbability,
   );
   coeffs
@@ -137,6 +146,7 @@ void _writeYAcToken(
       secondCoefficientIndex,
       nextIndex,
       nextContext,
+      yAcBandOneEobProbability,
       yAcBandTwoEobProbability,
     );
   } else if (nextIndex < 16) {
@@ -145,6 +155,7 @@ void _writeYAcToken(
         nextIndex,
         nextContext,
         0,
+        yAcBandOneEobProbability,
         yAcBandTwoEobProbability,
       ),
       false,
@@ -158,6 +169,7 @@ void _writeYAcTokenTail(
   int coefficientIndex,
   int nextIndex,
   int context,
+  int? yAcBandOneEobProbability,
   int? yAcBandTwoEobProbability,
 ) {
   var currentContext = context;
@@ -166,6 +178,7 @@ void _writeYAcTokenTail(
       index,
       currentContext,
       node,
+      yAcBandOneEobProbability,
       yAcBandTwoEobProbability,
     );
     coeffs
@@ -178,6 +191,7 @@ void _writeYAcTokenTail(
     coefficientIndex,
     currentContext,
     node,
+    yAcBandOneEobProbability,
     yAcBandTwoEobProbability,
   );
   coeffs
@@ -192,6 +206,7 @@ void _writeYAcTokenTail(
         finalIndex,
         magnitude == 1 ? 1 : 2,
         0,
+        yAcBandOneEobProbability,
         yAcBandTwoEobProbability,
       ),
       false,
@@ -295,9 +310,16 @@ int _fixtureYAcProbability(
   int coefficientIndex,
   int context,
   int node,
+  int? yAcBandOneEobProbability,
   int? yAcBandTwoEobProbability,
 ) {
   final band = _fixtureCoefficientBands[coefficientIndex];
+  if (band == 1 &&
+      context == 0 &&
+      node == 0 &&
+      yAcBandOneEobProbability != null) {
+    return yAcBandOneEobProbability;
+  }
   if (band == 2 &&
       context == 0 &&
       node == 0 &&
