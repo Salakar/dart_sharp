@@ -1,5 +1,7 @@
 part of 'webp_lossy_fixture.dart';
 
+const _uvDcCatFiveProbabilityUpdate = 2 * 8 * 3 * 11 + 10;
+
 /// Builds a lossy VP8 WebP whose residual partition contains EOB blocks.
 Uint8List eobResidualVp8Webp({
   required int width,
@@ -35,6 +37,7 @@ Uint8List chromaDcResidualVp8Webp({
   required int height,
   int qIndex = 0,
   int coefficient = 1,
+  int? uvDcCatFiveProbability,
 }) {
   final vp8 = _residualVp8Payload(
     width: width,
@@ -42,6 +45,7 @@ Uint8List chromaDcResidualVp8Webp({
     chromaDc: true,
     qIndex: qIndex,
     coefficient: coefficient,
+    uvDcCatFiveProbability: uvDcCatFiveProbability,
   );
   return _simpleWebp(vp8);
 }
@@ -54,6 +58,7 @@ Uint8List _residualVp8Payload({
   bool unsupportedChromaRun = false,
   int qIndex = 0,
   int coefficient = 1,
+  int? uvDcCatFiveProbability,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -72,7 +77,13 @@ Uint8List _residualVp8Payload({
   }
   first.bit(false);
   for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
-    first.bit(false);
+    if (i == _uvDcCatFiveProbabilityUpdate && uvDcCatFiveProbability != null) {
+      first
+        ..bit(true)
+        ..literal(uvDcCatFiveProbability, 8);
+    } else {
+      first.bit(false);
+    }
   }
   first.bit(false);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
@@ -89,7 +100,11 @@ Uint8List _residualVp8Payload({
     if (unsupportedChromaRun && i == 0) {
       _writeUnsupportedUvDcRunToken(coeffs);
     } else if (chromaDc && i == 0) {
-      _writeUvDcToken(coeffs, coefficient);
+      _writeUvDcToken(
+        coeffs,
+        coefficient,
+        catFiveProbability: uvDcCatFiveProbability ?? 255,
+      );
     } else {
       coeffs.prob(202, false);
     }
@@ -117,6 +132,7 @@ void _writeUvDcToken(
   _BoolWriter coeffs,
   int coefficient, {
   bool hasMore = false,
+  int catFiveProbability = 255,
 }) {
   final magnitude = coefficient.abs();
   if (magnitude < 1 || magnitude > 2048) {
@@ -184,7 +200,7 @@ void _writeUvDcToken(
       ..prob(235, true)
       ..prob(220, true)
       ..prob(240, true)
-      ..prob(255, false)
+      ..prob(catFiveProbability, false)
       ..prob(180, (offset & 16) != 0)
       ..prob(157, (offset & 8) != 0)
       ..prob(141, (offset & 4) != 0)
@@ -197,7 +213,7 @@ void _writeUvDcToken(
       ..prob(235, true)
       ..prob(220, true)
       ..prob(240, true)
-      ..prob(255, true)
+      ..prob(catFiveProbability, true)
       ..prob(254, (offset & 1024) != 0)
       ..prob(254, (offset & 512) != 0)
       ..prob(243, (offset & 256) != 0)

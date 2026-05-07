@@ -2,17 +2,30 @@ part of 'webp_vp8.dart';
 
 const _y2EobProb = 198;
 const _yAcEobProb = 253;
-const _uvEobProb = 202;
-const _uvZeroProb = 24;
-const _uvOneProb = 213;
-const _uvSmallProb = 235;
-const _uvTwoProb = 186;
-const _uvThreeProb = 191;
-const _uvHighLowProb = 220;
-const _uvCatOneProb = 160;
-const _uvCatThreeFourProb = 240;
-const _uvCatThreeProb = 175;
-const _uvCatFiveProb = 255;
+const _uvEobNode = 0;
+const _uvZeroNode = 1;
+const _uvOneNode = 2;
+const _uvSmallNode = 3;
+const _uvTwoNode = 4;
+const _uvThreeNode = 5;
+const _uvHighLowNode = 6;
+const _uvCatOneNode = 7;
+const _uvCatThreeFourNode = 8;
+const _uvCatThreeNode = 9;
+const _uvCatFiveNode = 10;
+const _defaultUvDcProbs = <int>[
+  202,
+  24,
+  213,
+  235,
+  186,
+  191,
+  220,
+  160,
+  240,
+  175,
+  255,
+];
 const _catOneExtraProb = 159;
 const _catTwoExtraProbs = <int>[165, 145];
 const _catThreeExtraProbs = <int>[173, 148, 140];
@@ -45,7 +58,7 @@ void _readResidual(
     _readEobOnlyBlock(coeffs, _yAcEobProb);
   }
   for (var block = 0; block < 4; block += 1) {
-    final coefficient = _readUvDcCoefficient(coeffs);
+    final coefficient = _readUvDcCoefficient(coeffs, frame.uvDcProbs);
     if (coefficient != 0) {
       planes.addChromaDc(
         mbX,
@@ -58,7 +71,7 @@ void _readResidual(
     }
   }
   for (var block = 0; block < 4; block += 1) {
-    final coefficient = _readUvDcCoefficient(coeffs);
+    final coefficient = _readUvDcCoefficient(coeffs, frame.uvDcProbs);
     if (coefficient != 0) {
       planes.addChromaDc(
         mbX,
@@ -80,16 +93,19 @@ void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
   }
 }
 
-int _readUvDcCoefficient(Vp8BoolDecoder coeffs) {
-  if (coeffs.readBool(_uvEobProb) == 0) {
+int _readUvDcCoefficient(
+  Vp8BoolDecoder coeffs,
+  _Vp8ChromaDcProbs probabilities,
+) {
+  if (coeffs.readBool(probabilities[_uvEobNode]) == 0) {
     return 0;
   }
-  if (coeffs.readBool(_uvZeroProb) == 0) {
+  if (coeffs.readBool(probabilities[_uvZeroNode]) == 0) {
     throw const UnsupportedCodecException(
       'VP8 residual coefficient values are not implemented yet.',
     );
   }
-  final magnitude = _readUvDcMagnitude(coeffs);
+  final magnitude = _readUvDcMagnitude(coeffs, probabilities);
   final sign = coeffs.readBit() == 1;
   if (coeffs.readBool(_uvPostOneEobProb) != 0) {
     throw const UnsupportedCodecException(
@@ -99,37 +115,50 @@ int _readUvDcCoefficient(Vp8BoolDecoder coeffs) {
   return sign ? -magnitude : magnitude;
 }
 
-int _readUvDcMagnitude(Vp8BoolDecoder coeffs) {
-  if (coeffs.readBool(_uvOneProb) == 0) {
+int _readUvDcMagnitude(Vp8BoolDecoder coeffs, _Vp8ChromaDcProbs probabilities) {
+  if (coeffs.readBool(probabilities[_uvOneNode]) == 0) {
     return 1;
   }
-  if (coeffs.readBool(_uvSmallProb) != 0) {
-    return _readUvDcCategory(coeffs);
+  if (coeffs.readBool(probabilities[_uvSmallNode]) != 0) {
+    return _readUvDcCategory(coeffs, probabilities);
   }
-  if (coeffs.readBool(_uvTwoProb) == 0) {
+  if (coeffs.readBool(probabilities[_uvTwoNode]) == 0) {
     return 2;
   }
-  return coeffs.readBool(_uvThreeProb) == 0 ? 3 : 4;
+  return coeffs.readBool(probabilities[_uvThreeNode]) == 0 ? 3 : 4;
 }
 
-int _readUvDcCategory(Vp8BoolDecoder coeffs) {
-  if (coeffs.readBool(_uvHighLowProb) == 0) {
-    if (coeffs.readBool(_uvCatOneProb) == 0) {
+int _readUvDcCategory(Vp8BoolDecoder coeffs, _Vp8ChromaDcProbs probabilities) {
+  if (coeffs.readBool(probabilities[_uvHighLowNode]) == 0) {
+    if (coeffs.readBool(probabilities[_uvCatOneNode]) == 0) {
       return 5 + coeffs.readBool(_catOneExtraProb);
     }
     return 7 + _readCategoryExtra(coeffs, _catTwoExtraProbs);
   }
 
-  if (coeffs.readBool(_uvCatThreeFourProb) != 0) {
-    if (coeffs.readBool(_uvCatFiveProb) == 0) {
+  if (coeffs.readBool(probabilities[_uvCatThreeFourNode]) != 0) {
+    if (coeffs.readBool(probabilities[_uvCatFiveNode]) == 0) {
       return 35 + _readCategoryExtra(coeffs, _catFiveExtraProbs);
     }
     return 67 + _readCategoryExtra(coeffs, _catSixExtraProbs);
   }
-  if (coeffs.readBool(_uvCatThreeProb) == 0) {
+  if (coeffs.readBool(probabilities[_uvCatThreeNode]) == 0) {
     return 11 + _readCategoryExtra(coeffs, _catThreeExtraProbs);
   }
   return 19 + _readCategoryExtra(coeffs, _catFourExtraProbs);
+}
+
+final class _Vp8ChromaDcProbs {
+  _Vp8ChromaDcProbs.defaults()
+    : _probabilities = List<int>.of(_defaultUvDcProbs, growable: false);
+
+  final List<int> _probabilities;
+
+  int operator [](int index) => _probabilities[index];
+
+  void operator []=(int index, int value) {
+    _probabilities[index] = value;
+  }
 }
 
 int _readCategoryExtra(Vp8BoolDecoder coeffs, List<int> probabilities) {

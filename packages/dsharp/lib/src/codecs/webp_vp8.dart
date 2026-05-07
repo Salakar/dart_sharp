@@ -117,12 +117,25 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   final uvDcDelta = _readOptionalSigned(bits, 4);
   _readOptionalSigned(bits, 4);
   bits.readBit();
-  for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
-    if (bits.readBit() == 1) {
-      bits.readLiteral(8);
+  final uvDcProbs = _Vp8ChromaDcProbs.defaults();
+  for (var plane = 0; plane < 4; plane += 1) {
+    for (var band = 0; band < 8; band += 1) {
+      for (var context = 0; context < 3; context += 1) {
+        for (var node = 0; node < 11; node += 1) {
+          if (bits.readBit() == 1) {
+            final probability = bits.readLiteral(8);
+            if (plane == 2 && band == 0 && context == 0) {
+              uvDcProbs[node] = probability;
+            }
+          }
+        }
+      }
     }
   }
-  return _Vp8FrameHeader(uvDcQuantIndex: qIndex + uvDcDelta);
+  return _Vp8FrameHeader(
+    uvDcQuantIndex: qIndex + uvDcDelta,
+    uvDcProbs: uvDcProbs,
+  );
 }
 
 int _readOptionalSigned(Vp8BoolDecoder bits, int magnitudeBits) {
@@ -169,7 +182,11 @@ final class _Vp8Header {
 }
 
 final class _Vp8FrameHeader {
-  const _Vp8FrameHeader({required this.uvDcQuantIndex});
+  const _Vp8FrameHeader({
+    required this.uvDcQuantIndex,
+    required this.uvDcProbs,
+  });
 
   final int uvDcQuantIndex;
+  final _Vp8ChromaDcProbs uvDcProbs;
 }
