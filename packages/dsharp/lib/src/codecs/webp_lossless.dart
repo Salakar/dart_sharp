@@ -4,6 +4,11 @@ import '../api/exceptions.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 
+part 'webp_lossless_bits.dart';
+part 'webp_lossless_color_cache.dart';
+part 'webp_lossless_distance.dart';
+part 'webp_lossless_prefix.dart';
+
 /// Decodes the supported VP8L subset of WebP lossless images.
 RawPixels decodeWebpLossless(Uint8List bytes) {
   final chunk = _findVp8lChunk(bytes);
@@ -22,34 +27,58 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
       'VP8L transforms are not implemented yet.',
     );
   }
-  if (reader.readBits(1) == 1) {
-    throw const UnsupportedCodecException(
-      'VP8L color cache is not implemented yet.',
-    );
-  }
+  final colorCache = _ColorCache.read(reader);
   if (reader.readBits(1) == 1) {
     throw const UnsupportedCodecException(
       'VP8L meta prefix codes are not implemented yet.',
     );
   }
-  final green = _PrefixCode.read(reader, 280);
+  final green = _PrefixCode.read(reader, 280 + colorCache.size);
   final red = _PrefixCode.read(reader, 256);
   final blue = _PrefixCode.read(reader, 256);
   final alpha = _PrefixCode.read(reader, 256);
-  _PrefixCode.read(reader, 40);
+  final distance = _PrefixCode.read(reader, 40);
   final out = Uint8List(width * height * 4);
-  for (var pixel = 0; pixel < width * height; pixel += 1) {
+  var pixel = 0;
+  while (pixel < width * height) {
     final g = green.decode(reader);
-    if (g >= 256) {
-      throw const UnsupportedCodecException(
-        'VP8L LZ77 and color cache symbols are not implemented yet.',
-      );
+    if (g >= 280) {
+      final argb = colorCache[g - 280];
+      _writeArgbToRgba(out, pixel, argb);
+      colorCache.insert(argb);
+      pixel += 1;
+      continue;
     }
-    final offset = pixel * 4;
-    out[offset] = red.decode(reader);
-    out[offset + 1] = g;
-    out[offset + 2] = blue.decode(reader);
-    out[offset + 3] = alpha.decode(reader);
+    if (g >= 256) {
+      final length = _prefixValue(g - 256, reader);
+      final dist = _distanceToPixels(
+        _prefixValue(distance.decode(reader), reader),
+        width,
+      );
+      if (dist <= 0 || dist > pixel || pixel + length > width * height) {
+        throw const InvalidImageException('Invalid VP8L backward reference.');
+      }
+      for (var i = 0; i < length; i += 1) {
+        out.setRange(
+          (pixel + i) * 4,
+          (pixel + i + 1) * 4,
+          out,
+          (pixel + i - dist) * 4,
+        );
+        colorCache.insert(_argbFromRgba(out, pixel + i));
+      }
+      pixel += length;
+      continue;
+    }
+    final argb = _argb(
+      alpha.decode(reader),
+      red.decode(reader),
+      g,
+      blue.decode(reader),
+    );
+    _writeArgbToRgba(out, pixel, argb);
+    colorCache.insert(argb);
+    pixel += 1;
   }
   return RawPixels(
     bytes: out,
@@ -82,65 +111,4 @@ Uint8List _findVp8lChunk(Uint8List bytes) {
   throw const UnsupportedCodecException(
     'Only VP8L lossless WebP pixel decoding is implemented so far.',
   );
-}
-
-final class _PrefixCode {
-  const _PrefixCode._(this.symbol, [this.secondSymbol]);
-
-  final int symbol;
-  final int? secondSymbol;
-
-  static _PrefixCode read(_BitReader reader, int alphabetSize) {
-    if (reader.readBits(1) != 1) {
-      throw const UnsupportedCodecException(
-        'Normal VP8L prefix codes are not implemented yet.',
-      );
-    }
-    final numSymbols = reader.readBits(1) + 1;
-    final isFirst8Bits = reader.readBits(1);
-    final symbol = reader.readBits(1 + 7 * isFirst8Bits);
-    if (symbol >= alphabetSize) {
-      throw const InvalidImageException('Invalid VP8L prefix symbol.');
-    }
-    if (numSymbols == 2) {
-      final second = reader.readBits(8);
-      if (second >= alphabetSize) {
-        throw const InvalidImageException('Invalid VP8L prefix symbol.');
-      }
-      return _PrefixCode._(symbol, second);
-    }
-    return _PrefixCode._(symbol);
-  }
-
-  int decode(_BitReader reader) {
-    final second = secondSymbol;
-    if (second == null) {
-      return symbol;
-    }
-    return reader.readBits(1) == 0 ? symbol : second;
-  }
-}
-
-final class _BitReader {
-  _BitReader(this.bytes, {required this.byteOffset});
-
-  final Uint8List bytes;
-  int byteOffset;
-  var bitOffset = 0;
-
-  int readBits(int count) {
-    var value = 0;
-    for (var i = 0; i < count; i += 1) {
-      if (byteOffset >= bytes.length) {
-        throw const InvalidImageException('Truncated VP8L bitstream.');
-      }
-      value |= ((bytes[byteOffset] >> bitOffset) & 1) << i;
-      bitOffset += 1;
-      if (bitOffset == 8) {
-        bitOffset = 0;
-        byteOffset += 1;
-      }
-    }
-    return value;
-  }
 }

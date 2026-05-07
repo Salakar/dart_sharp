@@ -77,4 +77,22 @@ void main() {
       255,
     ]);
   });
+
+  test('decodes VP8L normal prefix codes and backward references', () async {
+    final bytes = backrefVp8lWebp(red: 9, green: 20, blue: 30, alpha: 255);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      for (var i = 0; i < 4; i += 1) ...<int>[9, 20, 30, 255],
+    ]);
+  });
+
+  test('decodes VP8L color-cache codes', () async {
+    final bytes = colorCacheVp8lWebp(red: 91, green: 20, blue: 33, alpha: 244);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[91, 20, 33, 244, 91, 20, 33, 244]);
+  });
 }
