@@ -112,6 +112,16 @@ External references:
   - Create independent generated fixtures under `test/fixtures/generated/`.
   - Decode -> encode -> decode and assert dimensions, channels, and basic pixel expectations.
   - Use tolerances for lossy JPEG tests.
+- [ ] **3.8 Replace JPEG marker-raster path with interoperable codec support**
+  - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
+  - Ref: `sharp_clone/test/unit/jpeg.js`
+  - Implement first-party baseline JPEG encode/decode or explicitly revise the support matrix and public docs to remove JPEG support.
+  - Add external JPEG fixture decode tests, generated JPEG round-trip tests, and lossy pixel tolerance tests.
+- [ ] **3.9 Replace WebP marker-raster path with interoperable decode support**
+  - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
+  - Ref: `sharp_clone/test/unit/webp.js`
+  - Implement first-party WebP decode support or explicitly revise the support matrix and public docs to remove WebP input support.
+  - Add WebP fixture decode tests for supported WebP variants and malformed WebP parser tests.
 
 ## Checklist (Every Task)
 
