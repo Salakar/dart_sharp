@@ -99,7 +99,7 @@ void main() {
   });
 
   test('decodes VP8 streams with EOB residual partitions', () async {
-    final bytes = eobResidualVp8Webp(width: 2, height: 2);
+    final bytes = eobResidualVp8Webp(width: 2, height: 2, qIndex: 1);
 
     final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
 
@@ -132,5 +132,30 @@ void main() {
       ImagePipeline.fromBytes(bytes).toPixelImage(),
       throwsA(isA<UnsupportedCodecException>()),
     );
+  });
+
+  test('applies supported VP8 chroma DC residuals', () async {
+    final bytes = chromaDcResidualVp8Webp(width: 2, height: 2);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      129,
+      255,
+      128,
+      128,
+      129,
+      255,
+      128,
+      128,
+      129,
+      255,
+      128,
+      128,
+      129,
+      255,
+    ]);
   });
 }

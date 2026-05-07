@@ -1,8 +1,12 @@
 part of 'webp_lossy_fixture.dart';
 
 /// Builds a lossy VP8 WebP whose residual partition contains EOB blocks.
-Uint8List eobResidualVp8Webp({required int width, required int height}) {
-  final vp8 = _residualVp8Payload(width: width, height: height);
+Uint8List eobResidualVp8Webp({
+  required int width,
+  required int height,
+  int qIndex = 0,
+}) {
+  final vp8 = _residualVp8Payload(width: width, height: height, qIndex: qIndex);
   return _simpleWebp(vp8);
 }
 
@@ -12,10 +16,18 @@ Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
   return _simpleWebp(vp8);
 }
 
+/// Builds a VP8 WebP with a supported chroma DC residual.
+Uint8List chromaDcResidualVp8Webp({required int width, required int height}) {
+  final vp8 = _residualVp8Payload(width: width, height: height, chromaDc: true);
+  return _simpleWebp(vp8);
+}
+
 Uint8List _residualVp8Payload({
   required int width,
   required int height,
   bool nonEmpty = false,
+  bool chromaDc = false,
+  int qIndex = 0,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -28,7 +40,7 @@ Uint8List _residualVp8Payload({
     ..literal(0, 3)
     ..bit(false)
     ..literal(0, 2)
-    ..literal(0, 7);
+    ..literal(qIndex, 7);
   for (var i = 0; i < 5; i += 1) {
     first.bit(false);
   }
@@ -48,7 +60,12 @@ Uint8List _residualVp8Payload({
     for (var block = 0; block < 16; block += 1) {
       coeffs.prob(253, false);
     }
-    for (var block = 0; block < 8; block += 1) {
+    if (chromaDc && i == 0) {
+      _writeUvDcOne(coeffs);
+    } else {
+      coeffs.prob(202, false);
+    }
+    for (var block = 1; block < 8; block += 1) {
       coeffs.prob(202, false);
     }
   }
@@ -62,4 +79,13 @@ Uint8List _residualVp8Payload({
         ..bytes(firstPartition)
         ..bytes(coeffs.finish()))
       .finish();
+}
+
+void _writeUvDcOne(_BoolWriter coeffs) {
+  coeffs
+    ..prob(202, true)
+    ..prob(24, true)
+    ..prob(213, false)
+    ..bit(false)
+    ..prob(166, false);
 }

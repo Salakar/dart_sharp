@@ -26,6 +26,29 @@ final class _Vp8Planes {
     _predictBlock(v, uvWidth, mbX * 8, mbY * 8, 8, uvMode);
   }
 
+  void addChromaDc(
+    int mbX,
+    int mbY,
+    int block,
+    bool isU,
+    int coefficient,
+    int quant,
+  ) {
+    if (coefficient == 0) {
+      return;
+    }
+    final plane = isU ? u : v;
+    final bx = mbX * 8 + (block & 1) * 4;
+    final by = mbY * 8 + (block >> 1) * 4;
+    final residue = ((coefficient * quant) + 4) >> 3;
+    for (var row = 0; row < 4; row += 1) {
+      for (var col = 0; col < 4; col += 1) {
+        final offset = (by + row) * uvWidth + bx + col;
+        plane[offset] = _clip(plane[offset] + residue);
+      }
+    }
+  }
+
   Uint8List composeRgba() {
     final rgba = Uint8List(width * height * 4);
     for (var py = 0; py < height; py += 1) {

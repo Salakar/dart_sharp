@@ -23,7 +23,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   final header = _readFrameHeader(chunk);
   final firstEnd = 10 + header.firstPartSize;
   final bits = Vp8BoolDecoder(chunk.sublist(10, firstEnd));
-  _readSupportedFrameHeader(bits);
+  final frame = _readSupportedFrameHeader(bits);
   final mbNoSkipCoeff = bits.readBit() == 1;
   final probSkipFalse = mbNoSkipCoeff ? bits.readLiteral(8) : 0;
   final coeffs = Vp8BoolDecoder(chunk.sublist(firstEnd));
@@ -40,7 +40,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
       final uvMode = bits.readTree(_kfUvModeTree, _kfUvModeProb);
       planes.predictMacroblock(mbX, mbY, yMode, uvMode);
       if (!skipCoeff) {
-        _readEmptyResidual(coeffs);
+        _readResidual(coeffs, planes, mbX, mbY, frame);
       }
     }
   }
@@ -80,7 +80,7 @@ _Vp8Header _readFrameHeader(Uint8List chunk) {
   return _Vp8Header(width: width, height: height, firstPartSize: firstPartSize);
 }
 
-void _readSupportedFrameHeader(Vp8BoolDecoder bits) {
+_Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   final colorSpace = bits.readBit();
   bits.readBit();
   if (colorSpace != 0) {
@@ -109,23 +109,36 @@ void _readSupportedFrameHeader(Vp8BoolDecoder bits) {
       'Multiple VP8 coefficient partitions are not implemented yet.',
     );
   }
-  bits.readLiteral(7);
-  for (var i = 0; i < 5; i += 1) {
-    _readOptionalSigned(bits, 4);
-  }
+  final qIndex = bits.readLiteral(7);
+  _readOptionalSigned(bits, 4);
+  _readOptionalSigned(bits, 4);
+  _readOptionalSigned(bits, 4);
+  final uvDcDelta = _readOptionalSigned(bits, 4);
+  _readOptionalSigned(bits, 4);
   bits.readBit();
   for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
     if (bits.readBit() == 1) {
       bits.readLiteral(8);
     }
   }
+  return _Vp8FrameHeader(uvDcQuantIndex: qIndex + uvDcDelta);
 }
 
-void _readOptionalSigned(Vp8BoolDecoder bits, int magnitudeBits) {
+int _readOptionalSigned(Vp8BoolDecoder bits, int magnitudeBits) {
   if (bits.readBit() == 1) {
-    bits.readLiteral(magnitudeBits);
-    bits.readBit();
+    final value = bits.readLiteral(magnitudeBits);
+    return bits.readBit() == 1 ? -value : value;
   }
+  return 0;
+}
+
+int _dcQuant(int index) {
+  if (index != 0) {
+    throw const UnsupportedCodecException(
+      'VP8 non-zero quantizer residuals are not implemented yet.',
+    );
+  }
+  return 4;
 }
 
 Uint8List _findVp8Chunk(Uint8List bytes) {
@@ -161,4 +174,10 @@ final class _Vp8Header {
   final int width;
   final int height;
   final int firstPartSize;
+}
+
+final class _Vp8FrameHeader {
+  const _Vp8FrameHeader({required this.uvDcQuantIndex});
+
+  final int uvDcQuantIndex;
 }
