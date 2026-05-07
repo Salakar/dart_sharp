@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+part 'webp_lossless_meta_fixture.dart';
 part 'webp_lossless_transform_fixture.dart';
 
 /// Builds a minimal valid VP8L WebP with one repeated RGBA colour.

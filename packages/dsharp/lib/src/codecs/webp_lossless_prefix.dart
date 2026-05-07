@@ -1,5 +1,20 @@
 part of 'webp_lossless.dart';
 
+final class _PrefixCodeGroup {
+  _PrefixCodeGroup.read(_BitReader reader, int colorCacheSize)
+    : green = _PrefixCode.read(reader, 280 + colorCacheSize),
+      red = _PrefixCode.read(reader, 256),
+      blue = _PrefixCode.read(reader, 256),
+      alpha = _PrefixCode.read(reader, 256),
+      distance = _PrefixCode.read(reader, 40);
+
+  final _PrefixCode green;
+  final _PrefixCode red;
+  final _PrefixCode blue;
+  final _PrefixCode alpha;
+  final _PrefixCode distance;
+}
+
 final class _PrefixCode {
   const _PrefixCode._(this.symbol, [this.secondSymbol]) : tree = null;
 

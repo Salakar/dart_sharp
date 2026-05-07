@@ -60,20 +60,18 @@ Uint8List _decodeImageData(
   required bool readMetaPrefix,
 }) {
   final colorCache = _ColorCache.read(reader);
-  if (readMetaPrefix && reader.readBits(1) == 1) {
-    throw const UnsupportedCodecException(
-      'VP8L meta prefix codes are not implemented yet.',
-    );
-  }
-  final green = _PrefixCode.read(reader, 280 + colorCache.size);
-  final red = _PrefixCode.read(reader, 256);
-  final blue = _PrefixCode.read(reader, 256);
-  final alpha = _PrefixCode.read(reader, 256);
-  final distance = _PrefixCode.read(reader, 40);
+  final metaPrefix = readMetaPrefix
+      ? _MetaPrefixCodes.read(reader, width, height)
+      : _MetaPrefixCodes.single();
+  final groups = <_PrefixCodeGroup>[
+    for (var i = 0; i < metaPrefix.groupCount; i += 1)
+      _PrefixCodeGroup.read(reader, colorCache.size),
+  ];
   final out = Uint8List(width * height * 4);
   var pixel = 0;
   while (pixel < width * height) {
-    final g = green.decode(reader);
+    final group = groups[metaPrefix.groupFor(pixel % width, pixel ~/ width)];
+    final g = group.green.decode(reader);
     if (g >= 280) {
       final argb = colorCache[g - 280];
       _writeArgbToRgba(out, pixel, argb);
@@ -84,7 +82,7 @@ Uint8List _decodeImageData(
     if (g >= 256) {
       final length = _prefixValue(g - 256, reader);
       final dist = _distanceToPixels(
-        _prefixValue(distance.decode(reader), reader),
+        _prefixValue(group.distance.decode(reader), reader),
         width,
       );
       if (dist <= 0 || dist > pixel || pixel + length > width * height) {
@@ -103,16 +101,66 @@ Uint8List _decodeImageData(
       continue;
     }
     final argb = _argb(
-      alpha.decode(reader),
-      red.decode(reader),
+      group.alpha.decode(reader),
+      group.red.decode(reader),
       g,
-      blue.decode(reader),
+      group.blue.decode(reader),
     );
     _writeArgbToRgba(out, pixel, argb);
     colorCache.insert(argb);
     pixel += 1;
   }
   return out;
+}
+
+final class _MetaPrefixCodes {
+  const _MetaPrefixCodes._(
+    this._prefixBits,
+    this._width,
+    this._codes,
+    this.groupCount,
+  );
+
+  factory _MetaPrefixCodes.single() {
+    return _MetaPrefixCodes._(0, 0, Uint16List(0), 1);
+  }
+
+  factory _MetaPrefixCodes.read(_BitReader reader, int width, int height) {
+    if (reader.readBits(1) == 0) {
+      return _MetaPrefixCodes.single();
+    }
+    final prefixBits = reader.readBits(3) + 2;
+    final prefixWidth = _divRoundUp(width, 1 << prefixBits);
+    final prefixHeight = _divRoundUp(height, 1 << prefixBits);
+    final image = _decodeImageData(
+      reader,
+      prefixWidth,
+      prefixHeight,
+      readMetaPrefix: false,
+    );
+    final codes = Uint16List(prefixWidth * prefixHeight);
+    var maxCode = 0;
+    for (var i = 0; i < codes.length; i += 1) {
+      final code = (_argbFromRgba(image, i) >> 8) & 0xffff;
+      codes[i] = code;
+      if (code > maxCode) {
+        maxCode = code;
+      }
+    }
+    return _MetaPrefixCodes._(prefixBits, prefixWidth, codes, maxCode + 1);
+  }
+
+  final int _prefixBits;
+  final int _width;
+  final Uint16List _codes;
+  final int groupCount;
+
+  int groupFor(int x, int y) {
+    if (_codes.isEmpty) {
+      return 0;
+    }
+    return _codes[(y >> _prefixBits) * _width + (x >> _prefixBits)];
+  }
 }
 
 Uint8List _findVp8lChunk(Uint8List bytes) {
