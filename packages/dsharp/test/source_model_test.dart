@@ -1,0 +1,78 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:dsharp/dsharp.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('byte source defensively copies Uint8List input', () {
+    final bytes = Uint8List.fromList(<int>[1, 2, 3]);
+    final source = ImageSource.bytes(bytes) as BytesImageSource;
+
+    bytes[0] = 9;
+    final copy = source.bytes;
+    copy[1] = 8;
+
+    expect(source.bytes, <int>[1, 2, 3]);
+  });
+
+  test('byte data source respects offset and length', () {
+    final all = Uint8List.fromList(<int>[0, 1, 2, 3, 4]);
+    final data = ByteData.sublistView(all, 1, 4);
+    final source = ImageSource.byteData(data) as BytesImageSource;
+
+    expect(source.bytes, <int>[1, 2, 3]);
+  });
+
+  test('stream source buffers chunks within limit', () async {
+    final source =
+        ImageSource.stream(
+              Stream<List<int>>.fromIterable(<List<int>>[
+                <int>[1, 2],
+                <int>[3],
+              ]),
+              maxBytes: 3,
+            )
+            as StreamImageSource;
+
+    expect(await source.collectBytes(), <int>[1, 2, 3]);
+  });
+
+  test('stream source enforces max byte limit', () {
+    final source =
+        ImageSource.stream(
+              Stream<List<int>>.fromIterable(<List<int>>[
+                <int>[1, 2],
+                <int>[3],
+              ]),
+              maxBytes: 2,
+            )
+            as StreamImageSource;
+
+    expect(source.collectBytes, throwsA(isA<ImageLimitException>()));
+  });
+
+  test('channel count validates integer input', () {
+    expect(ChannelCount.fromInt(3), ChannelCount.three);
+    expect(
+      () => ChannelCount.fromInt(5),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
+  test('text source stores future renderer descriptor', () {
+    final source =
+        ImageSource.text(
+              const TextImageRequest(
+                text: 'hello',
+                width: 120,
+                align: TextAlign.center,
+              ),
+            )
+            as TextImageSource;
+
+    expect(source.text.text, 'hello');
+    expect(source.text.width, 120);
+    expect(source.text.align, TextAlign.center);
+  });
+}

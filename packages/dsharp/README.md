@@ -1,0 +1,105 @@
+# dsharp
+
+`dsharp` is a pure Dart image processing package for web-safe byte, stream,
+raw-pixel, and generated-image workflows. It is inspired by `sharp`, but the
+public API is Dart-first and the core library does not import `dart:io`.
+
+Use `package:dsharp/dsharp.dart` on VM and web. Use
+`package:dsharp/dsharp_io.dart` only when native file IO is available.
+
+## Supported Today
+
+- Inputs: encoded bytes, `ByteBuffer`, `ByteData`, bounded byte streams, raw
+  pixels, decoded `PixelImage`, and generated solid images.
+- Codecs: raw, PNG, JPEG, GIF, TIFF, and WebP decode through pure Dart
+  dependencies. PNG, JPEG, GIF, TIFF, and raw output are implemented. WebP
+  output is reported as unsupported until a verified pure Dart encoder is wired.
+- Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
+  alpha/channel operations, filters, convolution, color math, boolean ops,
+  compositing, tiling, frame-aware joins, metadata reads, and stats.
+- Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
+  `toImageBytesResult`, format-specific chain methods, cancellation, timeout,
+  and VM-only `writeToFile`.
+
+Unsupported native-only or advanced formats such as AVIF, HEIF, JP2, JXL, PDF,
+OpenSlide, Magick, camera raw, FITS, Radiance HDR, and SVG rasterization fail
+with typed `UnsupportedCodecException`s.
+
+## Examples
+
+Bytes:
+
+```dart
+final png = await ImagePipeline.fromBytes(inputBytes)
+    .resize(const ResizeOptions(width: 320))
+    .png()
+    .toBytes();
+```
+
+Stream:
+
+```dart
+final source = ImageSource.stream(byteStream, maxBytes: 10 * 1024 * 1024);
+final info = await ImagePipeline.fromSource(source).metadata();
+```
+
+Raw pixels:
+
+```dart
+final raw = RawPixels(
+  bytes: pixels,
+  width: 64,
+  height: 64,
+  channels: ChannelCount.four,
+);
+final jpeg = await ImagePipeline.fromRawPixels(raw).jpeg().toBytes();
+```
+
+Composite:
+
+```dart
+final output = await ImagePipeline.fromRawPixels(base)
+    .composite([
+      CompositeLayer(image: PixelImage.fromRawPixels(overlay), left: 8, top: 8),
+    ])
+    .png()
+    .toBytesWithInfo();
+```
+
+Metadata and stats:
+
+```dart
+final pipeline = ImagePipeline.fromBytes(inputBytes);
+final metadata = await pipeline.metadata();
+final stats = await pipeline.stats();
+```
+
+Native file IO:
+
+```dart
+import 'package:dsharp/dsharp_io.dart';
+
+final pipeline = await imagePipelineFromPath('input.png');
+await pipeline.resize(const ResizeOptions(width: 256)).png().writeToFile(
+  File('output.png'),
+);
+```
+
+More runnable examples live in `example/`.
+
+## Security Limits
+
+Use bounded streams for untrusted input. Raw pixel descriptors validate layout
+before processing. Unsupported codecs, malformed images, invalid operations, and
+cancelled pipelines throw typed `ImageProcessingException` subclasses.
+
+## Development
+
+```bash
+dart pub get
+dart run melos bootstrap
+dart run melos run format
+dart run melos run analyze
+dart run melos run test
+dart run melos run coverage
+```

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  dart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Install dependencies
+        run: dart pub get
+      - name: Bootstrap workspace
+        run: dart run melos bootstrap
+      - name: Check formatting
+        run: dart run melos run format
+      - name: Analyze
+        run: dart run melos run analyze
+      - name: Analyze package scopes
+        working-directory: packages/dsharp
+        run: dart analyze lib test example benchmark tool
+      - name: Test
+        run: dart run melos run test
+      - name: Coverage
+        run: dart run melos run coverage
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: packages/*/coverage
+      - name: Generate documentation
+        working-directory: packages/dsharp
+        run: dart doc --output doc/api
+      - name: Benchmark smoke
+        working-directory: packages/dsharp
+        run: dart run benchmark/dsharp_benchmark.dart --smoke
+      - name: Example smoke
+        working-directory: packages/dsharp
+        run: dart run example/web_safe.dart
+      - name: Publish dry-run
+        working-directory: packages/dsharp
+        run: dart pub publish --dry-run

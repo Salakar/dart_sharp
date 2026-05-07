@@ -1,0 +1,13 @@
+
+# Dart port planning scaffold
+sharp_clone/
+.dart_tool/
+.idea/
+.melos_tool/
+*.iml
+build/
+coverage/
+packages/*/coverage/
+packages/*/doc/api/
+packages/*/.dart_tool/
+doc/api/

@@ -1,0 +1,26 @@
+name: dsharp
+description: Pure Dart image processing pipeline APIs for bytes, streams, raw pixels, and optional IO adapters.
+version: 0.0.0
+repository: https://github.com/mike-diarmid/dsharp
+issue_tracker: https://github.com/mike-diarmid/dsharp/issues
+homepage: https://github.com/mike-diarmid/dsharp
+topics:
+  - image
+  - image-processing
+  - resize
+  - codecs
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  meta: ^1.16.0
+  image: ^4.8.0
+  archive: ^4.0.9
+  xml: ^6.6.1
+  vector_math: ^2.3.0
+
+dev_dependencies:
+  benchmark_harness: ^2.3.0
+  lints: ^6.0.0
+  test: ^1.25.0
