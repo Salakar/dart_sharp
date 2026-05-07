@@ -97,7 +97,7 @@ Uint8List _residualVp8Payload({
     coeffs.prob(198, nonEmpty && i == 0);
     for (var block = 0; block < 16; block += 1) {
       if (lumaAc && i == 0 && block == 0) {
-        _writeYAcToken(coeffs);
+        _writeYAcToken(coeffs, coefficient);
       } else {
         coeffs.prob(253, false);
       }

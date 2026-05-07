@@ -4,7 +4,11 @@ const _y2EobProb = 198;
 const _yAcEobProb = 253;
 const _yAcZeroProb = 136;
 const _yAcOneProb = 254;
+const _yAcSmallProb = 255;
+const _yAcTwoProb = 228;
+const _yAcThreeProb = 219;
 const _yAcPostOneEobProb = 181;
+const _yAcPostLargeEobProb = 78;
 const _uvEobNode = 0;
 const _uvZeroNode = 1;
 const _uvOneNode = 2;
@@ -99,13 +103,17 @@ void _readLumaAcBlock(
   if (coeffs.readBool(_yAcEobProb) == 0) {
     return;
   }
-  if (coeffs.readBool(_yAcZeroProb) == 0 || coeffs.readBool(_yAcOneProb) != 0) {
+  if (coeffs.readBool(_yAcZeroProb) == 0) {
     throw const UnsupportedCodecException(
       'VP8 luma AC residual coefficients are not implemented yet.',
     );
   }
-  final coefficient = coeffs.readBit() == 1 ? -1 : 1;
-  if (coeffs.readBool(_yAcPostOneEobProb) != 0) {
+  final magnitude = _readYAcMagnitude(coeffs);
+  final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
+  final nextEobProb = magnitude == 1
+      ? _yAcPostOneEobProb
+      : _yAcPostLargeEobProb;
+  if (coeffs.readBool(nextEobProb) != 0) {
     throw const UnsupportedCodecException(
       'VP8 residual coefficient runs are not implemented yet.',
     );
@@ -117,6 +125,21 @@ void _readLumaAcBlock(
     coefficient,
     _yAcQuant(frame.yAcQuantIndex),
   );
+}
+
+int _readYAcMagnitude(Vp8BoolDecoder coeffs) {
+  if (coeffs.readBool(_yAcOneProb) == 0) {
+    return 1;
+  }
+  if (coeffs.readBool(_yAcSmallProb) != 0) {
+    throw const UnsupportedCodecException(
+      'VP8 luma AC residual categories are not implemented yet.',
+    );
+  }
+  if (coeffs.readBool(_yAcTwoProb) == 0) {
+    return 2;
+  }
+  return coeffs.readBool(_yAcThreeProb) == 0 ? 3 : 4;
 }
 
 void _readEobOnlyBlock(Vp8BoolDecoder coeffs, int eobProbability) {
