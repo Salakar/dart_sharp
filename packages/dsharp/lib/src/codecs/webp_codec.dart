@@ -5,6 +5,7 @@ import '../pixels/pixel_image.dart';
 import 'codec.dart';
 import 'image_format.dart';
 import 'output.dart';
+import 'webp_animation.dart';
 import 'webp_info.dart';
 import 'webp_lossless.dart';
 
@@ -23,6 +24,9 @@ final class WebpImageCodec implements ImageCodec {
   @override
   PixelImage decode(Uint8List bytes) {
     final info = readWebpInfo(bytes);
+    if (info.isAnimated) {
+      return decodeAnimatedWebpLossless(bytes);
+    }
     if (info.compression != WebpCompression.vp8l) {
       throw UnsupportedCodecException(
         'WebP ${info.compression.name} pixel reconstruction is not implemented '

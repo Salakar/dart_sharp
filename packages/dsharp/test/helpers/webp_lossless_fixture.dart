@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+part 'webp_animation_fixture.dart';
 part 'webp_lossless_meta_fixture.dart';
 part 'webp_lossless_transform_fixture.dart';
 
@@ -26,18 +27,7 @@ Uint8List solidVp8lWebp({
   _writeSingleSymbolCode(bits, blue);
   _writeSingleSymbolCode(bits, alpha);
   _writeSingleSymbolCode(bits, 0);
-  final vp8l = Uint8List.fromList(<int>[0x2f, ...bits.finish()]);
-  final out = _ByteWriter()
-    ..ascii('RIFF')
-    ..u32(4 + 8 + vp8l.length + (vp8l.length.isOdd ? 1 : 0))
-    ..ascii('WEBP')
-    ..ascii('VP8L')
-    ..u32(vp8l.length)
-    ..bytes(vp8l);
-  if (vp8l.length.isOdd) {
-    out.byte(0);
-  }
-  return out.finish();
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
 /// Builds a minimal VP8L WebP where only green alternates between two symbols.
@@ -237,6 +227,19 @@ final class _ByteWriter {
       ..add((value >> 8) & 0xff)
       ..add((value >> 16) & 0xff)
       ..add((value >> 24) & 0xff);
+  }
+
+  void u24(int value) {
+    _bytes
+      ..add(value & 0xff)
+      ..add((value >> 8) & 0xff)
+      ..add((value >> 16) & 0xff);
+  }
+
+  void u16(int value) {
+    _bytes
+      ..add(value & 0xff)
+      ..add((value >> 8) & 0xff);
   }
 
   void bytes(Iterable<int> values) => _bytes.addAll(values);

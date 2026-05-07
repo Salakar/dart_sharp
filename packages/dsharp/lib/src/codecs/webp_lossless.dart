@@ -14,6 +14,11 @@ part 'webp_lossless_transform.dart';
 /// Decodes the supported VP8L subset of WebP lossless images.
 RawPixels decodeWebpLossless(Uint8List bytes) {
   final chunk = _findVp8lChunk(bytes);
+  return decodeWebpLosslessChunk(chunk);
+}
+
+/// Decodes a raw VP8L chunk payload.
+RawPixels decodeWebpLosslessChunk(Uint8List chunk) {
   final reader = _BitReader(chunk, byteOffset: 1);
   if (chunk.isEmpty || chunk[0] != 0x2f) {
     throw const InvalidImageException('Invalid VP8L signature.');
