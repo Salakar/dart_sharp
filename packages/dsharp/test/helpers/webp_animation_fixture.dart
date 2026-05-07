@@ -72,6 +72,78 @@ Uint8List animatedVp8lWebp() {
       .finish();
 }
 
+/// Builds a VP8L animation that alpha-blends over a retained canvas.
+Uint8List blendedAnimatedVp8lWebp() {
+  final base = _vp8lPayload(
+    width: 2,
+    height: 1,
+    red: 255,
+    green: 0,
+    blue: 0,
+    alpha: 255,
+  );
+  final overlay = _vp8lPayload(
+    width: 1,
+    height: 1,
+    red: 0,
+    green: 0,
+    blue: 255,
+    alpha: 128,
+  );
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x12)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(1)
+    ..u24(0);
+  _writeChunk(
+    chunks,
+    'ANIM',
+    (_ByteWriter()
+          ..u32(0)
+          ..u16(1))
+        .finish(),
+  );
+  _writeChunk(
+    chunks,
+    'ANMF',
+    _animationFramePayload(
+      x: 0,
+      y: 0,
+      width: 2,
+      height: 1,
+      durationMs: 10,
+      dispose: false,
+      blend: false,
+      vp8l: base,
+    ),
+  );
+  _writeChunk(
+    chunks,
+    'ANMF',
+    _animationFramePayload(
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+      durationMs: 10,
+      dispose: false,
+      blend: true,
+      vp8l: overlay,
+    ),
+  );
+  final payload = chunks.finish();
+  return (_ByteWriter()
+        ..ascii('RIFF')
+        ..u32(4 + payload.length)
+        ..ascii('WEBP')
+        ..bytes(payload))
+      .finish();
+}
+
 /// Builds an extended static WebP whose image payload is VP8L.
 Uint8List extendedVp8lWebp({
   required int width,

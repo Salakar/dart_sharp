@@ -74,4 +74,23 @@ void main() {
       255,
     ]);
   });
+
+  test('alpha-blends animated VP8L frames onto retained canvas', () async {
+    final bytes = blendedAnimatedVp8lWebp();
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.frames.length, 2);
+    expect(image.frames[0].pixels.bytes, <int>[255, 0, 0, 255, 255, 0, 0, 255]);
+    expect(image.frames[1].pixels.bytes, <int>[
+      127,
+      0,
+      128,
+      255,
+      255,
+      0,
+      0,
+      255,
+    ]);
+  });
 }
