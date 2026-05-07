@@ -134,14 +134,17 @@ void main() {
     );
   });
 
-  test('rejects unsupported VP8 chroma DC categories explicitly', () async {
-    final bytes = unsupportedChromaDcCategoryVp8Webp(width: 2, height: 2);
+  test(
+    'rejects unsupported VP8 chroma DC coefficient runs explicitly',
+    () async {
+      final bytes = unsupportedChromaDcRunVp8Webp(width: 2, height: 2);
 
-    await expectLater(
-      ImagePipeline.fromBytes(bytes).toPixelImage(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
-  });
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    },
+  );
 
   test('applies supported VP8 chroma DC residuals', () async {
     final bytes = chromaDcResidualVp8Webp(width: 2, height: 2, qIndex: 12);
@@ -191,6 +194,8 @@ void main() {
       (18, <int>[128, 125, 143, 255]),
       (19, <int>[128, 125, 145, 255]),
       (34, <int>[128, 123, 158, 255]),
+      (35, <int>[128, 122, 159, 255]),
+      (66, <int>[128, 117, 186, 255]),
       (-4, <int>[128, 129, 124, 255]),
     ];
 

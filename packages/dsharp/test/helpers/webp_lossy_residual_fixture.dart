@@ -16,15 +16,15 @@ Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
   return _simpleWebp(vp8);
 }
 
-/// Builds a VP8 WebP with a chroma DC category this decoder rejects.
-Uint8List unsupportedChromaDcCategoryVp8Webp({
+/// Builds a VP8 WebP with a chroma DC coefficient run this decoder rejects.
+Uint8List unsupportedChromaDcRunVp8Webp({
   required int width,
   required int height,
 }) {
   final vp8 = _residualVp8Payload(
     width: width,
     height: height,
-    unsupportedChromaCategory: true,
+    unsupportedChromaRun: true,
   );
   return _simpleWebp(vp8);
 }
@@ -51,7 +51,7 @@ Uint8List _residualVp8Payload({
   required int height,
   bool nonEmpty = false,
   bool chromaDc = false,
-  bool unsupportedChromaCategory = false,
+  bool unsupportedChromaRun = false,
   int qIndex = 0,
   int coefficient = 1,
 }) {
@@ -86,8 +86,8 @@ Uint8List _residualVp8Payload({
     for (var block = 0; block < 16; block += 1) {
       coeffs.prob(253, false);
     }
-    if (unsupportedChromaCategory && i == 0) {
-      _writeUnsupportedUvDcCategoryToken(coeffs);
+    if (unsupportedChromaRun && i == 0) {
+      _writeUnsupportedUvDcRunToken(coeffs);
     } else if (chromaDc && i == 0) {
       _writeUvDcToken(coeffs, coefficient);
     } else {
@@ -109,19 +109,17 @@ Uint8List _residualVp8Payload({
       .finish();
 }
 
-void _writeUnsupportedUvDcCategoryToken(_BoolWriter coeffs) {
-  coeffs
-    ..prob(202, true)
-    ..prob(24, true)
-    ..prob(213, true)
-    ..prob(235, true)
-    ..prob(220, true)
-    ..prob(240, true);
+void _writeUnsupportedUvDcRunToken(_BoolWriter coeffs) {
+  _writeUvDcToken(coeffs, 1, hasMore: true);
 }
 
-void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
+void _writeUvDcToken(
+  _BoolWriter coeffs,
+  int coefficient, {
+  bool hasMore = false,
+}) {
   final magnitude = coefficient.abs();
-  if (magnitude < 1 || magnitude > 34) {
+  if (magnitude < 1 || magnitude > 66) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
   coeffs
@@ -167,7 +165,7 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
       ..prob(173, (offset & 4) != 0)
       ..prob(148, (offset & 2) != 0)
       ..prob(140, offset.isOdd);
-  } else {
+  } else if (magnitude <= 34) {
     final offset = magnitude - 19;
     coeffs
       ..prob(213, true)
@@ -179,8 +177,21 @@ void _writeUvDcToken(_BoolWriter coeffs, int coefficient) {
       ..prob(155, (offset & 4) != 0)
       ..prob(140, (offset & 2) != 0)
       ..prob(135, offset.isOdd);
+  } else {
+    final offset = magnitude - 35;
+    coeffs
+      ..prob(213, true)
+      ..prob(235, true)
+      ..prob(220, true)
+      ..prob(240, true)
+      ..prob(255, false)
+      ..prob(180, (offset & 16) != 0)
+      ..prob(157, (offset & 8) != 0)
+      ..prob(141, (offset & 4) != 0)
+      ..prob(134, (offset & 2) != 0)
+      ..prob(130, offset.isOdd);
   }
   coeffs
     ..bit(coefficient.isNegative)
-    ..prob(166, false);
+    ..prob(166, hasMore);
 }
