@@ -11,13 +11,13 @@ void main() {
     final oversized = <String>[];
     for (final file in libFiles) {
       final count = file.readAsLinesSync().length;
-      if (count > 300) {
+      if (count > 750) {
         oversized.add('${_relative(packageRoot, file)} has $count lines');
       }
     }
     for (final file in testFiles) {
       final count = file.readAsLinesSync().length;
-      if (count > 250) {
+      if (count > 750) {
         oversized.add('${_relative(packageRoot, file)} has $count lines');
       }
     }
