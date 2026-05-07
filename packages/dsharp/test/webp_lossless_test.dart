@@ -37,7 +37,7 @@ void main() {
       blue: 3,
       alpha: 255,
     );
-    bytes[25] |= 1 << 0;
+    bytes[25] |= 0x07;
 
     await expectLater(
       ImagePipeline.fromBytes(bytes).toPixelImage(),
@@ -130,6 +130,31 @@ void main() {
 
     expect(image.firstFrameBytes(), <int>[
       for (var i = 0; i < 2; i += 1) ...<int>[100, 64, 180, 255],
+    ]);
+  });
+
+  test('decodes the VP8L predictor transform', () async {
+    final bytes = predictorVp8lWebp();
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      10,
+      20,
+      30,
+      255,
+      20,
+      40,
+      60,
+      255,
+      20,
+      40,
+      60,
+      255,
+      30,
+      60,
+      90,
+      255,
     ]);
   });
 }

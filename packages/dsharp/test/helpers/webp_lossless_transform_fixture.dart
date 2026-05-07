@@ -73,6 +73,36 @@ Uint8List colorTransformVp8lWebp({
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a 2x2 VP8L WebP using predictor mode 7.
+Uint8List predictorVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(1, 14)
+    ..write(1, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(0, 2)
+    ..write(0, 3);
+  _writeSolidImageData(
+    bits,
+    red: 0,
+    green: 7,
+    blue: 0,
+    alpha: 255,
+    writeMetaPrefix: false,
+  );
+  bits.write(0, 1);
+  _writeSolidImageData(
+    bits,
+    red: 10,
+    green: 20,
+    blue: 30,
+    alpha: 0,
+    writeMetaPrefix: true,
+  );
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 void _writeSolidImageData(
   _BitWriter bits, {
   required int red,
