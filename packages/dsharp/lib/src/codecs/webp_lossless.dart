@@ -25,14 +25,32 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
   }
   final transforms = <_LosslessTransform>[];
   while (reader.readBits(1) == 1) {
-    final transform = _LosslessTransform.read(reader);
+    final transform = _LosslessTransform.read(reader, width, height);
     if (transforms.any((item) => item.type == transform.type)) {
       throw const InvalidImageException('Duplicate VP8L transform.');
     }
     transforms.add(transform);
   }
+  final out = _decodeImageData(reader, width, height, readMetaPrefix: true);
+  for (final transform in transforms.reversed) {
+    transform.apply(out, width, height);
+  }
+  return RawPixels(
+    bytes: out,
+    width: width,
+    height: height,
+    channels: ChannelCount.four,
+  );
+}
+
+Uint8List _decodeImageData(
+  _BitReader reader,
+  int width,
+  int height, {
+  required bool readMetaPrefix,
+}) {
   final colorCache = _ColorCache.read(reader);
-  if (reader.readBits(1) == 1) {
+  if (readMetaPrefix && reader.readBits(1) == 1) {
     throw const UnsupportedCodecException(
       'VP8L meta prefix codes are not implemented yet.',
     );
@@ -84,15 +102,7 @@ RawPixels decodeWebpLossless(Uint8List bytes) {
     colorCache.insert(argb);
     pixel += 1;
   }
-  for (final transform in transforms.reversed) {
-    transform.apply(out, width, height);
-  }
-  return RawPixels(
-    bytes: out,
-    width: width,
-    height: height,
-    channels: ChannelCount.four,
-  );
+  return out;
 }
 
 Uint8List _findVp8lChunk(Uint8List bytes) {

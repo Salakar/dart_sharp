@@ -112,4 +112,24 @@ void main() {
       for (var i = 0; i < 2; i += 1) ...<int>[250, 20, 10, 255],
     ]);
   });
+
+  test('decodes the VP8L color transform', () async {
+    final bytes = colorTransformVp8lWebp(
+      width: 2,
+      height: 1,
+      red: 100,
+      green: 64,
+      blue: 180,
+      alpha: 255,
+      greenToRed: 32,
+      greenToBlue: 64,
+      redToBlue: 16,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      for (var i = 0; i < 2; i += 1) ...<int>[100, 64, 180, 255],
+    ]);
+  });
 }
