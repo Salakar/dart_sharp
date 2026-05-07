@@ -17,8 +17,17 @@ Uint8List nonEmptyResidualVp8Webp({required int width, required int height}) {
 }
 
 /// Builds a VP8 WebP with a supported chroma DC residual.
-Uint8List chromaDcResidualVp8Webp({required int width, required int height}) {
-  final vp8 = _residualVp8Payload(width: width, height: height, chromaDc: true);
+Uint8List chromaDcResidualVp8Webp({
+  required int width,
+  required int height,
+  int qIndex = 0,
+}) {
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    chromaDc: true,
+    qIndex: qIndex,
+  );
   return _simpleWebp(vp8);
 }
 

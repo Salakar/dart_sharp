@@ -135,27 +135,35 @@ void main() {
   });
 
   test('applies supported VP8 chroma DC residuals', () async {
-    final bytes = chromaDcResidualVp8Webp(width: 2, height: 2);
+    final bytes = chromaDcResidualVp8Webp(width: 2, height: 2, qIndex: 12);
 
     final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
 
     expect(image.firstFrameBytes(), <int>[
       128,
       128,
-      129,
+      131,
       255,
       128,
       128,
-      129,
+      131,
       255,
       128,
       128,
-      129,
+      131,
       255,
       128,
       128,
-      129,
+      131,
       255,
     ]);
+  });
+
+  test('caps supported VP8 chroma DC residual quantizers', () async {
+    final bytes = chromaDcResidualVp8Webp(width: 2, height: 2, qIndex: 127);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes().take(4), <int>[128, 123, 158, 255]);
   });
 }

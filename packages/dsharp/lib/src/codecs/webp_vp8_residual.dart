@@ -27,7 +27,7 @@ void _readResidual(
         block,
         true,
         coefficient,
-        _dcQuant(frame.uvDcQuantIndex),
+        _uvDcQuant(frame.uvDcQuantIndex),
       );
     }
   }
@@ -40,7 +40,7 @@ void _readResidual(
         block,
         false,
         coefficient,
-        _dcQuant(frame.uvDcQuantIndex),
+        _uvDcQuant(frame.uvDcQuantIndex),
       );
     }
   }

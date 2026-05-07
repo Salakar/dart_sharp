@@ -6,6 +6,7 @@ import 'binary_io.dart';
 import 'webp_vp8_bool.dart';
 
 part 'webp_vp8_prediction.dart';
+part 'webp_vp8_quant.dart';
 part 'webp_vp8_residual.dart';
 
 const _kfYModeTree = <int>[-4, 2, 4, 6, 0, -1, -2, -3];
@@ -130,15 +131,6 @@ int _readOptionalSigned(Vp8BoolDecoder bits, int magnitudeBits) {
     return bits.readBit() == 1 ? -value : value;
   }
   return 0;
-}
-
-int _dcQuant(int index) {
-  if (index != 0) {
-    throw const UnsupportedCodecException(
-      'VP8 non-zero quantizer residuals are not implemented yet.',
-    );
-  }
-  return 4;
 }
 
 Uint8List _findVp8Chunk(Uint8List bytes) {
