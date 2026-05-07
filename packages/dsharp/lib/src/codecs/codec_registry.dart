@@ -6,10 +6,13 @@ import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'codec.dart';
 import 'format_sniffer.dart';
+import 'gif_codec.dart';
 import 'image_format.dart';
+import 'marker_raster_codec.dart';
 import 'output.dart';
-import 'package_image_codec.dart';
+import 'png_codec.dart';
 import 'raw_codec.dart';
+import 'tiff_codec.dart';
 import 'unsupported_codec.dart';
 
 /// Registry of pure Dart image codecs.
@@ -24,11 +27,11 @@ final class CodecRegistry {
   factory CodecRegistry.defaultRegistry() {
     return CodecRegistry(<ImageCodec>[
       const RawImageCodec(),
-      const PackageImageCodec(ImageFormat.png),
-      const PackageImageCodec(ImageFormat.jpeg),
-      const PackageImageCodec(ImageFormat.gif),
-      const PackageImageCodec(ImageFormat.tiff),
-      const PackageImageCodec(ImageFormat.webp),
+      const PngImageCodec(),
+      const MarkerRasterCodec(ImageFormat.jpeg),
+      const GifImageCodec(),
+      const TiffImageCodec(),
+      const MarkerRasterCodec(ImageFormat.webp, canEncode: false),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',

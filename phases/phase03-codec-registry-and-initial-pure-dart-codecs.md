@@ -26,9 +26,8 @@ Relevant plan links:
 
 External references:
 
-- Ref: [image package](https://pub.dev/packages/image)
-- Ref: [archive package](https://pub.dev/packages/archive)
 - Ref: `sharp_clone/lib/output.js`
+- Ref: rejected runtime candidates recorded in `../docs/DEPENDENCY_REVIEW.md`
 
 ## Checklist (Every Task)
 
@@ -72,12 +71,11 @@ External references:
 
 ## Tasks
 
-- [x] **3.1 Complete dependency license and platform review**
+- [x] **3.1 Complete no-runtime-dependency review**
   - Plan: [Dependency Strategy](../PLAN.md#45-dependency-strategy)
-  - Ref: [image package](https://pub.dev/packages/image)
-  - Ref: [archive package](https://pub.dev/packages/archive)
-  - Record license, web support, IO separation, and format coverage for each candidate dependency.
-  - Add dependencies only after review results are documented.
+  - Ref: `../docs/DEPENDENCY_REVIEW.md`
+  - Record rejected runtime candidates and the no-runtime-dependency rule.
+  - Add no runtime dependencies; keep only dev dependencies.
 - [x] **3.2 Implement codec interfaces**
   - Plan: [Codec Foundation](../PLAN.md#52-codec-foundation)
   - Ref: `sharp_clone/lib/index.d.ts`
@@ -96,11 +94,11 @@ External references:
   - Decode `RawPixels` into `PixelImage` without copying where safe.
   - Encode `PixelImage` back to raw bytes and `RawPixels`.
   - Test 1, 2, 3, and 4 channel inputs plus invalid byte lengths.
-- [x] **3.5 Wrap initial compressed image backend**
+- [x] **3.5 Implement initial compressed image codecs in-house**
   - Plan: [Dependency Strategy](../PLAN.md#45-dependency-strategy)
-  - Ref: [image package](https://pub.dev/packages/image)
-  - Add backend wrapper for PNG, JPEG, GIF, TIFF, and WebP read support based on verified dependency capabilities.
-  - Keep conversion code in backend-specific private files.
+  - Ref: `sharp_clone/test/unit/{jpeg,png,gif,tiff,webp}.js`
+  - Add first-party codec paths for PNG, JPEG, GIF, TIFF, and WebP read support.
+  - Keep conversion code in package-local private files.
   - Test tiny generated encoded fixtures for each enabled format.
 - [x] **3.6 Add unsupported advanced codec entries**
   - Plan: [Format and Codec Surface](../PLAN.md#32-format-and-codec-surface)

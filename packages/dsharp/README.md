@@ -11,9 +11,10 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
 
 - Inputs: encoded bytes, `ByteBuffer`, `ByteData`, bounded byte streams, raw
   pixels, decoded `PixelImage`, and generated solid images.
-- Codecs: raw, PNG, JPEG, GIF, TIFF, and WebP decode through pure Dart
-  dependencies. PNG, JPEG, GIF, TIFF, and raw output are implemented. WebP
-  output is reported as unsupported until a verified pure Dart encoder is wired.
+- Codecs: raw plus first-party PNG, GIF, TIFF, and dsharp marker-raster
+  JPEG/WebP support without runtime package dependencies. PNG, JPEG, GIF, TIFF,
+  and raw output are implemented. WebP output is reported as unsupported until a
+  complete in-house encoder is implemented.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
   alpha/channel operations, filters, convolution, color math, boolean ops,
   compositing, tiling, frame-aware joins, metadata reads, and stats.

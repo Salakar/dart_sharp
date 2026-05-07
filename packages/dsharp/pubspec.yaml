@@ -13,13 +13,6 @@ topics:
 environment:
   sdk: ^3.8.0
 
-dependencies:
-  meta: ^1.16.0
-  image: ^4.8.0
-  archive: ^4.0.9
-  xml: ^6.6.1
-  vector_math: ^2.3.0
-
 dev_dependencies:
   benchmark_harness: ^2.3.0
   lints: ^6.0.0

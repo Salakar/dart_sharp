@@ -26,9 +26,9 @@ Relevant plan links:
 
 External references:
 
-- Ref: [xml package](https://pub.dev/packages/xml)
 - Ref: `sharp_clone/src/metadata.cc`
 - Ref: `sharp_clone/src/stats.cc`
+- Ref: rejected XML runtime dependency recorded in `../docs/DEPENDENCY_REVIEW.md`
 
 ## Checklist (Every Task)
 
@@ -104,8 +104,8 @@ External references:
   - Test malformed metadata, truncated bytes, and permissive pixel decode behavior.
 - [x] **4.6 Add metadata XML scaffolding**
   - Plan: [Output and Encoders](../PLAN.md#38-output-and-encoders)
-  - Ref: [xml package](https://pub.dev/packages/xml)
-  - Add XMP/XML parse and validation scaffolding after dependency review.
+  - Ref: `../docs/DEPENDENCY_REVIEW.md`
+  - Add in-house XMP/XML parse and validation scaffolding after dependency review.
   - Do not expose raw XML maps in public APIs.
   - Test invalid XML and unsupported metadata write paths.
 

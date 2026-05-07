@@ -58,10 +58,13 @@ Features that depend on native-only ecosystems in the source package, such as Op
 
 ### 2.2 Package Files
 
-- `packages/dsharp/pubspec.yaml` currently contains the target package metadata and `meta`, `test`, `lints`, and `benchmark_harness` dependencies.
-- `packages/dsharp/lib/dsharp.dart` is currently an empty `library;` entrypoint.
-- `packages/dsharp/test/dsharp_test.dart` is a scaffold smoke test.
-- `packages/dsharp/example/README.md` and `packages/dsharp/benchmark/README.md` are placeholders.
+- `packages/dsharp/pubspec.yaml` contains the target package metadata and no
+  runtime dependencies. Only dev dependencies are allowed.
+- `packages/dsharp/lib/dsharp.dart` exports the web-safe core API.
+- `packages/dsharp/test/dsharp_test.dart` verifies package identity and
+  capability behavior.
+- `packages/dsharp/example/README.md` and `packages/dsharp/benchmark/README.md`
+  describe runnable examples and benchmark commands.
 - `packages/dsharp/CHANGELOG.md` starts at `0.0.0`.
 
 ### 2.3 Upstream Reference Files Inspected
@@ -116,7 +119,8 @@ Dart target support matrix:
 - Tier 2: WebP write, APNG, ICC/EXIF/XMP preservation, animated frame timing/looping, deep zoom tile packaging, and color-management accuracy.
 - Tier 3 unsupported until pure Dart implementations exist: AVIF, HEIF/HEIC, JP2/JPEG 2000, JXL/JPEG XL, PDF rasterization, OpenSlide, Magick, DCRAW/RAW camera formats, FITS, RAD, and complete SVG rasterization.
 - The public API must expose `CodecSupport` and `FormatRegistry` so unsupported formats fail predictably with `UnsupportedCodecException` rather than pretending support exists.
-- If `package:image` is used, treat it as a codec/pixel backend only after license and behavior review. Pub.dev currently describes it as a Dart package for server and web apps with read/write JPG, PNG/APNG, GIF/animated GIF, BMP, TIFF, TGA, PVR, ICO and read-only WebP/animated WebP, PSD, EXR, and PNM.
+- Runtime codec dependencies are not permitted. PNG, GIF, TIFF, JPEG marker-raster,
+  and WebP marker-raster behavior must stay behind first-party codec interfaces.
 
 ### 3.3 Metadata and Statistics
 
@@ -404,14 +408,14 @@ Rules:
 
 ### 4.5 Dependency Strategy
 
-- Add dependencies only after a license and platform review task.
-- Candidate dependencies based on current pub.dev documentation:
-  - `image`: pure Dart image loading, manipulation, and saving for server and web apps.
-  - `archive`: ZIP/ZLib/GZip/Tar/BZip2/XZ with memory-only interfaces for web and IO-specific APIs in separate imports.
-  - `xml`: DOM/SAX/XPath XML parsing for XMP/SVG/XML metadata work.
-  - `vector_math`: matrix/vector utilities if it reduces error-prone affine math.
-- Do not expose dependency-specific public classes.
-- Wrap all backend behavior behind `ImageBackend` and codec interfaces so the package can replace or patch dependencies when parity requires it.
+- Do not add runtime dependencies. The package must remain usable with only the
+  Dart SDK at runtime.
+- `package:image`, `archive`, `xml`, `vector_math`, and similar packages are not
+  allowed in `dependencies`.
+- Dev dependencies are allowed for tests, lints, and benchmarks.
+- Keep codec, metadata, compression, archive, and matrix behavior behind
+  package-local interfaces so future in-house implementations can replace
+  internals without public API churn.
 
 ### 4.6 Processing Model
 
@@ -437,7 +441,8 @@ Rules:
 - Implement `ImageFormat` sniffing from magic bytes and optional metadata.
 - Implement `Codec` and `CodecRegistry` with static capability data.
 - Add raw pixel codec first because it is deterministic and does not depend on compressed formats.
-- Evaluate and wrap `package:image` for PNG, JPEG, GIF, TIFF, and WebP read support.
+- Implement first-party raw, PNG, JPEG, GIF, TIFF, and WebP codec paths without
+  runtime dependencies.
 - Add unsupported codec implementations for AVIF, HEIF, JP2, JXL, PDF, OpenSlide, Magick, DCRAW, FITS, RAD, SVG rasterization, and deep zoom until pure Dart support exists.
 - Add malformed input tests and input size limits before enabling decode APIs.
 
@@ -481,7 +486,8 @@ Rules:
 - Implement format option methods: `jpeg`, `png`, `gif`, `tiff`, `webp`, `raw`, and `toFormat`.
 - Add `dsharp_io.dart` file read/write extensions.
 - Implement metadata preservation/writing only for formats with verified pure Dart support.
-- Add deep zoom tile output only after `archive` review and codec support.
+- Add deep zoom tile output only after an in-house archive/container writer and
+  codec support exist.
 
 ### 5.8 Tests and Fixtures
 
@@ -541,7 +547,8 @@ Rules:
 - Pixel operation tests for every operation family.
 - Encoder/decoder integration tests for every supported format.
 - IO adapter tests behind VM-only tags.
-- Web compatibility tests using `dart test -p chrome` once dependencies support browser testing.
+- Web compatibility tests using `dart test -p chrome` once the in-house codecs
+  are exercised in browser CI.
 - Fuzz/property tests for parsers and pixel operations.
 - Performance benchmarks under `packages/dsharp/benchmark/`.
 
@@ -565,7 +572,7 @@ Rules:
 
 1. Foundation and package correctness.
 2. Core source, byte, raw pixel, format, and capability models.
-3. Codec backend review and raw/PNG/JPEG/GIF/TIFF/WebP wrappers.
+3. First-party raw/PNG/JPEG/GIF/TIFF/WebP codec paths.
 4. Pixel image model, metadata, and stats.
 5. Resize geometry and resampling.
 6. Transform, color, channel, alpha, and filter operations.
@@ -579,7 +586,8 @@ This order makes the web-safe boundary and type model hard to regress before lar
 ## 9. Risks and Open Decisions
 
 - Placeholder repository URL: replace `https://github.com/mike-diarmid/dsharp` with the real repository URL before publishing.
-- Dependency choice: `package:image` appears to cover many initial pure Dart formats, but behavior, licenses, performance, and web support must be verified before pinning it.
+- Dependency choice: runtime dependencies are disallowed; codec and metadata
+  support must be implemented in-house or remain explicitly unsupported.
 - Exact parity tolerance: native `libvips` kernels and codecs will not always match pure Dart output byte-for-byte. The plan uses pixel/dimension tolerances where exact equality is unrealistic.
 - Advanced codecs: AVIF, HEIF, JP2, JXL, PDF, OpenSlide, Magick, DCRAW, FITS, RAD, and SVG rasterization may remain unsupported for a long time without pure Dart implementations.
 - Text rendering: native Pango behavior is out of scope for phase 1. A pure Dart text renderer needs separate design.

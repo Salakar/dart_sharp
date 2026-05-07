@@ -116,7 +116,7 @@ final class DsharpCapabilities {
           format: ImageFormat.deepZoom,
           input: CodecAvailability.unsupported,
           output: CodecAvailability.planned,
-          reason: 'Tile output is planned after archive support is reviewed.',
+          reason: 'Tile output requires an in-house archive/container writer.',
         ),
       });
 
