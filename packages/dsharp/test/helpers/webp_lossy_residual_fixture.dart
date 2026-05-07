@@ -1,6 +1,7 @@
 part of 'webp_lossy_fixture.dart';
 
 const _uvDcCatFiveProbabilityUpdate = 2 * 8 * 3 * 11 + 10;
+const _yAcBandTwoEobProbabilityUpdate = 2 * 3 * 11;
 
 /// Builds a lossy VP8 WebP whose residual partition contains EOB blocks.
 Uint8List eobResidualVp8Webp({
@@ -61,6 +62,7 @@ Uint8List _residualVp8Payload({
   int coefficient = 1,
   int lumaCoefficientIndex = 1,
   int? uvDcCatFiveProbability,
+  int? yAcBandTwoEobProbability,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -79,7 +81,13 @@ Uint8List _residualVp8Payload({
   }
   first.bit(false);
   for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
-    if (i == _uvDcCatFiveProbabilityUpdate && uvDcCatFiveProbability != null) {
+    if (i == _yAcBandTwoEobProbabilityUpdate &&
+        yAcBandTwoEobProbability != null) {
+      first
+        ..bit(true)
+        ..literal(yAcBandTwoEobProbability, 8);
+    } else if (i == _uvDcCatFiveProbabilityUpdate &&
+        uvDcCatFiveProbability != null) {
       first
         ..bit(true)
         ..literal(uvDcCatFiveProbability, 8);
@@ -98,7 +106,12 @@ Uint8List _residualVp8Payload({
     coeffs.prob(198, nonEmpty && i == 0);
     for (var block = 0; block < 16; block += 1) {
       if (lumaAc && i == 0 && block == 0) {
-        _writeYAcToken(coeffs, coefficient, lumaCoefficientIndex);
+        _writeYAcToken(
+          coeffs,
+          coefficient,
+          lumaCoefficientIndex,
+          yAcBandTwoEobProbability: yAcBandTwoEobProbability,
+        );
       } else {
         coeffs.prob(253, false);
       }

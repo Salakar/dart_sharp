@@ -141,7 +141,7 @@ void _readLumaAcBlock(
   var context = 0;
   for (var coefficientIndex = 1; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
-        _defaultYAcProbability(coefficientIndex, context, node);
+        frame.yAcProbs.probabilityAt(coefficientIndex, context, node);
     if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
       break;
     }
@@ -229,8 +229,20 @@ int _readDctCategory(
   return 19 + _readCategoryExtra(coeffs, _catFourExtraProbs);
 }
 
-int _defaultYAcProbability(int coefficientIndex, int context, int node) {
-  return _defaultYAcProbs[_coefficientBands[coefficientIndex]][context][node];
+final class _Vp8LumaAcProbs {
+  _Vp8LumaAcProbs.defaults()
+    : _probabilities = [
+        for (final band in _defaultYAcProbs)
+          [for (final context in band) List<int>.of(context, growable: false)],
+      ];
+
+  final List<List<List<int>>> _probabilities;
+
+  List<List<int>> operator [](int band) => _probabilities[band];
+
+  int probabilityAt(int coefficientIndex, int context, int node) {
+    return _probabilities[_coefficientBands[coefficientIndex]][context][node];
+  }
 }
 
 final class _Vp8ChromaDcProbs {

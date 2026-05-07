@@ -117,6 +117,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   final uvDcDelta = _readOptionalSigned(bits, 4);
   _readOptionalSigned(bits, 4);
   bits.readBit();
+  final yAcProbs = _Vp8LumaAcProbs.defaults();
   final uvDcProbs = _Vp8ChromaDcProbs.defaults();
   for (var plane = 0; plane < 4; plane += 1) {
     for (var band = 0; band < 8; band += 1) {
@@ -124,6 +125,9 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
         for (var node = 0; node < 11; node += 1) {
           if (bits.readBit() == 1) {
             final probability = bits.readLiteral(8);
+            if (plane == 0) {
+              yAcProbs[band][context][node] = probability;
+            }
             if (plane == 2 && band == 0 && context == 0) {
               uvDcProbs[node] = probability;
             }
@@ -135,6 +139,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   return _Vp8FrameHeader(
     yAcQuantIndex: qIndex,
     uvDcQuantIndex: qIndex + uvDcDelta,
+    yAcProbs: yAcProbs,
     uvDcProbs: uvDcProbs,
   );
 }
@@ -186,10 +191,12 @@ final class _Vp8FrameHeader {
   const _Vp8FrameHeader({
     required this.yAcQuantIndex,
     required this.uvDcQuantIndex,
+    required this.yAcProbs,
     required this.uvDcProbs,
   });
 
   final int yAcQuantIndex;
   final int uvDcQuantIndex;
+  final _Vp8LumaAcProbs yAcProbs;
   final _Vp8ChromaDcProbs uvDcProbs;
 }

@@ -5,6 +5,7 @@ Uint8List lumaAcResidualVp8Webp({
   required int height,
   int coefficient = 1,
   int coefficientIndex = 1,
+  int? yAcBandTwoEobProbability,
 }) => _simpleWebp(
   _residualVp8Payload(
     width: width,
@@ -12,6 +13,7 @@ Uint8List lumaAcResidualVp8Webp({
     lumaAc: true,
     coefficient: coefficient,
     lumaCoefficientIndex: coefficientIndex,
+    yAcBandTwoEobProbability: yAcBandTwoEobProbability,
   ),
 );
 
@@ -76,7 +78,12 @@ const _fixtureYAcProbs = <List<List<int>>>[
   ],
 ];
 
-void _writeYAcToken(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
+void _writeYAcToken(
+  _BoolWriter coeffs,
+  int coefficient,
+  int coefficientIndex, {
+  int? yAcBandTwoEobProbability,
+}) {
   final magnitude = coefficient.abs();
   if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
@@ -86,65 +93,92 @@ void _writeYAcToken(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
   }
   var context = 0;
   for (var index = 1; index < coefficientIndex; index += 1) {
+    int probabilityAt(int node) =>
+        _fixtureYAcProbability(index, context, node, yAcBandTwoEobProbability);
     coeffs
-      ..prob(_fixtureYAcProbability(index, context, 0), true)
-      ..prob(_fixtureYAcProbability(index, context, 1), false);
+      ..prob(probabilityAt(0), true)
+      ..prob(probabilityAt(1), false);
     context = 0;
   }
+  int probabilityAt(int node) => _fixtureYAcProbability(
+    coefficientIndex,
+    context,
+    node,
+    yAcBandTwoEobProbability,
+  );
   coeffs
-    ..prob(_fixtureYAcProbability(coefficientIndex, context, 0), true)
-    ..prob(_fixtureYAcProbability(coefficientIndex, context, 1), true);
+    ..prob(probabilityAt(0), true)
+    ..prob(probabilityAt(1), true);
+  _writeYAcMagnitude(coeffs, magnitude, probabilityAt);
+  final nextIndex = coefficientIndex + 1;
+  final nextContext = magnitude == 1 ? 1 : 2;
+  coeffs.bit(coefficient.isNegative);
+  if (nextIndex < 16) {
+    coeffs.prob(
+      _fixtureYAcProbability(
+        nextIndex,
+        nextContext,
+        0,
+        yAcBandTwoEobProbability,
+      ),
+      false,
+    );
+  }
+}
+
+void _writeYAcMagnitude(
+  _BoolWriter coeffs,
+  int magnitude,
+  int Function(int node) probabilityAt,
+) {
   if (magnitude == 1) {
-    coeffs.prob(_fixtureYAcProbability(coefficientIndex, context, 2), false);
+    coeffs.prob(probabilityAt(2), false);
   } else if (magnitude <= 4) {
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), false);
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), false);
     if (magnitude == 2) {
-      coeffs.prob(_fixtureYAcProbability(coefficientIndex, context, 4), false);
+      coeffs.prob(probabilityAt(4), false);
     } else {
       coeffs
-        ..prob(_fixtureYAcProbability(coefficientIndex, context, 4), true)
-        ..prob(
-          _fixtureYAcProbability(coefficientIndex, context, 5),
-          magnitude == 4,
-        );
+        ..prob(probabilityAt(4), true)
+        ..prob(probabilityAt(5), magnitude == 4);
     }
   } else if (magnitude <= 6) {
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), false)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 7), false)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), false)
+      ..prob(probabilityAt(7), false)
       ..prob(159, magnitude == 6);
   } else if (magnitude <= 10) {
     final offset = magnitude - 7;
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), false)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 7), true)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), false)
+      ..prob(probabilityAt(7), true)
       ..prob(165, offset >= 2)
       ..prob(145, offset.isOdd);
   } else if (magnitude <= 18) {
     final offset = magnitude - 11;
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 8), false)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 9), false)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), true)
+      ..prob(probabilityAt(8), false)
+      ..prob(probabilityAt(9), false)
       ..prob(173, (offset & 4) != 0)
       ..prob(148, (offset & 2) != 0)
       ..prob(140, offset.isOdd);
   } else if (magnitude <= 34) {
     final offset = magnitude - 19;
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 8), false)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 9), true)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), true)
+      ..prob(probabilityAt(8), false)
+      ..prob(probabilityAt(9), true)
       ..prob(176, (offset & 8) != 0)
       ..prob(155, (offset & 4) != 0)
       ..prob(140, (offset & 2) != 0)
@@ -152,11 +186,11 @@ void _writeYAcToken(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
   } else if (magnitude <= 66) {
     final offset = magnitude - 35;
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 8), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 10), false)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), true)
+      ..prob(probabilityAt(8), true)
+      ..prob(probabilityAt(10), false)
       ..prob(180, (offset & 16) != 0)
       ..prob(157, (offset & 8) != 0)
       ..prob(141, (offset & 4) != 0)
@@ -165,11 +199,11 @@ void _writeYAcToken(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
   } else {
     final offset = magnitude - 67;
     coeffs
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 2), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 3), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 6), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 8), true)
-      ..prob(_fixtureYAcProbability(coefficientIndex, context, 10), true)
+      ..prob(probabilityAt(2), true)
+      ..prob(probabilityAt(3), true)
+      ..prob(probabilityAt(6), true)
+      ..prob(probabilityAt(8), true)
+      ..prob(probabilityAt(10), true)
       ..prob(254, (offset & 1024) != 0)
       ..prob(254, (offset & 512) != 0)
       ..prob(243, (offset & 256) != 0)
@@ -182,14 +216,20 @@ void _writeYAcToken(_BoolWriter coeffs, int coefficient, int coefficientIndex) {
       ..prob(130, (offset & 2) != 0)
       ..prob(129, offset.isOdd);
   }
-  final nextIndex = coefficientIndex + 1;
-  final nextContext = magnitude == 1 ? 1 : 2;
-  coeffs.bit(coefficient.isNegative);
-  if (nextIndex < 16) {
-    coeffs.prob(_fixtureYAcProbability(nextIndex, nextContext, 0), false);
-  }
 }
 
-int _fixtureYAcProbability(int coefficientIndex, int context, int node) {
-  return _fixtureYAcProbs[_fixtureCoefficientBands[coefficientIndex]][context][node];
+int _fixtureYAcProbability(
+  int coefficientIndex,
+  int context,
+  int node,
+  int? yAcBandTwoEobProbability,
+) {
+  final band = _fixtureCoefficientBands[coefficientIndex];
+  if (band == 2 &&
+      context == 0 &&
+      node == 0 &&
+      yAcBandTwoEobProbability != null) {
+    return yAcBandTwoEobProbability;
+  }
+  return _fixtureYAcProbs[band][context][node];
 }
