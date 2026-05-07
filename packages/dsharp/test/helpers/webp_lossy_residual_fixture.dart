@@ -119,7 +119,7 @@ void _writeUvDcToken(
   bool hasMore = false,
 }) {
   final magnitude = coefficient.abs();
-  if (magnitude < 1 || magnitude > 66) {
+  if (magnitude < 1 || magnitude > 2048) {
     throw ArgumentError.value(coefficient, 'coefficient');
   }
   coeffs
@@ -177,7 +177,7 @@ void _writeUvDcToken(
       ..prob(155, (offset & 4) != 0)
       ..prob(140, (offset & 2) != 0)
       ..prob(135, offset.isOdd);
-  } else {
+  } else if (magnitude <= 66) {
     final offset = magnitude - 35;
     coeffs
       ..prob(213, true)
@@ -190,6 +190,25 @@ void _writeUvDcToken(
       ..prob(141, (offset & 4) != 0)
       ..prob(134, (offset & 2) != 0)
       ..prob(130, offset.isOdd);
+  } else {
+    final offset = magnitude - 67;
+    coeffs
+      ..prob(213, true)
+      ..prob(235, true)
+      ..prob(220, true)
+      ..prob(240, true)
+      ..prob(255, true)
+      ..prob(254, (offset & 1024) != 0)
+      ..prob(254, (offset & 512) != 0)
+      ..prob(243, (offset & 256) != 0)
+      ..prob(230, (offset & 128) != 0)
+      ..prob(196, (offset & 64) != 0)
+      ..prob(177, (offset & 32) != 0)
+      ..prob(153, (offset & 16) != 0)
+      ..prob(140, (offset & 8) != 0)
+      ..prob(133, (offset & 4) != 0)
+      ..prob(130, (offset & 2) != 0)
+      ..prob(129, offset.isOdd);
   }
   coeffs
     ..bit(coefficient.isNegative)
