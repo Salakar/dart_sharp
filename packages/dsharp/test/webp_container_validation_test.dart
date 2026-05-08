@@ -114,6 +114,31 @@ void main() {
     );
   });
 
+  test('rejects animation alpha flag and frame mismatches', () async {
+    final alphaFlagWithoutFrameAlpha = animatedVp8Webp(width: 1, height: 1);
+    alphaFlagWithoutFrameAlpha[20] |= 0x10;
+    final frameAlphaWithoutFlag = animatedVp8Webp(
+      width: 1,
+      height: 1,
+      alpha: <int>[127],
+    );
+    frameAlphaWithoutFlag[20] &= 0xef;
+
+    for (final bytes in <Uint8List>[
+      alphaFlagWithoutFrameAlpha,
+      frameAlphaWithoutFlag,
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects VP8X chunks that are not first', () async {
     final imageBeforeVp8x = extendedSolidVp8Webp(width: 1, height: 1);
     final alphaBeforeVp8x = alphaSolidVp8Webp(

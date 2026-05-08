@@ -244,6 +244,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     if (frames.isEmpty) {
       throw const InvalidImageException('WebP animation has no frames.');
     }
+    if (parsed.hasAlpha != frames.any((frame) => frame.hasAlpha)) {
+      throw const InvalidImageException(
+        'WebP animation alpha flag does not match frame data.',
+      );
+    }
   } else if (hasAnimationHeader || frames.isNotEmpty) {
     throw const InvalidImageException('WebP animation flag is not set.');
   }
@@ -382,7 +387,7 @@ WebpFrameInfo _frameInfo(Uint8List data) {
       'WebP animation frame has no image data.',
     );
   }
-  if (payload.hasVp8l && payload.hasAlpha) {
+  if (payload.hasVp8l && payload.hasAlphaChunk) {
     throw const InvalidImageException('WebP VP8L animation frame has ALPH.');
   }
   final width = _uint24Le(data, 6) + 1;
@@ -401,10 +406,18 @@ WebpFrameInfo _frameInfo(Uint8List data) {
   );
 }
 
-({bool hasAlpha, bool hasVp8l, bool hasVp8, int? width, int? height})
+({
+  bool hasAlpha,
+  bool hasAlphaChunk,
+  bool hasVp8l,
+  bool hasVp8,
+  int? width,
+  int? height,
+})
 _framePayloadInfo(Uint8List bytes, {required int start}) {
   var offset = start;
   var hasAlpha = false;
+  var hasAlphaChunk = false;
   var hasVp8l = false;
   var hasVp8 = false;
   int? width;
@@ -429,6 +442,7 @@ _framePayloadInfo(Uint8List bytes, {required int start}) {
           'WebP animation frame ALPH chunk follows image data.',
         );
       }
+      hasAlphaChunk = true;
       hasAlpha = true;
     } else if (type == 'VP8L') {
       imageChunkCount += 1;
@@ -441,6 +455,7 @@ _framePayloadInfo(Uint8List bytes, {required int start}) {
       width = info.width;
       height = info.height;
       hasVp8l = true;
+      hasAlpha = hasAlpha || info.hasAlpha;
     } else if (type == 'VP8 ') {
       imageChunkCount += 1;
       if (imageChunkCount > 1) {
@@ -460,6 +475,7 @@ _framePayloadInfo(Uint8List bytes, {required int start}) {
   }
   return (
     hasAlpha: hasAlpha,
+    hasAlphaChunk: hasAlphaChunk,
     hasVp8l: hasVp8l,
     hasVp8: hasVp8,
     width: width,

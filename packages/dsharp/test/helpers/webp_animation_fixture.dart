@@ -21,7 +21,7 @@ Uint8List animatedVp8lWebp() {
   final chunks = _ByteWriter()
     ..ascii('VP8X')
     ..u32(10)
-    ..byte(0x12)
+    ..byte(0x02)
     ..byte(0)
     ..byte(0)
     ..byte(0)
