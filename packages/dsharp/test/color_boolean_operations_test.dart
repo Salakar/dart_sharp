@@ -39,6 +39,11 @@ void main() {
           rawRgba(1, 1, <int>[64, 64, 64, 77]),
         ).gamma(2),
       );
+      final gammaOut = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgba(1, 1, <int>[64, 64, 64, 77]),
+        ).gamma(2.2, 3),
+      );
 
       expect(firstBytes(gray), <int>[18, 18, 18, 77]);
       expect(firstBytes(grayDisabled), <int>[10, 20, 30, 77]);
@@ -63,6 +68,7 @@ void main() {
       );
       expect(firstBytes(colorThreshold), <int>[0, 255, 255, 77]);
       expect(firstBytes(gamma), <int>[128, 128, 128, 77]);
+      expect(firstBytes(gammaOut), <int>[161, 161, 161, 77]);
       expect(
         () => ImagePipeline.fromRawPixels(raw).threshold(-1),
         throwsA(isA<OperationValidationException>()),
@@ -73,6 +79,22 @@ void main() {
       );
       expect(
         () => ImagePipeline.fromRawPixels(raw).threshold(20, 'false'),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).gamma(0.5),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).gamma(3.1),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).gamma(2.2, 0.5),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).gamma(2.2, 3.1),
         throwsA(isA<OperationValidationException>()),
       );
     },

@@ -54,8 +54,12 @@ extension ImagePipelineColor on ImagePipeline {
   }
 
   /// Applies gamma correction.
-  ImagePipeline gamma([double gamma = 2.2]) {
-    return _append(GammaOperation(gamma));
+  ImagePipeline gamma([num gamma = 2.2, num? gammaOut]) {
+    _validateGamma('Gamma', gamma);
+    if (gammaOut != null) {
+      _validateGamma('Gamma output', gammaOut);
+    }
+    return _append(GammaOperation(gamma, gammaOut));
   }
 
   /// Normalizes channel values between lower and upper percentiles.
@@ -204,5 +208,11 @@ extension ImagePipelineColor on ImagePipeline {
       );
     }
     return ThresholdOptions(threshold: thresholdValue, grayscale: grayscale);
+  }
+
+  void _validateGamma(String label, num value) {
+    if (value < 1 || value > 3) {
+      throw OperationValidationException('$label must be between 1.0 and 3.0.');
+    }
   }
 }

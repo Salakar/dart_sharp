@@ -222,26 +222,40 @@ final class TintOperation implements PipelineOperation {
 /// Applies gamma correction.
 final class GammaOperation implements PipelineOperation {
   /// Creates a gamma operation.
-  const GammaOperation([this.gamma = 2.2]);
+  const GammaOperation([this.gamma = 2.2, this.gammaOut]);
 
-  /// Gamma value.
-  final double gamma;
+  /// Input gamma value.
+  final num gamma;
+
+  /// Output gamma value.
+  final num? gammaOut;
 
   @override
   String get name => 'gamma';
 
   @override
   PixelImage apply(PixelImage image) {
+    _validateGamma('Gamma', gamma);
+    final outputGamma = gammaOut ?? gamma;
+    _validateGamma('Gamma output', outputGamma);
     return mapFrames(image, (raw) {
       final output = raw.bytes;
       final channels = raw.channels.value;
       for (var i = 0; i < output.length; i += channels) {
         for (var c = 0; c < min(3, channels); c += 1) {
-          output[i + c] = byteClamp(255 * pow(output[i + c] / 255, 1 / gamma));
+          output[i + c] = byteClamp(
+            255 * pow(output[i + c] / 255, 1 / outputGamma),
+          );
         }
       }
       return sameSizeRaw(raw, output, raw.channels);
     });
+  }
+}
+
+void _validateGamma(String label, num value) {
+  if (value < 1 || value > 3) {
+    throw OperationValidationException('$label must be between 1.0 and 3.0.');
   }
 }
 
