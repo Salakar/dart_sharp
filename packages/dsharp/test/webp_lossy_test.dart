@@ -232,6 +232,24 @@ void main() {
     ]);
   });
 
+  test('decodes VP8 streams with multiple coefficient partitions', () async {
+    final bytes = eobResidualVp8Webp(
+      width: 2,
+      height: 17,
+      qIndex: 1,
+      tokenPartitionBits: 1,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.width, 2);
+    expect(image.height, 17);
+    final rgba = image.firstFrameBytes();
+    for (var i = 0; i < rgba.length; i += 4) {
+      expect(rgba.sublist(i, i + 4), <int>[128, 128, 128, 255]);
+    }
+  });
+
   test('applies supported VP8 Y2 DC residuals', () async {
     final bytes = y2DcResidualVp8Webp(width: 2, height: 2);
 

@@ -62,11 +62,16 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   final frame = _readSupportedFrameHeader(bits);
   final mbNoSkipCoeff = bits.readBit() == 1;
   final probSkipFalse = mbNoSkipCoeff ? bits.readLiteral(8) : 0;
-  final coeffs = Vp8BoolDecoder(chunk.sublist(firstEnd));
+  final coeffPartitions = _readCoeffPartitions(
+    chunk,
+    firstEnd,
+    frame.tokenPartitionCount,
+  );
   final planes = _Vp8Planes(header.width, header.height);
   final contexts = _Vp8TokenContexts(planes.mbCols);
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
     contexts.resetLeft();
+    final coeffs = coeffPartitions[mbY & (coeffPartitions.length - 1)];
     for (var mbX = 0; mbX < planes.mbCols; mbX += 1) {
       final segmentId = frame.readSegmentId(bits);
       final skipCoeff = mbNoSkipCoeff && bits.readBool(probSkipFalse) == 1;
@@ -146,11 +151,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
       'VP8 segmentation loop-filter updates are not implemented yet.',
     );
   }
-  if (bits.readLiteral(2) != 0) {
-    throw const UnsupportedCodecException(
-      'Multiple VP8 coefficient partitions are not implemented yet.',
-    );
-  }
+  final tokenPartitionCount = 1 << bits.readLiteral(2);
   final qIndex = bits.readLiteral(7);
   _readOptionalSigned(bits, 4);
   final y2DcDelta = _readOptionalSigned(bits, 4);
@@ -191,10 +192,42 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     uvDcDelta: uvDcDelta,
     uvAcDelta: uvAcDelta,
     segmentation: segmentation,
+    tokenPartitionCount: tokenPartitionCount,
     yAcProbs: yAcProbs,
     y2Probs: y2Probs,
     uvProbs: uvProbs,
   );
+}
+
+List<Vp8BoolDecoder> _readCoeffPartitions(
+  Uint8List chunk,
+  int offset,
+  int count,
+) {
+  if (count == 1) {
+    return <Vp8BoolDecoder>[Vp8BoolDecoder(chunk.sublist(offset))];
+  }
+  final tableEnd = offset + (count - 1) * 3;
+  if (tableEnd > chunk.length) {
+    throw const InvalidImageException('Truncated VP8 coefficient partitions.');
+  }
+  final partitions = <Vp8BoolDecoder>[];
+  var partitionStart = tableEnd;
+  for (var i = 0; i < count - 1; i += 1) {
+    final sizeOffset = offset + i * 3;
+    final size =
+        chunk[sizeOffset] |
+        (chunk[sizeOffset + 1] << 8) |
+        (chunk[sizeOffset + 2] << 16);
+    final partitionEnd = partitionStart + size;
+    if (partitionEnd > chunk.length) {
+      throw const InvalidImageException('Truncated VP8 coefficient partition.');
+    }
+    partitions.add(Vp8BoolDecoder(chunk.sublist(partitionStart, partitionEnd)));
+    partitionStart = partitionEnd;
+  }
+  partitions.add(Vp8BoolDecoder(chunk.sublist(partitionStart)));
+  return partitions;
 }
 
 int _readOptionalSigned(Vp8BoolDecoder bits, int magnitudeBits) {
@@ -254,6 +287,7 @@ final class _Vp8FrameHeader {
     required this.uvDcDelta,
     required this.uvAcDelta,
     required this.segmentation,
+    required this.tokenPartitionCount,
     required this.yAcProbs,
     required this.y2Probs,
     required this.uvProbs,
@@ -265,6 +299,7 @@ final class _Vp8FrameHeader {
   final int uvDcDelta;
   final int uvAcDelta;
   final _Vp8Segmentation segmentation;
+  final int tokenPartitionCount;
   final _Vp8LumaAcProbs yAcProbs;
   final _Vp8Y2Probs y2Probs;
   final _Vp8ChromaProbs uvProbs;

@@ -98,8 +98,14 @@ Uint8List eobResidualVp8Webp({
   required int width,
   required int height,
   int qIndex = 0,
+  int tokenPartitionBits = 0,
 }) {
-  final vp8 = _residualVp8Payload(width: width, height: height, qIndex: qIndex);
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    qIndex: qIndex,
+    tokenPartitionBits: tokenPartitionBits,
+  );
   return _simpleWebp(vp8);
 }
 
@@ -216,9 +222,13 @@ Uint8List _residualVp8Payload({
   List<int>? segmentIds,
   List<int?>? segmentQuantIndexes,
   bool segmentAbsolute = false,
+  int tokenPartitionBits = 0,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
+  if (tokenPartitionBits < 0 || tokenPartitionBits > 3) {
+    throw ArgumentError.value(tokenPartitionBits, 'tokenPartitionBits');
+  }
   final currentSegmentIds = segmentIds;
   if (currentSegmentIds != null &&
       currentSegmentIds.length != mbCols * mbRows) {
@@ -244,7 +254,7 @@ Uint8List _residualVp8Payload({
     ..literal(0, 6)
     ..literal(0, 3)
     ..bit(false)
-    ..literal(0, 2)
+    ..literal(tokenPartitionBits, 2)
     ..literal(qIndex, 7);
   for (var i = 0; i < 5; i += 1) {
     first.bit(false);
@@ -280,10 +290,14 @@ Uint8List _residualVp8Payload({
     first.prob(142, false);
   }
   final firstPartition = first.finish();
-  final coeffs = _BoolWriter();
+  final coeffWriters = [
+    for (var i = 0; i < 1 << tokenPartitionBits; i += 1) _BoolWriter(),
+  ];
   final contexts = _FixtureTokenContexts(mbCols);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
     final mbX = i % mbCols;
+    final mbY = i ~/ mbCols;
+    final coeffs = coeffWriters[mbY & (coeffWriters.length - 1)];
     if (mbX == 0) {
       contexts.resetLeft();
     }
@@ -358,16 +372,22 @@ Uint8List _residualVp8Payload({
       }
     }
   }
-  return (_ByteWriter()
-        ..u24((1 << 4) | (firstPartition.length << 5))
-        ..byte(0x9d)
-        ..byte(0x01)
-        ..byte(0x2a)
-        ..u16(width)
-        ..u16(height)
-        ..bytes(firstPartition)
-        ..bytes(coeffs.finish()))
-      .finish();
+  final tokenPartitions = [for (final coeffs in coeffWriters) coeffs.finish()];
+  final vp8 = _ByteWriter()
+    ..u24((1 << 4) | (firstPartition.length << 5))
+    ..byte(0x9d)
+    ..byte(0x01)
+    ..byte(0x2a)
+    ..u16(width)
+    ..u16(height)
+    ..bytes(firstPartition);
+  for (var i = 0; i < tokenPartitions.length - 1; i += 1) {
+    vp8.u24(tokenPartitions[i].length);
+  }
+  for (final partition in tokenPartitions) {
+    vp8.bytes(partition);
+  }
+  return vp8.finish();
 }
 
 void _writeSegmentationHeader(
