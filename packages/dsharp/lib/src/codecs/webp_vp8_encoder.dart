@@ -101,6 +101,12 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaSecondHorizontalAcBlocks = _lossyLumaSecondHorizontalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
@@ -108,6 +114,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaAcBlocks: lumaAcBlocks,
     lumaVerticalAcBlocks: lumaVerticalAcBlocks,
     lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
+    lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -185,6 +192,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaAcBlocks,
   required List<int> lumaVerticalAcBlocks,
   required List<int> lumaDiagonalAcBlocks,
+  required List<int> lumaSecondHorizontalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -233,6 +241,7 @@ Uint8List _encodeVp8SolidPayload({
           lumaAcBlocks[blockOffset],
           lumaVerticalAcBlocks[blockOffset],
           lumaDiagonalAcBlocks[blockOffset],
+          lumaSecondHorizontalAcBlocks[blockOffset],
         );
       }
       final predictedU = _predictedChromaDc(
@@ -295,6 +304,7 @@ void _writeLumaDct(
   int acCoefficient,
   int verticalAcCoefficient,
   int diagonalAcCoefficient,
+  int secondHorizontalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
@@ -306,6 +316,7 @@ void _writeLumaDct(
       verticalAcCoefficient,
       0,
       diagonalAcCoefficient,
+      secondHorizontalAcCoefficient,
     ],
     context,
     (coefficientIndex, context, node) {
@@ -318,7 +329,8 @@ void _writeLumaDct(
     dcCoefficient != 0 ||
         acCoefficient != 0 ||
         verticalAcCoefficient != 0 ||
-        diagonalAcCoefficient != 0,
+        diagonalAcCoefficient != 0 ||
+        secondHorizontalAcCoefficient != 0,
   );
 }
 
