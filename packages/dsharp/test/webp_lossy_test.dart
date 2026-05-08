@@ -72,6 +72,24 @@ void main() {
     ]);
   });
 
+  test('rejects unsupported VP8 color spaces on decode', () async {
+    final bytes = solidVp8Webp(
+      width: 1,
+      height: 1,
+      unsupportedColorSpace: true,
+    );
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.width, 1);
+    expect(metadata.height, 1);
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('rejects VP8X WebP with reserved feature flags', () async {
     for (final reservedFlags in <int>[0x01, 0x40, 0x80]) {
       final bytes = reservedFlagVp8xWebp(

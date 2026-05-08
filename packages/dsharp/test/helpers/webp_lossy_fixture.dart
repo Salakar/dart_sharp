@@ -11,6 +11,7 @@ Uint8List solidVp8Webp({
   int yMode = 0,
   int loopFilterLevel = 0,
   bool loopFilterAdjustmentEnabled = false,
+  bool unsupportedColorSpace = false,
   List<int?>? loopFilterRefDeltas,
   List<int?>? loopFilterModeDeltas,
 }) {
@@ -21,6 +22,7 @@ Uint8List solidVp8Webp({
       yMode: yMode,
       loopFilterLevel: loopFilterLevel,
       loopFilterAdjustmentEnabled: loopFilterAdjustmentEnabled,
+      unsupportedColorSpace: unsupportedColorSpace,
       loopFilterRefDeltas: loopFilterRefDeltas,
       loopFilterModeDeltas: loopFilterModeDeltas,
     ),
@@ -430,13 +432,14 @@ Uint8List _solidVp8Payload({
   required int yMode,
   int loopFilterLevel = 0,
   bool loopFilterAdjustmentEnabled = false,
+  bool unsupportedColorSpace = false,
   List<int?>? loopFilterRefDeltas,
   List<int?>? loopFilterModeDeltas,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
   final first = _BoolWriter()
-    ..bit(false)
+    ..bit(unsupportedColorSpace)
     ..bit(false)
     ..bit(false);
   _writeLoopFilterHeader(
