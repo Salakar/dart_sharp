@@ -459,6 +459,41 @@ void main() {
       255,
     ]);
   });
+
+  test('optional upstream WebP corpus decodes all fixture pixels', () async {
+    final root = Directory('../../sharp_clone/test/fixtures');
+    if (!root.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+    final fixtures =
+        root
+            .listSync(recursive: true)
+            .whereType<File>()
+            .where((file) => file.path.toLowerCase().endsWith('.webp'))
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
+
+    expect(fixtures, isNotEmpty);
+    for (final fixture in fixtures) {
+      final bytes = await fixture.readAsBytes();
+      final pipeline = ImagePipeline.fromBytes(bytes);
+      final metadata = await pipeline.metadata();
+      final image = await pipeline.toPixelImage();
+
+      expect(metadata.format, ImageFormat.webp, reason: fixture.path);
+      expect(image.width, metadata.width, reason: fixture.path);
+      expect(image.height, metadata.height, reason: fixture.path);
+      expect(
+        image.frames.first.pixels.bytes.length,
+        image.width * image.height * 4,
+        reason: fixture.path,
+      );
+      if (metadata.frames > 1) {
+        expect(image.frames.length, metadata.frames, reason: fixture.path);
+      }
+    }
+  });
 }
 
 void _expectPixelNear(
