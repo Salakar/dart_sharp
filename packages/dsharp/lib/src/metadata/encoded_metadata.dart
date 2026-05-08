@@ -247,6 +247,8 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
   var hasAlpha = false;
   int? loopCount;
   var progressive = false;
+  var pendingDelay = Duration.zero;
+  final frameDelays = <Duration>[];
   while (offset < bytes.length) {
     final marker = bytes[offset];
     offset += 1;
@@ -259,6 +261,8 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
       }
       final imagePacked = bytes[offset + 8];
       progressive = progressive || (imagePacked & 0x40) != 0;
+      frameDelays.add(pendingDelay);
+      pendingDelay = Duration.zero;
       offset += 9;
       if ((imagePacked & 0x80) != 0) {
         offset += 3 * (1 << ((imagePacked & 0x07) + 1));
@@ -279,6 +283,9 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
           throw const InvalidImageException('Invalid GIF graphics extension.');
         }
         hasAlpha = hasAlpha || (bytes[offset + 1] & 0x01) != 0;
+        pendingDelay = Duration(
+          milliseconds: readUint16Le(bytes, offset + 2) * 10,
+        );
         offset += 6;
       } else if (label == 0xff) {
         if (offset >= bytes.length) {
@@ -317,6 +324,7 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
     hasAlpha: hasAlpha,
     frames: frames == 0 ? 1 : frames,
     loopCount: loopCount,
+    frameDelays: frameDelays,
     bitDepth: (packed & 0x07) + 1,
     isProgressive: progressive,
   );
@@ -336,6 +344,7 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
     hasAlpha: info.hasAlpha,
     frames: frames,
     loopCount: info.isAnimated ? info.loopCount : null,
+    frameDelays: <Duration>[for (final frame in info.frames) frame.duration],
     hasProfile: info.hasProfile,
     hasExif: info.hasExif,
     hasXmp: info.hasXmp,

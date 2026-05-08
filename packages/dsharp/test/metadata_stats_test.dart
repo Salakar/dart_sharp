@@ -39,6 +39,35 @@ void main() {
     expect(metadata.height, 1);
   });
 
+  test('metadata includes decoded animation delays', () async {
+    RawPixels pixel(int red) {
+      return RawPixels(
+        bytes: Uint8List.fromList(<int>[red, 0, 0, 255]),
+        width: 1,
+        height: 1,
+        channels: ChannelCount.four,
+      );
+    }
+
+    final metadata = await ImagePipeline.fromPixelImage(
+      PixelImage(
+        frames: <ImageFrame>[
+          ImageFrame(pixels: pixel(1), delay: const Duration(milliseconds: 10)),
+          ImageFrame(pixels: pixel(2), delay: const Duration(milliseconds: 20)),
+        ],
+        loopCount: 4,
+      ),
+    ).metadata();
+
+    expect(metadata.frames, 2);
+    expect(metadata.loopCount, 4);
+    expect(metadata.frameDelays, <Duration>[
+      Duration(milliseconds: 10),
+      Duration(milliseconds: 20),
+    ]);
+    expect(metadata.delay, <int>[10, 20]);
+  });
+
   test('stats compute per-channel values and opacity', () async {
     final stats = await ImagePipeline.fromRawPixels(
       RawPixels(

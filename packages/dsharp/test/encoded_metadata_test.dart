@@ -62,6 +62,11 @@ void main() {
     expect(metadata.height, 1);
     expect(metadata.frames, 2);
     expect(metadata.loopCount, 3);
+    expect(metadata.frameDelays, <Duration>[
+      Duration(milliseconds: 30),
+      Duration(milliseconds: 40),
+    ]);
+    expect(metadata.delay, <int>[30, 40]);
     expect(metadata.hasAlpha, isTrue);
   });
 
@@ -115,6 +120,21 @@ void main() {
     expect(metadata.hasXmp, isTrue);
     expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.orientation, 6);
+  });
+
+  test('reads WebP animation frame delay metadata', () async {
+    final metadata = await ImagePipeline.fromBytes(
+      animatedVp8lWebp(),
+    ).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.frames, 2);
+    expect(metadata.loopCount, 3);
+    expect(metadata.frameDelays, <Duration>[
+      Duration(milliseconds: 10),
+      Duration(milliseconds: 20),
+    ]);
+    expect(metadata.delay, <int>[10, 20]);
   });
 
   test('metadata payload byte getters are defensive', () async {
@@ -306,8 +326,8 @@ Uint8List _gifMetadataBytes() {
     ..writeBytes(<int>[0x21, 0xff, 0x0b])
     ..writeAscii('NETSCAPE2.0')
     ..writeBytes(<int>[3, 1, 3, 0, 0]);
-  _gifFrame(writer);
-  _gifFrame(writer);
+  _gifFrame(writer, delayCs: 3);
+  _gifFrame(writer, delayCs: 4);
   return (writer..writeByte(0x3b)).toBytes();
 }
 
@@ -548,9 +568,9 @@ Uint8List _exifOrientation(int orientation) {
   return writer.toBytes();
 }
 
-void _gifFrame(ByteWriter writer) {
+void _gifFrame(ByteWriter writer, {required int delayCs}) {
   writer
-    ..writeBytes(<int>[0x21, 0xf9, 4, 1, 0, 0, 0, 0])
+    ..writeBytes(<int>[0x21, 0xf9, 4, 1, delayCs, delayCs >> 8, 0, 0])
     ..writeByte(0x2c)
     ..writeUint16Le(0)
     ..writeUint16Le(0)

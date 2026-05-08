@@ -17,6 +17,7 @@ final class ImageMetadata {
     this.frames = 1,
     this.pageHeight,
     this.loopCount,
+    List<Duration> frameDelays = const <Duration>[],
     this.density,
     bool hasProfile = false,
     bool hasExif = false,
@@ -27,7 +28,8 @@ final class ImageMetadata {
     this.bitDepth,
     this.orientation,
     this.isProgressive = false,
-  }) : _iccProfile = iccProfile,
+  }) : _frameDelays = frameDelays,
+       _iccProfile = iccProfile,
        _exif = exif,
        hasProfile = hasProfile || iccProfile != null,
        hasExif = hasExif || exif != null,
@@ -59,6 +61,20 @@ final class ImageMetadata {
 
   /// Optional animation loop count.
   final int? loopCount;
+
+  final List<Duration> _frameDelays;
+
+  /// Animation frame delays when known.
+  List<Duration> get frameDelays {
+    return List<Duration>.unmodifiable(_frameDelays);
+  }
+
+  /// Sharp-style frame delays in milliseconds.
+  List<int> get delay {
+    return List<int>.unmodifiable(
+      frameDelays.map((frameDelay) => frameDelay.inMilliseconds),
+    );
+  }
 
   /// Optional pixel density in DPI.
   final double? density;
@@ -113,6 +129,10 @@ final class ImageMetadata {
       frames: image.frames.length,
       pageHeight: image.firstFrame.pixels.pageHeight,
       loopCount: image.loopCount,
+      frameDelays: <Duration>[
+        for (final frame in image.frames)
+          if (frame.delay != null) frame.delay!,
+      ],
       bitDepth: 8,
     );
   }
