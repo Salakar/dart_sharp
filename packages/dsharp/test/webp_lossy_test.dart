@@ -72,6 +72,38 @@ void main() {
     ]);
   });
 
+  test('rejects VP8X WebP with reserved feature flags', () async {
+    for (final reservedFlags in <int>[0x01, 0x40, 0x80]) {
+      final bytes = reservedFlagVp8xWebp(
+        width: 1,
+        height: 1,
+        reservedFlags: reservedFlags,
+      );
+
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
+  test('rejects duplicate top-level WebP ALPH chunks', () async {
+    final bytes = duplicateAlphaVp8Webp(width: 2, height: 1);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('ignores VP8 chunks appended outside declared RIFF payload', () async {
     final base = extendedVp8lWebp(
       width: 1,

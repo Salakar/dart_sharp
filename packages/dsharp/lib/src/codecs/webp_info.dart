@@ -4,6 +4,8 @@ import '../api/exceptions.dart';
 import 'binary_io.dart';
 import 'webp_riff.dart';
 
+const _vp8xReservedFeatureFlags = 0xc1;
+
 /// WebP compression payload kind.
 enum WebpCompression {
   /// Lossy VP8 payload.
@@ -108,10 +110,12 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
   WebpImageInfo? info;
-  var hasAlpha = false;
-  var hasProfile = false;
-  var hasExif = false;
-  var hasXmp = false;
+  WebpCompression? imageCompression;
+  var hasVp8x = false;
+  var hasAlphaChunk = false;
+  var hasProfileChunk = false;
+  var hasExifChunk = false;
+  var hasXmpChunk = false;
   var loopCount = 1;
   var hasAnimationHeader = false;
   var imageChunkCount = 0;
@@ -130,28 +134,47 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       if (imageChunkCount > 1) {
         throw const InvalidImageException('WebP has multiple image chunks.');
       }
+      imageCompression = WebpCompression.vp8;
       info ??= _vp8Info(data);
     } else if (type == 'VP8L') {
       imageChunkCount += 1;
       if (imageChunkCount > 1) {
         throw const InvalidImageException('WebP has multiple image chunks.');
       }
+      imageCompression = WebpCompression.vp8l;
       info ??= _vp8lInfo(data);
     } else if (type == 'VP8X') {
+      if (hasVp8x) {
+        throw const InvalidImageException('WebP has multiple VP8X chunks.');
+      }
+      hasVp8x = true;
       info = _vp8xInfo(data);
-      hasAlpha = info.hasAlpha;
-      hasProfile = info.hasProfile;
-      hasExif = info.hasExif;
-      hasXmp = info.hasXmp;
     } else if (type == 'ALPH') {
-      hasAlpha = true;
+      if (hasAlphaChunk) {
+        throw const InvalidImageException('WebP has multiple ALPH chunks.');
+      }
+      hasAlphaChunk = true;
     } else if (type == 'ICCP') {
-      hasProfile = true;
+      if (hasProfileChunk) {
+        throw const InvalidImageException('WebP has multiple ICCP chunks.');
+      }
+      hasProfileChunk = true;
     } else if (type == 'EXIF') {
-      hasExif = true;
+      if (hasExifChunk) {
+        throw const InvalidImageException('WebP has multiple EXIF chunks.');
+      }
+      hasExifChunk = true;
     } else if (type == 'XMP ') {
-      hasXmp = true;
+      if (hasXmpChunk) {
+        throw const InvalidImageException('WebP has multiple XMP chunks.');
+      }
+      hasXmpChunk = true;
     } else if (type == 'ANIM') {
+      if (hasAnimationHeader) {
+        throw const InvalidImageException(
+          'WebP animation has multiple ANIM chunks.',
+        );
+      }
       if (data.length < 6) {
         throw const InvalidImageException('Invalid WebP animation header.');
       }
@@ -180,6 +203,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
         'WebP animation has top-level image chunks.',
       );
     }
+    if (hasAlphaChunk) {
+      throw const InvalidImageException(
+        'WebP animation has top-level ALPH chunks.',
+      );
+    }
     if (!hasAnimationHeader) {
       throw const InvalidImageException('WebP animation is missing ANIM.');
     }
@@ -188,6 +216,13 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     }
   } else if (hasAnimationHeader || frames.isNotEmpty) {
     throw const InvalidImageException('WebP animation flag is not set.');
+  }
+  if (hasAlphaChunk &&
+      (parsed.compression != WebpCompression.extended ||
+          imageCompression != WebpCompression.vp8)) {
+    throw const InvalidImageException(
+      'WebP ALPH chunk requires an extended VP8 image.',
+    );
   }
   for (final frame in frames) {
     if (frame.x + frame.width > parsed.width ||
@@ -200,10 +235,12 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     height: parsed.height,
     compression: parsed.compression,
     hasAlpha:
-        parsed.hasAlpha || hasAlpha || frames.any((frame) => frame.hasAlpha),
-    hasProfile: parsed.hasProfile || hasProfile,
-    hasExif: parsed.hasExif || hasExif,
-    hasXmp: parsed.hasXmp || hasXmp,
+        parsed.hasAlpha ||
+        hasAlphaChunk ||
+        frames.any((frame) => frame.hasAlpha),
+    hasProfile: parsed.hasProfile || hasProfileChunk,
+    hasExif: parsed.hasExif || hasExifChunk,
+    hasXmp: parsed.hasXmp || hasXmpChunk,
     isAnimated: parsed.isAnimated || frames.isNotEmpty,
     loopCount: frames.isEmpty ? parsed.loopCount : loopCount,
     frames: List<WebpFrameInfo>.unmodifiable(frames),
@@ -255,6 +292,9 @@ WebpImageInfo _vp8xInfo(Uint8List data) {
     throw const InvalidImageException('Invalid VP8X header.');
   }
   final flags = data[0];
+  if ((flags & _vp8xReservedFeatureFlags) != 0) {
+    throw const InvalidImageException('Invalid VP8X feature flags.');
+  }
   return WebpImageInfo(
     width: _uint24Le(data, 4) + 1,
     height: _uint24Le(data, 7) + 1,

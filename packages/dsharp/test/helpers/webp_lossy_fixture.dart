@@ -43,6 +43,48 @@ Uint8List extendedSolidVp8Webp({required int width, required int height}) {
   return _riffWebp(chunks.finish());
 }
 
+/// Builds an extended lossy WebP with reserved VP8X feature bits set.
+Uint8List reservedFlagVp8xWebp({
+  required int width,
+  required int height,
+  required int reservedFlags,
+}) {
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(reservedFlags)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(chunks, 'VP8 ', vp8);
+  return _riffWebp(chunks.finish());
+}
+
+/// Builds an extended lossy WebP with duplicate top-level ALPH chunks.
+Uint8List duplicateAlphaVp8Webp({required int width, required int height}) {
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final alpha = Uint8List.fromList(<int>[
+    0,
+    for (var i = 0; i < width * height; i += 1) 255,
+  ]);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(chunks, 'ALPH', alpha);
+  _writeChunk(chunks, 'ALPH', alpha);
+  _writeChunk(chunks, 'VP8 ', vp8);
+  return _riffWebp(chunks.finish());
+}
+
 /// Builds an extended lossy VP8 WebP with an uncompressed ALPH chunk.
 Uint8List alphaSolidVp8Webp({
   required int width,

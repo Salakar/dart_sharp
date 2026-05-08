@@ -86,6 +86,26 @@ void main() {
     );
   });
 
+  test('rejects top-level ALPH chunks with VP8L payloads', () async {
+    final bytes = extendedVp8lWebpWithAlphaChunk(
+      width: 2,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 128,
+    );
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('decodes simple two-symbol VP8L prefix codes', () async {
     final bytes = twoGreenVp8lWebp(
       width: 4,

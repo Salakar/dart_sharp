@@ -410,6 +410,50 @@ Uint8List extendedVp8lWebp({
       .finish();
 }
 
+/// Builds an extended static WebP with invalid top-level ALPH plus VP8L.
+Uint8List extendedVp8lWebpWithAlphaChunk({
+  required int width,
+  required int height,
+  required int red,
+  required int green,
+  required int blue,
+  required int alpha,
+}) {
+  final vp8l = _vp8lPayload(
+    width: width,
+    height: height,
+    red: red,
+    green: green,
+    blue: blue,
+    alpha: 255,
+  );
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(
+    chunks,
+    'ALPH',
+    Uint8List.fromList(<int>[
+      0,
+      for (var i = 0; i < width * height; i += 1) alpha,
+    ]),
+  );
+  _writeChunk(chunks, 'VP8L', vp8l);
+  final payload = chunks.finish();
+  return (_ByteWriter()
+        ..ascii('RIFF')
+        ..u32(4 + payload.length)
+        ..ascii('WEBP')
+        ..bytes(payload))
+      .finish();
+}
+
 Uint8List _vp8lPayload({
   required int width,
   required int height,
