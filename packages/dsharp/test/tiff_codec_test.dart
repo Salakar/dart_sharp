@@ -137,6 +137,79 @@ void main() {
     expect(image.firstFrameBytes(), _rgbaGray(<int>[255, 0]));
   });
 
+  test('decodes low-bit paletted TIFF color maps', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 4,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 3,
+        bitsPerSample: const <int>[2],
+        strip: Uint8List.fromList(<int>[0x1b]),
+        colorMap: _paletteColorMap(4, const <List<int>>[
+          <int>[0, 0, 0],
+          <int>[255, 0, 0],
+          <int>[0, 255, 0],
+          <int>[0, 0, 255],
+        ]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      0,
+      0,
+      0,
+      255,
+      255,
+      0,
+      0,
+      255,
+      0,
+      255,
+      0,
+      255,
+      0,
+      0,
+      255,
+      255,
+    ]);
+  });
+
+  test('decodes 8-bit paletted TIFF color maps', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 3,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 3,
+        bitsPerSample: const <int>[8],
+        strip: Uint8List.fromList(<int>[0, 1, 2]),
+        colorMap: _paletteColorMap(256, const <List<int>>[
+          <int>[12, 34, 56],
+          <int>[90, 120, 150],
+          <int>[200, 210, 220],
+        ]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      12,
+      34,
+      56,
+      255,
+      90,
+      120,
+      150,
+      255,
+      200,
+      210,
+      220,
+      255,
+    ]);
+  });
+
   test('encodes TIFF PackBits compression', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -188,6 +261,24 @@ void main() {
       throwsA(isA<InvalidImageException>()),
     );
   });
+
+  test('rejects truncated paletted TIFF color maps', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 4,
+          height: 1,
+          samples: 1,
+          compression: 1,
+          photometric: 3,
+          bitsPerSample: const <int>[2],
+          strip: Uint8List.fromList(<int>[0x1b]),
+          colorMap: const <int>[0, 65535, 0, 0, 0, 0],
+        ),
+      ).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
 }
 
 Uint8List _packBitsTiff({
@@ -229,6 +320,7 @@ Uint8List _littleEndianTiff({
   List<Uint8List>? strips,
   int? predictor,
   int? rowsPerStrip,
+  List<int>? colorMap,
 }) {
   final stripList = strips ?? <Uint8List>[strip!];
   final bytes = <int>[];
@@ -259,16 +351,28 @@ Uint8List _littleEndianTiff({
     }
   }
 
-  final entryCount = predictor == null ? 10 : 11;
+  final entryCount =
+      10 + (predictor == null ? 0 : 1) + (colorMap == null ? 0 : 1);
   const ifdOffset = 8;
   final extraOffset = ifdOffset + 2 + entryCount * 12 + 4;
-  final bitsOffset = extraOffset;
-  final stripOffsetsOffset =
-      bitsOffset + (bitsPerSample.length > 1 ? bitsPerSample.length * 2 : 0);
-  final stripByteCountsOffset =
-      stripOffsetsOffset + (stripList.length > 1 ? stripList.length * 4 : 0);
-  final firstStripOffset =
-      stripByteCountsOffset + (stripList.length > 1 ? stripList.length * 4 : 0);
+  var dataOffset = extraOffset;
+  final bitsOffset = dataOffset;
+  if (bitsPerSample.length > 1) {
+    dataOffset += bitsPerSample.length * 2;
+  }
+  final colorMapOffset = dataOffset;
+  if (colorMap != null) {
+    dataOffset += colorMap.length * 2;
+  }
+  final stripOffsetsOffset = dataOffset;
+  if (stripList.length > 1) {
+    dataOffset += stripList.length * 4;
+  }
+  final stripByteCountsOffset = dataOffset;
+  if (stripList.length > 1) {
+    dataOffset += stripList.length * 4;
+  }
+  final firstStripOffset = dataOffset;
   final stripOffsets = <int>[];
   var nextStripOffset = firstStripOffset;
   for (final currentStrip in stripList) {
@@ -306,10 +410,18 @@ Uint8List _littleEndianTiff({
   if (predictor != null) {
     entry(317, 3, 1, predictor);
   }
+  if (colorMap != null) {
+    entry(320, 3, colorMap.length, colorMapOffset);
+  }
   u32(0);
   if (bitsPerSample.length > 1) {
     for (final bits in bitsPerSample) {
       u16(bits);
+    }
+  }
+  if (colorMap != null) {
+    for (final value in colorMap) {
+      u16(value);
     }
   }
   if (stripList.length > 1) {
@@ -371,4 +483,16 @@ List<int> _rgbaGray(List<int> values) {
   return <int>[
     for (final value in values) ...<int>[value, value, value, 255],
   ];
+}
+
+List<int> _paletteColorMap(int colorCount, List<List<int>> colors) {
+  final red = List<int>.filled(colorCount, 0);
+  final green = List<int>.filled(colorCount, 0);
+  final blue = List<int>.filled(colorCount, 0);
+  for (var i = 0; i < colors.length; i += 1) {
+    red[i] = colors[i][0] * 257;
+    green[i] = colors[i][1] * 257;
+    blue[i] = colors[i][2] * 257;
+  }
+  return <int>[...red, ...green, ...blue];
 }
