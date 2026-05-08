@@ -11,13 +11,15 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
 
 - Inputs: encoded bytes, `ByteBuffer`, `ByteData`, bounded byte streams, raw
   pixels, decoded `PixelImage`, and generated solid images.
-- Codecs: raw plus first-party PNG, baseline JPEG, GIF, TIFF, and WebP support
-  without runtime package dependencies. PNG, JPEG, GIF, TIFF, WebP VP8L
-  lossless, and raw output are implemented. WebP metadata, VP8L, VP8 lossy,
-  alpha, and animation decoding are implemented for supported bitstreams.
+- Codecs: raw plus first-party PNG, JPEG, GIF, TIFF, and WebP support without
+  runtime package dependencies. PNG, baseline/lossless JPEG, GIF, TIFF, WebP
+  VP8L lossless, and raw output are implemented. WebP metadata, VP8L, VP8
+  lossy, alpha, and animation decoding are implemented for supported
+  bitstreams.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
   alpha/channel operations, filters, convolution, color math, boolean ops,
-  compositing, tiling, frame-aware joins, metadata reads, and stats.
+  compositing, tiling, frame-aware joins, encoded header metadata reads, and
+  stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
   `toImageBytesResult`, format-specific chain methods, cancellation, timeout,
   and VM-only `writeToFile`.

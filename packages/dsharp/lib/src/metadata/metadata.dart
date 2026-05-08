@@ -16,6 +16,9 @@ final class ImageMetadata {
     this.loopCount,
     this.density,
     this.hasProfile = false,
+    this.bitDepth,
+    this.orientation,
+    this.isProgressive = false,
   });
 
   /// Encoded or source format.
@@ -51,6 +54,15 @@ final class ImageMetadata {
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;
 
+  /// Encoded bits per sample when known.
+  final int? bitDepth;
+
+  /// EXIF orientation value when present.
+  final int? orientation;
+
+  /// Whether the encoded image uses progressive/interlaced storage.
+  final bool isProgressive;
+
   /// Creates metadata from decoded pixels.
   factory ImageMetadata.fromPixelImage({
     required PixelImage image,
@@ -67,6 +79,7 @@ final class ImageMetadata {
       frames: image.frames.length,
       pageHeight: image.firstFrame.pixels.pageHeight,
       loopCount: image.loopCount,
+      bitDepth: 8,
     );
   }
 }
