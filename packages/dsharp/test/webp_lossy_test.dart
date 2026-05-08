@@ -174,6 +174,16 @@ void main() {
     ]);
   });
 
+  test('rejects WebP ALPH chunks with reserved flags', () async {
+    final bytes = alphaSolidVp8Webp(width: 1, height: 1, alpha: <int>[127]);
+    bytes[38] |= 0x80;
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('applies WebP ALPH predictor filters', () async {
     const alpha = <int>[10, 20, 5, 7, 40, 80];
 

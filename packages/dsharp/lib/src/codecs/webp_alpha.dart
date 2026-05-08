@@ -6,6 +6,8 @@ import 'binary_io.dart';
 import 'webp_lossless.dart';
 import 'webp_riff.dart';
 
+const _alphaReservedFlags = 0xc0;
+
 /// Applies a static extended WebP ALPH chunk to decoded VP8 pixels.
 RawPixels applyWebpAlpha(Uint8List bytes, RawPixels pixels) {
   final alphaChunk = _findWebpChunk(bytes, 'ALPH');
@@ -42,6 +44,9 @@ Uint8List decodeWebpAlphaChunk(
     throw const InvalidImageException('Invalid WebP ALPH chunk.');
   }
   final flags = chunk[0];
+  if ((flags & _alphaReservedFlags) != 0) {
+    throw const InvalidImageException('Invalid WebP ALPH flags.');
+  }
   final compression = flags & 0x03;
   final filter = (flags >> 2) & 0x03;
   final expectedLength = width * height;
