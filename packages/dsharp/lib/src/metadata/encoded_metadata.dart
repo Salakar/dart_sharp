@@ -126,6 +126,8 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
   _JpegFrameInfo? frame;
   double? density;
   var hasProfile = false;
+  var hasExif = false;
+  var hasXmp = false;
   int? orientation;
   while (offset < bytes.length) {
     if (bytes[offset] != 0xff) {
@@ -158,7 +160,13 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     if (marker == 0xe0) {
       density ??= _jfifDensity(data);
     } else if (marker == 0xe1) {
-      orientation ??= _exifOrientation(data);
+      if (_startsWithAscii(data, 'http://ns.adobe.com/xap/1.0/')) {
+        hasXmp = true;
+      } else {
+        hasExif = hasExif || _startsWithAscii(data, 'Exif');
+        orientation ??= _exifOrientation(data);
+        hasExif = hasExif || orientation != null;
+      }
     } else if (marker == 0xe2 && _startsWithAscii(data, 'ICC_PROFILE')) {
       hasProfile = true;
     } else if (_jpegSofMarker(marker)) {
@@ -180,6 +188,8 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     hasAlpha: false,
     density: density,
     hasProfile: hasProfile,
+    hasExif: hasExif,
+    hasXmp: hasXmp,
     bitDepth: parsed.precision,
     orientation: orientation,
     isProgressive: parsed.progressive,
@@ -294,6 +304,8 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
     frames: frames,
     loopCount: info.isAnimated ? info.loopCount : null,
     hasProfile: info.hasProfile,
+    hasExif: info.hasExif,
+    hasXmp: info.hasXmp,
     bitDepth: 8,
     orientation: exif == null ? null : _exifOrientation(exif),
   );

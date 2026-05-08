@@ -16,6 +16,8 @@ final class ImageMetadata {
     this.loopCount,
     this.density,
     this.hasProfile = false,
+    this.hasExif = false,
+    this.hasXmp = false,
     this.bitDepth,
     this.orientation,
     this.isProgressive = false,
@@ -53,6 +55,12 @@ final class ImageMetadata {
 
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;
+
+  /// Whether EXIF metadata is present.
+  final bool hasExif;
+
+  /// Whether XMP metadata is present.
+  final bool hasXmp;
 
   /// Encoded bits per sample when known.
   final int? bitDepth;

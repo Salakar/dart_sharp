@@ -37,6 +37,8 @@ void main() {
     expect(metadata.density, 72);
     expect(metadata.orientation, 6);
     expect(metadata.hasProfile, isTrue);
+    expect(metadata.hasExif, isTrue);
+    expect(metadata.hasXmp, isTrue);
     expect(metadata.isProgressive, isTrue);
   });
 
@@ -97,6 +99,8 @@ void main() {
     expect(metadata.width, 3);
     expect(metadata.height, 2);
     expect(metadata.hasProfile, isTrue);
+    expect(metadata.hasExif, isTrue);
+    expect(metadata.hasXmp, isTrue);
     expect(metadata.orientation, 6);
   });
 
@@ -150,6 +154,11 @@ Uint8List _jpegMetadataBytes() {
     0,
   ]);
   _jpegSegment(writer, 0xe1, _exifOrientation(6));
+  _jpegSegment(writer, 0xe1, <int>[
+    ...ascii.encode('http://ns.adobe.com/xap/1.0/'),
+    0,
+    ...utf8.encode('<x:xmpmeta />'),
+  ]);
   _jpegSegment(writer, 0xe2, <int>[...ascii.encode('ICC_PROFILE'), 0, 1, 1, 0]);
   _jpegSegment(writer, 0xc2, <int>[
     8,
