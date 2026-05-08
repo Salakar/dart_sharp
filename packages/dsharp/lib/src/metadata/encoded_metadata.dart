@@ -39,6 +39,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
   var interlace = 0;
   var hasTransparency = false;
   var hasProfile = false;
+  var hasXmp = false;
   double? density;
   while (offset + 12 <= bytes.length) {
     final length = readUint32Be(bytes, offset);
@@ -67,6 +68,8 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
       hasTransparency = true;
     } else if (type == 'iCCP') {
       hasProfile = true;
+    } else if (type == 'iTXt' && _isPngXmpChunk(data)) {
+      hasXmp = true;
     } else if (type == 'pHYs' && length == 9 && data[8] == 1) {
       density = readUint32Be(data, 0) * 0.0254;
     } else if (type == 'IEND') {
@@ -103,9 +106,23 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     hasAlpha: hasTransparency || colorType == 4 || colorType == 6,
     density: density,
     hasProfile: hasProfile,
+    hasXmp: hasXmp,
     bitDepth: bitDepth,
     isProgressive: interlace == 1,
   );
+}
+
+bool _isPngXmpChunk(Uint8List data) {
+  const keyword = 'XML:com.adobe.xmp';
+  if (data.length <= keyword.length || data[keyword.length] != 0) {
+    return false;
+  }
+  for (var i = 0; i < keyword.length; i += 1) {
+    if (data[i] != keyword.codeUnitAt(i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool _supportsPngMetadataBitDepth(int colorType, int bitDepth) {

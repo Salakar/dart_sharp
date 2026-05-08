@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../api/capabilities.dart';
 import '../api/exceptions.dart';
+import '../codecs/binary_io.dart';
 import '../codecs/codec_registry.dart';
 import '../codecs/encoder_options.dart';
 import '../codecs/format_sniffer.dart';
@@ -161,9 +163,10 @@ final class ImagePipeline {
         format: resolved,
         options: _encoderOptions?.format == resolved ? _encoderOptions : null,
       );
+      final withMetadata = _applyMetadataWrites(this, encoded);
       return EncodedImage(
-        bytes: encoded.bytes,
-        info: _outputInfo(encoded.info, image),
+        bytes: withMetadata.bytes,
+        info: _outputInfo(withMetadata.info, image),
       );
     });
   }

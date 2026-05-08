@@ -116,6 +116,20 @@ void main() {
     expect(kept.info.format, ImageFormat.png);
   });
 
+  test('writes explicit XMP metadata to PNG output', () async {
+    final xmp = XmpMetadata.parse('<xmp><title>Test</title></xmp>');
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw(),
+    ).withXmpMetadata(xmp).png().toBytesWithInfo();
+    final metadata = await ImagePipeline.fromBytes(encoded.bytes).metadata();
+
+    expect(encoded.info.format, ImageFormat.png);
+    expect(encoded.info.size, encoded.bytes.length);
+    expect(metadata.width, 1);
+    expect(metadata.height, 1);
+    expect(metadata.hasXmp, isTrue);
+  });
+
   test('unsupported output format and metadata writes fail clearly', () {
     expect(
       ImagePipeline.fromRawPixels(
@@ -130,7 +144,7 @@ void main() {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
-      ).withXmpMetadata(XmpMetadata.parse('<xmp />')).png().toBytes(),
+      ).withXmpMetadata(XmpMetadata.parse('<xmp />')).webp().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
   });
