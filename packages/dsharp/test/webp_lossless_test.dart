@@ -194,6 +194,26 @@ void main() {
     ]);
   });
 
+  test('decodes composed VP8L color and subtract-green transforms', () async {
+    final bytes = colorAndSubtractGreenVp8lWebp(
+      width: 2,
+      height: 1,
+      red: 181,
+      green: 73,
+      blue: 29,
+      alpha: 244,
+      greenToRed: 48,
+      greenToBlue: 224,
+      redToBlue: 24,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      for (var i = 0; i < 2; i += 1) ...<int>[181, 73, 29, 244],
+    ]);
+  });
+
   test('decodes the VP8L predictor transform', () async {
     final bytes = predictorVp8lWebp();
 
