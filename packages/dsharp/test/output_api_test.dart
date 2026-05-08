@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:dsharp/dsharp.dart';
+import 'package:dsharp/src/codecs/binary_io.dart';
 import 'package:test/test.dart';
 
 import 'pipeline_test_helpers.dart';
@@ -171,6 +174,40 @@ void main() {
     expect((await ImagePipeline.fromBytes(keptPng).metadata()).hasXmp, isTrue);
   });
 
+  test('keeps EXIF metadata across supported encoded outputs', () async {
+    final jpegSource = _withJpegExif(
+      await ImagePipeline.fromRawPixels(raw()).jpeg().toBytes(),
+    );
+    final pngSource = _withPngExif(
+      await ImagePipeline.fromRawPixels(raw()).png().toBytes(),
+    );
+    final webpSource = _withWebpExif(
+      await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+      width: 1,
+      height: 1,
+    );
+
+    final keptWebp = await ImagePipeline.fromBytes(
+      jpegSource,
+    ).keepExif().webp().toBytes();
+    final keptJpeg = await ImagePipeline.fromBytes(
+      pngSource,
+    ).keepExif().jpeg().toBytes();
+    final keptPng = await ImagePipeline.fromBytes(
+      webpSource,
+    ).keepExif().png().toBytes();
+
+    final webpMetadata = await ImagePipeline.fromBytes(keptWebp).metadata();
+    final jpegMetadata = await ImagePipeline.fromBytes(keptJpeg).metadata();
+    final pngMetadata = await ImagePipeline.fromBytes(keptPng).metadata();
+    expect(webpMetadata.hasExif, isTrue);
+    expect(webpMetadata.orientation, 6);
+    expect(jpegMetadata.hasExif, isTrue);
+    expect(jpegMetadata.orientation, 6);
+    expect(pngMetadata.hasExif, isTrue);
+    expect(pngMetadata.orientation, 6);
+  });
+
   test('unsupported output format and metadata writes fail clearly', () async {
     expect(
       ImagePipeline.fromRawPixels(
@@ -195,6 +232,13 @@ void main() {
       ImagePipeline.fromBytes(jpegWithXmp).keepXmp().gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
+    final jpegWithExif = _withJpegExif(
+      await ImagePipeline.fromRawPixels(raw()).jpeg().toBytes(),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(jpegWithExif).keepExif().gif().toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
   });
 
   test('cancellation token aborts cooperatively', () {
@@ -205,4 +249,125 @@ void main() {
       throwsA(isA<ImageCancellationException>()),
     );
   });
+}
+
+Uint8List _withJpegExif(Uint8List jpeg) {
+  final writer = ByteWriter()
+    ..writeByte(0xff)
+    ..writeByte(0xd8);
+  _jpegSegment(writer, 0xe1, <int>[
+    ...<int>[0x45, 0x78, 0x69, 0x66, 0, 0],
+    ..._exifTiffOrientation(6),
+  ]);
+  writer.writeBytes(jpeg.sublist(2));
+  return writer.toBytes();
+}
+
+Uint8List _withPngExif(Uint8List png) {
+  final writer = ByteWriter()..writeBytes(png.sublist(0, 8));
+  var offset = 8;
+  var inserted = false;
+  while (offset + 12 <= png.length) {
+    final length = readUint32Be(png, offset);
+    final type = String.fromCharCodes(png.sublist(offset + 4, offset + 8));
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + length;
+    final chunkEnd = dataEnd + 4;
+    if (type == 'IDAT' && !inserted) {
+      _pngChunk(writer, 'eXIf', _exifTiffOrientation(6));
+      inserted = true;
+    }
+    writer.writeBytes(png.sublist(offset, chunkEnd));
+    offset = chunkEnd;
+  }
+  return writer.toBytes();
+}
+
+Uint8List _withWebpExif(
+  Uint8List webp, {
+  required int width,
+  required int height,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x08)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _riffChunk(content, 'EXIF', _exifTiffOrientation(6));
+  _riffChunk(content, 'VP8L', _webpChunk(webp, 'VP8L'));
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _webpChunk(Uint8List bytes, String target) {
+  var offset = 12;
+  while (offset + 8 <= bytes.length) {
+    final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
+    final length = readUint32Le(bytes, offset + 4);
+    final start = offset + 8;
+    final end = start + length;
+    if (type == target) {
+      return bytes.sublist(start, end);
+    }
+    offset = end + (length.isOdd ? 1 : 0);
+  }
+  throw StateError('Missing $target chunk.');
+}
+
+void _riffChunk(ByteWriter writer, String type, Iterable<int> data) {
+  final payload = Uint8List.fromList(List<int>.from(data));
+  writer
+    ..writeAscii(type)
+    ..writeUint32Le(payload.length)
+    ..writeBytes(payload);
+  if (payload.length.isOdd) {
+    writer.writeByte(0);
+  }
+}
+
+void _pngChunk(ByteWriter writer, String type, Uint8List data) {
+  final typeBytes = type.codeUnits;
+  writer
+    ..writeUint32Be(data.length)
+    ..writeBytes(typeBytes)
+    ..writeBytes(data)
+    ..writeUint32Be(crc32(<int>[...typeBytes, ...data]));
+}
+
+void _jpegSegment(ByteWriter writer, int marker, List<int> data) {
+  writer
+    ..writeByte(0xff)
+    ..writeByte(marker)
+    ..writeUint16Be(data.length + 2)
+    ..writeBytes(data);
+}
+
+void _writeUint24Le(ByteWriter writer, int value) {
+  writer
+    ..writeByte(value)
+    ..writeByte(value >> 8)
+    ..writeByte(value >> 16);
+}
+
+Uint8List _exifTiffOrientation(int orientation) {
+  final writer = ByteWriter()
+    ..writeAscii('II')
+    ..writeUint16Le(42)
+    ..writeUint32Le(8)
+    ..writeUint16Le(1)
+    ..writeUint16Le(0x0112)
+    ..writeUint16Le(3)
+    ..writeUint32Le(1)
+    ..writeUint16Le(orientation)
+    ..writeUint16Le(0)
+    ..writeUint32Le(0);
+  return writer.toBytes();
 }

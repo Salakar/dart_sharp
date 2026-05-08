@@ -39,8 +39,10 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
   var interlace = 0;
   var hasTransparency = false;
   var hasProfile = false;
+  var hasExif = false;
   var hasXmp = false;
   double? density;
+  int? orientation;
   while (offset + 12 <= bytes.length) {
     final length = readUint32Be(bytes, offset);
     final type = String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
@@ -68,6 +70,9 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
       hasTransparency = true;
     } else if (type == 'iCCP') {
       hasProfile = true;
+    } else if (type == 'eXIf') {
+      hasExif = true;
+      orientation ??= _exifOrientation(data);
     } else if (type == 'iTXt' && _isPngXmpChunk(data)) {
       hasXmp = true;
     } else if (type == 'pHYs' && length == 9 && data[8] == 1) {
@@ -106,8 +111,10 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     hasAlpha: hasTransparency || colorType == 4 || colorType == 6,
     density: density,
     hasProfile: hasProfile,
+    hasExif: hasExif,
     hasXmp: hasXmp,
     bitDepth: bitDepth,
+    orientation: orientation,
     isProgressive: interlace == 1,
   );
 }

@@ -68,19 +68,18 @@ ImageFormat _resolveOutputFormat(
 
 void _validateMetadataWrites(ImagePipeline pipeline) {
   final writes = pipeline._metadataWrites;
-  if (!writes.isRequested || _isSupportedXmpWrite(writes)) {
+  if (!writes.isRequested || _isSupportedMetadataWrite(writes)) {
     return;
   }
   throw const UnsupportedCodecException(
-    'Only explicit or kept XMP metadata writes are implemented.',
+    'Only explicit or kept XMP and kept EXIF metadata writes are implemented.',
   );
 }
 
-bool _isSupportedXmpWrite(MetadataWriteOptions writes) {
-  return (writes.xmp != null || writes.keepXmp) &&
-      !writes.keepExif &&
-      !writes.keepIcc &&
-      !writes.withMetadata;
+bool _isSupportedMetadataWrite(MetadataWriteOptions writes) {
+  return !writes.keepIcc &&
+      !writes.withMetadata &&
+      (writes.xmp != null || writes.keepXmp || writes.keepExif);
 }
 
 EncodedImage _applyMetadataWrites(
@@ -92,32 +91,49 @@ EncodedImage _applyMetadataWrites(
     return encoded;
   }
   final xmp = writes.xmp ?? (writes.keepXmp ? _sourceXmp(pipeline) : null);
-  if (xmp == null) {
+  final exif = writes.keepExif ? _sourceExif(pipeline) : null;
+  if (xmp == null && exif == null) {
     return encoded;
   }
+  var bytes = encoded.bytes;
   if (encoded.info.format == ImageFormat.png) {
-    final bytes = _writePngXmp(encoded.bytes, xmp);
+    if (exif != null) {
+      bytes = _writePngExif(bytes, exif);
+    }
+    if (xmp != null) {
+      bytes = _writePngXmp(bytes, xmp);
+    }
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
   if (encoded.info.format == ImageFormat.webp) {
-    final bytes = _writeWebpXmp(encoded.bytes, xmp);
+    if (exif != null) {
+      bytes = _writeWebpExif(bytes, exif);
+    }
+    if (xmp != null) {
+      bytes = _writeWebpXmp(bytes, xmp);
+    }
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
   if (encoded.info.format == ImageFormat.jpeg) {
-    final bytes = _writeJpegXmp(encoded.bytes, xmp);
+    if (exif != null) {
+      bytes = _writeJpegExif(bytes, exif);
+    }
+    if (xmp != null) {
+      bytes = _writeJpegXmp(bytes, xmp);
+    }
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
   throw const UnsupportedCodecException(
-    'XMP metadata writing is only implemented for JPEG, PNG, and WebP output.',
+    'Metadata writing is only implemented for JPEG, PNG, and WebP output.',
   );
 }
 
@@ -282,7 +298,11 @@ Uint8List _writeWebpXmp(Uint8List bytes, XmpMetadata xmp) {
     }
     final data = bytes.sublist(start, end);
     if (!hasVp8x && type != 'VP8X') {
-      _writeWebpChunk(content, 'VP8X', _webpVp8xPayload(info, xmp: true));
+      _writeWebpChunk(
+        content,
+        'VP8X',
+        _webpVp8xPayload(info, exif: info.hasExif, xmp: true),
+      );
       _writeWebpChunk(
         content,
         'XMP ',
@@ -311,7 +331,11 @@ Uint8List _writeWebpXmp(Uint8List bytes, XmpMetadata xmp) {
     throw const InvalidImageException('Truncated WebP chunk.');
   }
   if (!wroteXmp) {
-    _writeWebpChunk(content, 'VP8X', _webpVp8xPayload(info, xmp: true));
+    _writeWebpChunk(
+      content,
+      'VP8X',
+      _webpVp8xPayload(info, exif: info.hasExif, xmp: true),
+    );
     _writeWebpChunk(
       content,
       'XMP ',
@@ -358,11 +382,15 @@ XmpMetadata? _readWebpXmp(Uint8List bytes) {
   return null;
 }
 
-Uint8List _webpVp8xPayload(WebpImageInfo info, {required bool xmp}) {
+Uint8List _webpVp8xPayload(
+  WebpImageInfo info, {
+  required bool exif,
+  required bool xmp,
+}) {
   final flags =
       (info.hasProfile ? 0x20 : 0) |
       (info.hasAlpha ? 0x10 : 0) |
-      (info.hasExif ? 0x08 : 0) |
+      (exif ? 0x08 : 0) |
       (xmp ? 0x04 : 0) |
       (info.isAnimated ? 0x02 : 0);
   final writer = ByteWriter()

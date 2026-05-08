@@ -44,6 +44,7 @@ part 'image_pipeline_filter.dart';
 part 'image_pipeline_geometry.dart';
 part 'image_pipeline_metadata.dart';
 part 'image_pipeline_output.dart';
+part 'image_pipeline_output_exif.dart';
 part 'image_pipeline_output_internals.dart';
 part 'image_pipeline_transform.dart';
 
