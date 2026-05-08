@@ -85,11 +85,11 @@ final class _Vp8Planes {
         final uu = u[(py >> 1) * uvWidth + (px >> 1)];
         final vv = v[(py >> 1) * uvWidth + (px >> 1)];
         final out = (py * width + px) * 4;
-        rgba[out] = _clip(yy + ((91881 * (vv - 128)) >> 16));
+        rgba[out] = _clip(yy + _shiftRightSigned(91881 * (vv - 128), 16));
         rgba[out + 1] = _clip(
-          yy - ((22554 * (uu - 128) + 46802 * (vv - 128)) >> 16),
+          yy - _shiftRightSigned(22554 * (uu - 128) + 46802 * (vv - 128), 16),
         );
-        rgba[out + 2] = _clip(yy + ((116130 * (uu - 128)) >> 16));
+        rgba[out + 2] = _clip(yy + _shiftRightSigned(116130 * (uu - 128), 16));
         rgba[out + 3] = 255;
       }
     }
@@ -105,13 +105,13 @@ void _addDctBlock(Uint8List plane, int stride, int x, int y, List<int> coeffs) {
     final a1 = coeffs[i] + coeffs[8 + i];
     final b1 = coeffs[i] - coeffs[8 + i];
     final c1 =
-        ((coeffs[4 + i] * sinpi8Sqrt2) >> 16) -
+        _shiftRightSigned(coeffs[4 + i] * sinpi8Sqrt2, 16) -
         coeffs[12 + i] -
-        ((coeffs[12 + i] * cospi8Sqrt2Minus1) >> 16);
+        _shiftRightSigned(coeffs[12 + i] * cospi8Sqrt2Minus1, 16);
     final d1 =
         coeffs[4 + i] +
-        ((coeffs[4 + i] * cospi8Sqrt2Minus1) >> 16) +
-        ((coeffs[12 + i] * sinpi8Sqrt2) >> 16);
+        _shiftRightSigned(coeffs[4 + i] * cospi8Sqrt2Minus1, 16) +
+        _shiftRightSigned(coeffs[12 + i] * sinpi8Sqrt2, 16);
     tmp[i] = a1 + d1;
     tmp[12 + i] = a1 - d1;
     tmp[4 + i] = b1 + c1;
@@ -122,24 +122,24 @@ void _addDctBlock(Uint8List plane, int stride, int x, int y, List<int> coeffs) {
     final a1 = tmp[base] + tmp[base + 2];
     final b1 = tmp[base] - tmp[base + 2];
     final c1 =
-        ((tmp[base + 1] * sinpi8Sqrt2) >> 16) -
+        _shiftRightSigned(tmp[base + 1] * sinpi8Sqrt2, 16) -
         tmp[base + 3] -
-        ((tmp[base + 3] * cospi8Sqrt2Minus1) >> 16);
+        _shiftRightSigned(tmp[base + 3] * cospi8Sqrt2Minus1, 16);
     final d1 =
         tmp[base + 1] +
-        ((tmp[base + 1] * cospi8Sqrt2Minus1) >> 16) +
-        ((tmp[base + 3] * sinpi8Sqrt2) >> 16);
+        _shiftRightSigned(tmp[base + 1] * cospi8Sqrt2Minus1, 16) +
+        _shiftRightSigned(tmp[base + 3] * sinpi8Sqrt2, 16);
     plane[(y + row) * stride + x] = _clip(
-      plane[(y + row) * stride + x] + ((a1 + d1 + 4) >> 3),
+      plane[(y + row) * stride + x] + _shiftRightSigned(a1 + d1 + 4, 3),
     );
     plane[(y + row) * stride + x + 3] = _clip(
-      plane[(y + row) * stride + x + 3] + ((a1 - d1 + 4) >> 3),
+      plane[(y + row) * stride + x + 3] + _shiftRightSigned(a1 - d1 + 4, 3),
     );
     plane[(y + row) * stride + x + 1] = _clip(
-      plane[(y + row) * stride + x + 1] + ((b1 + c1 + 4) >> 3),
+      plane[(y + row) * stride + x + 1] + _shiftRightSigned(b1 + c1 + 4, 3),
     );
     plane[(y + row) * stride + x + 2] = _clip(
-      plane[(y + row) * stride + x + 2] + ((b1 - c1 + 4) >> 3),
+      plane[(y + row) * stride + x + 2] + _shiftRightSigned(b1 - c1 + 4, 3),
     );
   }
 }

@@ -456,17 +456,11 @@ void _normalSubblockFilter(
     q0,
     q1,
   );
-  final adjustment =
-      (_commonAdjust(
-            plane,
-            hasHighVariance,
-            p1Index,
-            p0Index,
-            q0Index,
-            q1Index,
-          ) +
-          1) >>
-      1;
+  final adjustment = _shiftRightSigned(
+    _commonAdjust(plane, hasHighVariance, p1Index, p0Index, q0Index, q1Index) +
+        1,
+    1,
+  );
   if (!hasHighVariance) {
     plane[q1Index] = _s2u(q1 - adjustment);
     plane[p1Index] = _s2u(p1 + adjustment);
@@ -501,13 +495,13 @@ void _normalMacroblockFilter(
     return;
   }
   final w = _signedClamp(_signedClamp(p1 - q1) + 3 * (q0 - p0));
-  var adjustment = _signedClamp((27 * w + 63) >> 7);
+  var adjustment = _signedClamp(_shiftRightSigned(27 * w + 63, 7));
   plane[q0Index] = _s2u(q0 - adjustment);
   plane[p0Index] = _s2u(p0 + adjustment);
-  adjustment = _signedClamp((18 * w + 63) >> 7);
+  adjustment = _signedClamp(_shiftRightSigned(18 * w + 63, 7));
   plane[q1Index] = _s2u(q1 - adjustment);
   plane[p1Index] = _s2u(p1 + adjustment);
-  adjustment = _signedClamp((9 * w + 63) >> 7);
+  adjustment = _signedClamp(_shiftRightSigned(9 * w + 63, 7));
   plane[q2Index] = _s2u(q2 - adjustment);
   plane[p2Index] = _s2u(p2 + adjustment);
 }
@@ -555,8 +549,8 @@ int _commonAdjust(
   var adjustment = _signedClamp(
     (useOuterTaps ? _signedClamp(p1 - q1) : 0) + 3 * (q0 - p0),
   );
-  final balanced = _signedClamp(adjustment + 3) >> 3;
-  adjustment = _signedClamp(adjustment + 4) >> 3;
+  final balanced = _shiftRightSigned(_signedClamp(adjustment + 3), 3);
+  adjustment = _shiftRightSigned(_signedClamp(adjustment + 4), 3);
   plane[q0Index] = _s2u(q0 - adjustment);
   plane[p0Index] = _s2u(p0 + balanced);
   return adjustment;

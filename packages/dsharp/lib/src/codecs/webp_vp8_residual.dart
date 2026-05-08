@@ -695,10 +695,10 @@ List<int> _inverseWht(List<int> input) {
     final b1 = output[base + 1] + output[base + 2];
     final c1 = output[base + 1] - output[base + 2];
     final d1 = output[base] - output[base + 3];
-    output[base] = (a1 + b1 + 3) >> 3;
-    output[base + 1] = (c1 + d1 + 3) >> 3;
-    output[base + 2] = (a1 - b1 + 3) >> 3;
-    output[base + 3] = (d1 - c1 + 3) >> 3;
+    output[base] = _shiftRightSigned(a1 + b1 + 3, 3);
+    output[base + 1] = _shiftRightSigned(c1 + d1 + 3, 3);
+    output[base + 2] = _shiftRightSigned(a1 - b1 + 3, 3);
+    output[base + 3] = _shiftRightSigned(d1 - c1 + 3, 3);
   }
   return output;
 }

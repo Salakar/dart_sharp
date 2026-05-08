@@ -275,8 +275,8 @@ _Vp8Yuv _rgbToVp8Yuv(_Rgb color) {
   final y =
       ((19595 * color.red + 38470 * color.green + 7471 * color.blue + 32768) >>
       16);
-  final u = 128 + (((color.blue - y) * 36982 + 32768) >> 16);
-  final v = 128 + (((color.red - y) * 46727 + 32768) >> 16);
+  final u = 128 + _shiftRightSigned((color.blue - y) * 36982 + 32768, 16);
+  final v = 128 + _shiftRightSigned((color.red - y) * 46727 + 32768, 16);
   return _Vp8Yuv(_clampByte(y), _clampByte(u), _clampByte(v));
 }
 

@@ -201,6 +201,14 @@ const _coefficientUpdateProbCodes =
     '\u00fd\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00fa\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff'
     '\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00fe\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff';
 
+int _shiftRightSigned(int value, int bits) {
+  final divisor = 1 << bits;
+  if (value >= 0) {
+    return value ~/ divisor;
+  }
+  return -((-value + divisor - 1) ~/ divisor);
+}
+
 /// Decodes a simple lossy VP8 WebP image to RGBA pixels.
 RawPixels decodeWebpVp8(Uint8List bytes) {
   return decodeWebpVp8Chunk(_findVp8Chunk(bytes));
