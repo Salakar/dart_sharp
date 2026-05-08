@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../pipeline/pipeline_operation.dart';
 import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
@@ -78,6 +79,11 @@ final class RotateOperation implements PipelineOperation {
     final normalized = ((degrees % 360) + 360) % 360;
     if (normalized == 0) {
       return image;
+    }
+    if (image.isAnimated && normalized != 180) {
+      throw const OperationValidationException(
+        'Rotate is not supported for multi-page images unless rotating by 180 degrees.',
+      );
     }
     if (normalized % 90 == 0) {
       return mapFrames(image, (raw) => _rotate(raw, normalized.toInt()));

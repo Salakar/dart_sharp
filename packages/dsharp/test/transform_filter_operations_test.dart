@@ -28,6 +28,16 @@ void main() {
     ]);
   }
 
+  PixelImage animated2x2() {
+    return PixelImage(
+      frames: <ImageFrame>[
+        ImageFrame(pixels: raw2x2(), delay: const Duration(milliseconds: 10)),
+        ImageFrame(pixels: raw2x2(), delay: const Duration(milliseconds: 20)),
+      ],
+      loopCount: 2,
+    );
+  }
+
   test(
     'flip, flop, and right-angle rotate move pixels deterministically',
     () async {
@@ -259,6 +269,24 @@ void main() {
       );
     },
   );
+
+  test('animated images only support 180 degree rotate', () async {
+    final rotated = await ImagePipeline.fromPixelImage(
+      animated2x2(),
+    ).rotate(180).toPixelImage();
+
+    expect(rotated.frames, hasLength(2));
+    expect(rotated.loopCount, 2);
+    expect(redBytes(rotated), <int>[4, 3, 2, 1]);
+    expect(
+      ImagePipeline.fromPixelImage(animated2x2()).rotate(90).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromPixelImage(animated2x2()).rotate(45).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
 
   test('operation ordering is preserved with resize and extract', () async {
     final rotateThenExtract = await pixels(
