@@ -107,6 +107,12 @@ void main() {
     final image = await ImagePipeline.fromBytes(
       bytes,
     ).autoOrient().toPixelImage();
+    final autoThenFlip = await ImagePipeline.fromBytes(
+      bytes,
+    ).autoOrient().flip().toPixelImage();
+    final flipThenAuto = await ImagePipeline.fromBytes(
+      bytes,
+    ).flip().autoOrient().toPixelImage();
     final orientedMetadata = await ImagePipeline.fromBytes(
       bytes,
     ).autoOrient().metadata();
@@ -116,6 +122,7 @@ void main() {
     expect(sourceMetadata.orientation, 6);
     expect(image.width, 2);
     expect(image.height, 3);
+    expect(firstBytes(flipThenAuto), firstBytes(autoThenFlip));
     expect(orientedMetadata.width, 2);
     expect(orientedMetadata.height, 3);
     expect(orientedMetadata.orientation, isNull);

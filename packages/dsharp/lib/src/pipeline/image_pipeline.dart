@@ -131,15 +131,19 @@ final class ImagePipeline {
       ),
     };
     token?.throwIfCancelled();
-    var image = decoded;
-    final orientation = _steps.any((step) => step is AutoOrientOperation)
-        ? _sourceOrientation()
-        : null;
+    final hasAutoOrient = _steps.any((step) => step is AutoOrientOperation);
+    var image = hasAutoOrient
+        ? const AutoOrientOperation().applyOrientation(
+            decoded,
+            _sourceOrientation(),
+          )
+        : decoded;
     for (final step in _steps) {
       token?.throwIfCancelled();
-      image = step is AutoOrientOperation
-          ? step.applyOrientation(image, orientation)
-          : step.apply(image);
+      if (step is AutoOrientOperation) {
+        continue;
+      }
+      image = step.apply(image);
     }
     token?.throwIfCancelled();
     return image;
