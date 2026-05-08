@@ -83,7 +83,7 @@ Uint8List _encodeVp8SolidFromRgba(
     quality: quality,
     macroblockColors: colors,
   );
-  final chromaHorizontalAcBlocks = _lossyChromaHorizontalAcBlocks(
+  final chromaAcBlocks = _lossyChromaAcBlocks(
     rgba,
     width: width,
     height: height,
@@ -101,7 +101,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaBlocks: lumaBlocks,
     lumaAcBlocks: lumaAcBlocks,
     chromaBlocks: chromaBlocks,
-    chromaHorizontalAcBlocks: chromaHorizontalAcBlocks,
+    chromaAcBlocks: chromaAcBlocks,
   );
 }
 
@@ -177,7 +177,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaBlocks,
   required List<List<int>> lumaAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
-  required List<_Vp8ChromaAc> chromaHorizontalAcBlocks,
+  required List<List<_Vp8ChromaAc>> chromaAcBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -241,19 +241,17 @@ Uint8List _encodeVp8SolidPayload({
       for (var block = 0; block < 4; block += 1) {
         final blockOffset = (mbY * mbCols + mbX) * 4 + block;
         final chroma = chromaBlocks[blockOffset];
-        final chromaAc = chromaHorizontalAcBlocks[blockOffset];
         _writeChromaDct(coeffs, contexts, mbX, 16 + block, <int>[
           (chroma.u - predictedU) * 2,
-          chromaAc.u,
+          for (final blocks in chromaAcBlocks) blocks[blockOffset].u,
         ]);
       }
       for (var block = 0; block < 4; block += 1) {
         final blockOffset = (mbY * mbCols + mbX) * 4 + block;
         final chroma = chromaBlocks[blockOffset];
-        final chromaAc = chromaHorizontalAcBlocks[blockOffset];
         _writeChromaDct(coeffs, contexts, mbX, 20 + block, <int>[
           (chroma.v - predictedV) * 2,
-          chromaAc.v,
+          for (final blocks in chromaAcBlocks) blocks[blockOffset].v,
         ]);
       }
     }
