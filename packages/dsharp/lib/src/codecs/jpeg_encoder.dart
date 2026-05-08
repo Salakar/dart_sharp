@@ -8,15 +8,28 @@ import 'jpeg_bit_io.dart';
 import 'jpeg_tables.dart';
 import 'jpeg_transform.dart';
 
-/// Encodes pixels as baseline sequential JPEG bytes.
+part 'jpeg_progressive_encoder.dart';
+
+/// Encodes pixels as JPEG bytes.
 Uint8List encodeJpegBytes(
   RawPixels raw, {
   int quality = 80,
   String chromaSubsampling = '4:2:0',
+  bool progressive = false,
 }) {
   final rgb = rawToRgb(raw);
   final lumaQuant = jpegScaledQuantTable(jpegStandardLumaQuant, quality);
   final chromaQuant = jpegScaledQuantTable(jpegStandardChromaQuant, quality);
+  if (progressive) {
+    return _encodeProgressiveJpegBytes(
+      rgb,
+      raw.width,
+      raw.height,
+      lumaQuant,
+      chromaQuant,
+      chromaSubsampling,
+    );
+  }
   final writer = ByteWriter()
     ..writeByte(0xff)
     ..writeByte(0xd8);
@@ -294,6 +307,14 @@ Uint8List _dht(int tableClass, int id) {
 
 Uint8List _sos() {
   return Uint8List.fromList(<int>[3, 1, 0x00, 2, 0x00, 3, 0x00, 0, 63, 0]);
+}
+
+Uint8List _dcSos() {
+  return Uint8List.fromList(<int>[3, 1, 0x00, 2, 0x00, 3, 0x00, 0, 0, 0]);
+}
+
+Uint8List _acSos(int componentId) {
+  return Uint8List.fromList(<int>[1, componentId, 0x00, 1, 63, 0]);
 }
 
 void _segment(ByteWriter writer, int marker, Uint8List data) {

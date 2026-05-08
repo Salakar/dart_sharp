@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import 'codec.dart';
 import 'encoder_options.dart';
@@ -27,16 +26,12 @@ final class JpegImageCodec implements ImageCodec {
     final jpegOptions = options is JpegEncoderOptions
         ? options
         : const JpegEncoderOptions();
-    if (jpegOptions.progressive) {
-      throw const UnsupportedCodecException(
-        'Progressive JPEG encoding is not implemented yet.',
-      );
-    }
     final raw = image.firstFrame.pixels;
     final bytes = encodeJpegBytes(
       raw,
       quality: jpegOptions.quality,
       chromaSubsampling: jpegOptions.chromaSubsampling,
+      progressive: jpegOptions.progressive,
     );
     return EncodedImage(
       bytes: bytes,

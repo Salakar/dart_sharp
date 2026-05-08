@@ -39,6 +39,28 @@ void main() {
     expect(red.toSet(), hasLength(greaterThan(1)));
     expect(red.first, greaterThan(red.last));
   });
+
+  test('encodes progressive JPEG bytes', () async {
+    final bytes = await ImagePipeline.fromRawPixels(
+      RawPixels(
+        bytes: Uint8List.fromList(<int>[
+          for (var y = 0; y < 8; y += 1)
+            for (var x = 0; x < 8; x += 1) ...[x * 31, y * 31, 128],
+        ]),
+        width: 8,
+        height: 8,
+        channels: ChannelCount.three,
+      ),
+    ).jpeg(const JpegEncoderOptions(progressive: true)).toBytes();
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(_jpegFrameMarker(bytes), 0xc2);
+    expect(metadata.isProgressive, isTrue);
+    expect(image.width, 8);
+    expect(image.height, 8);
+    expect(image.firstFrameBytes().length, 8 * 8 * 4);
+  });
 }
 
 Uint8List _losslessJpeg() {
@@ -181,4 +203,20 @@ Uint8List _dht(int tableClass) {
         ..writeBytes(<int>[0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0])
         ..writeBytes(List<int>.generate(255, (index) => index)))
       .toBytes();
+}
+
+int _jpegFrameMarker(Uint8List bytes) {
+  var offset = 2;
+  while (offset + 4 < bytes.length) {
+    while (offset < bytes.length && bytes[offset] == 0xff) {
+      offset += 1;
+    }
+    final marker = bytes[offset++];
+    final length = readUint16Be(bytes, offset);
+    if (marker >= 0xc0 && marker <= 0xcf && marker != 0xc4) {
+      return marker;
+    }
+    offset += length;
+  }
+  throw StateError('JPEG frame marker not found.');
 }
