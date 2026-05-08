@@ -105,6 +105,12 @@ final class DsharpCapabilities {
           output: CodecAvailability.unsupported,
           reason: 'Camera raw decoding is not implemented in pure Dart.',
         ),
+        ImageFormat.exr: CodecSupport(
+          format: ImageFormat.exr,
+          input: CodecAvailability.unsupported,
+          output: CodecAvailability.unsupported,
+          reason: 'No pure Dart OpenEXR codec is wired yet.',
+        ),
         ImageFormat.fits: CodecSupport(
           format: ImageFormat.fits,
           input: CodecAvailability.supported,

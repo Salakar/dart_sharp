@@ -20,6 +20,7 @@ void main() {
     expect(png.info.format, ImageFormat.png);
     expect(jpeg.info.format, ImageFormat.jpeg);
     expect(tiff.info.format, ImageFormat.tiff);
+    expect(ImageFormat.fromId('openexr'), ImageFormat.exr);
   });
 
   test('toFormat accepts exported format support objects', () async {

@@ -33,6 +33,10 @@ void main() {
       sniffImageFormat(Uint8List.fromList('SIMPLE  ='.codeUnits)),
       ImageFormat.fits,
     );
+    expect(
+      sniffImageFormat(Uint8List.fromList(<int>[0x76, 0x2f, 0x31, 0x01])),
+      ImageFormat.exr,
+    );
     expect(sniffImageFormat(Uint8List(0)), ImageFormat.unknown);
   });
 
@@ -543,6 +547,7 @@ void main() {
       ImageFormat.openSlide,
       ImageFormat.magick,
       ImageFormat.dcraw,
+      ImageFormat.exr,
       ImageFormat.vips,
       ImageFormat.deepZoom,
     ]) {

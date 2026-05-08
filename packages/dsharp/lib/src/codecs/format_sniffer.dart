@@ -45,6 +45,9 @@ ImageFormat sniffImageFormat(Uint8List bytes) {
   if (_startsWith(bytes, '%PDF'.codeUnits)) {
     return ImageFormat.pdf;
   }
+  if (_startsWith(bytes, const <int>[0x76, 0x2f, 0x31, 0x01])) {
+    return ImageFormat.exr;
+  }
   if (_startsWith(bytes, 'SIMPLE  ='.codeUnits)) {
     return ImageFormat.fits;
   }

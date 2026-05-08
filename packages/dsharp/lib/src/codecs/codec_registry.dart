@@ -77,6 +77,10 @@ final class CodecRegistry {
         reason: 'Camera raw decoding is not implemented in pure Dart.',
       ),
       const UnsupportedImageCodec(
+        ImageFormat.exr,
+        reason: 'No pure Dart OpenEXR codec is wired yet.',
+      ),
+      const UnsupportedImageCodec(
         ImageFormat.vips,
         reason: 'Native V image data is not part of the pure Dart core.',
       ),

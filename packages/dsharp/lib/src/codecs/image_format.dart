@@ -48,6 +48,9 @@ enum ImageFormat {
   /// Digital camera raw input.
   dcraw('dcraw'),
 
+  /// OpenEXR high dynamic range image data.
+  exr('exr', aliases: ['openexr']),
+
   /// Flexible Image Transport System input.
   fits('fits'),
 

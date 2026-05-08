@@ -30,8 +30,8 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   cancellation, timeout, and VM-only `writeToFile`.
 
 Unsupported native-only or advanced formats such as AVIF, HEIF, JP2, JXL, PDF,
-OpenSlide, Magick, camera raw, native V, deep zoom, and SVG rasterization fail
-with typed `UnsupportedCodecException`s.
+OpenEXR, OpenSlide, Magick, camera raw, native V, deep zoom, and SVG
+rasterization fail with typed `UnsupportedCodecException`s.
 
 ## Examples
 
