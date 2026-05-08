@@ -38,9 +38,30 @@ extension ImagePipelineAlpha on ImagePipeline {
     return _append(ExtractChannelOperation(channel));
   }
 
-  /// Joins a one-channel image as an additional channel.
-  ImagePipeline joinChannel(PixelImage channel) {
-    return _append(JoinChannelOperation(channel));
+  /// Joins one or more one-channel images as additional channels.
+  ImagePipeline joinChannel(Object channels) {
+    if (channels is PixelImage) {
+      return _append(JoinChannelOperation(channels));
+    }
+    if (channels is Iterable) {
+      var pipeline = this;
+      var count = 0;
+      for (final channel in channels) {
+        if (channel is! PixelImage) {
+          throw const OperationValidationException(
+            'joinChannel expects PixelImage channel inputs.',
+          );
+        }
+        pipeline = pipeline._append(JoinChannelOperation(channel));
+        count += 1;
+      }
+      if (count > 0) {
+        return pipeline;
+      }
+    }
+    throw const OperationValidationException(
+      'joinChannel expects a PixelImage or a non-empty iterable of PixelImage.',
+    );
   }
 
   /// Makes white pixels transparent.

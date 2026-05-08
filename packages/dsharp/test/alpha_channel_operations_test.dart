@@ -138,8 +138,17 @@ void main() {
         rawRgb(1, 1, <int>[1, 2, 3]),
       ).joinChannel(PixelImage.fromRawPixels(rawGray(1, 1, <int>[9]))),
     );
+    final multiJoined = await pixels(
+      ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[1])).joinChannel(
+        <PixelImage>[
+          PixelImage.fromRawPixels(rawGray(1, 1, <int>[2])),
+          PixelImage.fromRawPixels(rawGray(1, 1, <int>[3])),
+        ],
+      ),
+    );
 
     expect(firstBytes(joined), <int>[1, 2, 3, 9]);
+    expect(firstBytes(multiJoined), <int>[1, 2, 3]);
     expect(
       ImagePipeline.fromRawPixels(rawRgb(1, 1, <int>[1, 2, 3]))
           .joinChannel(PixelImage.fromRawPixels(rawGray(2, 1, <int>[1, 2])))
@@ -151,6 +160,18 @@ void main() {
           .joinChannel(PixelImage.fromRawPixels(rawRgb(1, 1, <int>[1, 2, 3])))
           .toPixelImage(),
       throwsA(isA<InvalidImageException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawGray(1, 1, <int>[1]),
+      ).joinChannel(<PixelImage>[]),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawGray(1, 1, <int>[1]),
+      ).joinChannel(<Object>[Object()]),
+      throwsA(isA<OperationValidationException>()),
     );
   });
 }
