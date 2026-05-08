@@ -268,6 +268,31 @@ void main() {
     expect(keptDecoded.frames.length, 3);
   });
 
+  test('gif encoder progressive option writes interlaced frames', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var y = 0; y < 9; y += 1)
+          for (var x = 0; x < 2; x += 1) ...[
+            y * 24,
+            x * 120,
+            255 - y * 24,
+            255,
+          ],
+      ]),
+      width: 2,
+      height: 9,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).gif(const GifEncoderOptions(progressive: true)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_gifFirstImagePacked(encoded) & 0x40, 0x40);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('gif encoder colors option limits palette size', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -471,4 +496,29 @@ bool _pngHasChunk(Uint8List bytes, String type) {
     offset += length + 12;
   }
   return false;
+}
+
+int _gifFirstImagePacked(Uint8List bytes) {
+  var offset = 13;
+  final packed = bytes[10];
+  if ((packed & 0x80) != 0) {
+    offset += 3 * (1 << ((packed & 0x07) + 1));
+  }
+  while (offset < bytes.length) {
+    final marker = bytes[offset++];
+    if (marker == 0x2c) {
+      return bytes[offset + 8];
+    }
+    if (marker == 0x21) {
+      offset += 1;
+      while (offset < bytes.length) {
+        final size = bytes[offset++];
+        if (size == 0) {
+          break;
+        }
+        offset += size;
+      }
+    }
+  }
+  throw StateError('GIF image descriptor not found.');
 }

@@ -80,11 +80,6 @@ final class GifImageCodec implements ImageCodec {
     final gifOptions = options is GifEncoderOptions
         ? options
         : const GifEncoderOptions();
-    if (gifOptions.progressive) {
-      throw const UnsupportedCodecException(
-        'Interlaced GIF encoding is not implemented yet.',
-      );
-    }
     final raw = image.firstFrame.pixels;
     final frames = _framesForEncoding(image, gifOptions.keepDuplicateFrames);
     final palette = GifPalette.fromRgba(
@@ -117,6 +112,7 @@ final class GifImageCodec implements ImageCodec {
           palette.transparentIndex,
         ),
         minCodeSize,
+        interlaced: gifOptions.progressive,
       );
       indexOffset += pixelCount;
     }
@@ -241,11 +237,7 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   final height = readUint16Le(bytes, offset + 6);
   final packed = bytes[offset + 8];
   offset += 9;
-  if ((packed & 0x40) != 0) {
-    throw const UnsupportedCodecException(
-      'Interlaced GIF decoding is not implemented yet.',
-    );
-  }
+  final interlaced = (packed & 0x40) != 0;
   var palette = globalPalette;
   if ((packed & 0x80) != 0) {
     final size = 3 * (1 << ((packed & 0x07) + 1));
@@ -259,16 +251,17 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   final blocks = _readSubBlocks(bytes, offset);
   final indices = gifLzwDecode(blocks.bytes, minCodeSize, width * height);
   final canvas = Uint8List(screenWidth * screenHeight * 4);
-  for (var i = 0; i < indices.length; i += 1) {
-    final x = left + (i % width);
-    final y = top + (i ~/ width);
-    final index = indices[i];
-    final paletteOffset = index * 3;
-    final target = (y * screenWidth + x) * 4;
-    canvas[target] = palette[paletteOffset];
-    canvas[target + 1] = palette[paletteOffset + 1];
-    canvas[target + 2] = palette[paletteOffset + 2];
-    canvas[target + 3] = index == transparentIndex ? 0 : 255;
+  var indexOffset = 0;
+  for (final row in _gifRows(height, interlaced: interlaced)) {
+    for (var col = 0; col < width; col += 1) {
+      final index = indices[indexOffset++];
+      final paletteOffset = index * 3;
+      final target = ((top + row) * screenWidth + left + col) * 4;
+      canvas[target] = palette[paletteOffset];
+      canvas[target + 1] = palette[paletteOffset + 1];
+      canvas[target + 2] = palette[paletteOffset + 2];
+      canvas[target + 3] = index == transparentIndex ? 0 : 255;
+    }
   }
   return (
     offset: blocks.offset,
@@ -313,9 +306,13 @@ void _writeFrame(
   ByteWriter writer,
   ImageFrame frame,
   GifPalette palette,
-  int minCodeSize,
-) {
+  int minCodeSize, {
+  required bool interlaced,
+}) {
   final delay = frame.delay?.inMilliseconds ?? 0;
+  final indices = interlaced
+      ? _interlacedIndices(palette.indices, frame.width, frame.height)
+      : palette.indices;
   writer
     ..writeByte(0x21)
     ..writeByte(0xf9)
@@ -329,9 +326,32 @@ void _writeFrame(
     ..writeUint16Le(0)
     ..writeUint16Le(frame.width)
     ..writeUint16Le(frame.height)
-    ..writeByte(0)
+    ..writeByte(interlaced ? 0x40 : 0)
     ..writeByte(minCodeSize);
-  _writeSubBlocks(writer, gifLzwEncode(palette.indices, minCodeSize));
+  _writeSubBlocks(writer, gifLzwEncode(indices, minCodeSize));
+}
+
+List<int> _interlacedIndices(List<int> indices, int width, int height) {
+  return <int>[
+    for (final row in _gifRows(height, interlaced: true))
+      ...indices.sublist(row * width, (row + 1) * width),
+  ];
+}
+
+Iterable<int> _gifRows(int height, {required bool interlaced}) sync* {
+  if (!interlaced) {
+    for (var row = 0; row < height; row += 1) {
+      yield row;
+    }
+    return;
+  }
+  const starts = <int>[0, 4, 2, 1];
+  const steps = <int>[8, 8, 4, 2];
+  for (var pass = 0; pass < starts.length; pass += 1) {
+    for (var row = starts[pass]; row < height; row += steps[pass]) {
+      yield row;
+    }
+  }
 }
 
 void _writeSubBlocks(ByteWriter writer, Uint8List bytes) {
