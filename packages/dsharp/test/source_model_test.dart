@@ -52,6 +52,30 @@ void main() {
     expect(source.collectBytes, throwsA(isA<ImageLimitException>()));
   });
 
+  test('pipeline accepts byte buffer, byte data, and stream sources', () async {
+    final encoded = await ImagePipeline.fromRawPixels(_raw()).png().toBytes();
+    final byteDataBytes = Uint8List.fromList(<int>[9, ...encoded, 9]);
+    final byteData = ByteData.sublistView(
+      byteDataBytes,
+      1,
+      byteDataBytes.length - 1,
+    );
+    final stream = Stream<List<int>>.fromIterable(<List<int>>[
+      encoded.sublist(0, 8),
+      encoded.sublist(8),
+    ]);
+
+    final fromBuffer = await ImagePipeline.fromByteBuffer(
+      Uint8List.fromList(encoded).buffer,
+    ).toPixelImage();
+    final fromData = await ImagePipeline.fromByteData(byteData).toPixelImage();
+    final fromStream = await ImagePipeline.fromStream(stream).toPixelImage();
+
+    expect(fromBuffer.firstFrameBytes(), _raw().bytes);
+    expect(fromData.firstFrameBytes(), _raw().bytes);
+    expect(fromStream.firstFrameBytes(), _raw().bytes);
+  });
+
   test('channel count validates integer input', () {
     expect(ChannelCount.fromInt(3), ChannelCount.three);
     expect(
@@ -75,4 +99,13 @@ void main() {
     expect(source.text.width, 120);
     expect(source.text.align, TextAlign.center);
   });
+}
+
+RawPixels _raw() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[10, 20, 30, 255]),
+    width: 1,
+    height: 1,
+    channels: ChannelCount.four,
+  );
 }

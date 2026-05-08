@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -71,6 +72,23 @@ final class ImagePipeline {
   /// Creates a pipeline from encoded bytes.
   factory ImagePipeline.fromBytes(Uint8List bytes) {
     return ImagePipeline.fromSource(ImageSource.bytes(bytes));
+  }
+
+  /// Creates a pipeline from an encoded byte buffer.
+  factory ImagePipeline.fromByteBuffer(ByteBuffer buffer) {
+    return ImagePipeline.fromSource(ImageSource.byteBuffer(buffer));
+  }
+
+  /// Creates a pipeline from encoded byte data.
+  factory ImagePipeline.fromByteData(ByteData data) {
+    return ImagePipeline.fromSource(ImageSource.byteData(data));
+  }
+
+  /// Creates a pipeline from an encoded byte stream.
+  factory ImagePipeline.fromStream(Stream<List<int>> stream, {int? maxBytes}) {
+    return ImagePipeline.fromSource(
+      ImageSource.stream(stream, maxBytes: maxBytes),
+    );
   }
 
   /// Creates a pipeline from raw pixels.
