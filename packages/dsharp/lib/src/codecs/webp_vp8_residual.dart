@@ -194,6 +194,48 @@ const _defaultUvProbs = <List<List<int>>>[
     [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
   ],
 ];
+const _defaultYProbs = <List<List<int>>>[
+  [
+    [202, 24, 213, 235, 186, 191, 220, 160, 240, 175, 255],
+    [126, 38, 182, 232, 169, 184, 228, 174, 255, 187, 128],
+    [61, 46, 138, 219, 151, 178, 240, 170, 255, 216, 128],
+  ],
+  [
+    [1, 112, 230, 250, 199, 191, 247, 159, 255, 255, 128],
+    [166, 109, 228, 252, 211, 215, 255, 174, 128, 128, 128],
+    [39, 77, 162, 232, 172, 180, 245, 178, 255, 255, 128],
+  ],
+  [
+    [1, 52, 220, 246, 198, 199, 249, 220, 255, 255, 128],
+    [124, 74, 191, 243, 183, 193, 250, 221, 255, 255, 128],
+    [24, 71, 130, 219, 154, 170, 243, 182, 255, 255, 128],
+  ],
+  [
+    [1, 182, 225, 249, 219, 240, 255, 224, 128, 128, 128],
+    [149, 150, 226, 252, 216, 205, 255, 171, 128, 128, 128],
+    [28, 108, 170, 242, 183, 194, 254, 223, 255, 255, 128],
+  ],
+  [
+    [1, 81, 230, 252, 204, 203, 255, 192, 128, 128, 128],
+    [123, 102, 209, 247, 188, 196, 255, 233, 128, 128, 128],
+    [20, 95, 153, 243, 164, 173, 255, 203, 128, 128, 128],
+  ],
+  [
+    [1, 222, 248, 255, 216, 213, 128, 128, 128, 128, 128],
+    [168, 175, 246, 252, 235, 205, 255, 255, 128, 128, 128],
+    [47, 116, 215, 255, 211, 212, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 121, 236, 253, 212, 214, 255, 255, 128, 128, 128],
+    [141, 84, 213, 252, 201, 202, 255, 219, 128, 128, 128],
+    [42, 80, 160, 240, 162, 185, 255, 205, 128, 128, 128],
+  ],
+  [
+    [1, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [244, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [238, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
+];
 const _catOneExtraProb = 159;
 const _catTwoExtraProbs = <int>[165, 145];
 const _catThreeExtraProbs = <int>[173, 148, 140];
@@ -239,6 +281,63 @@ void _readResidual(
       frame,
       segmentId,
       lumaDc?[block] ?? 0,
+      contexts.contextFor(mbX, block),
+    );
+    contexts.setHasCoefficients(mbX, block, hasCoefficients);
+  }
+  for (var block = 0; block < 4; block += 1) {
+    final blockIndex = 16 + block;
+    final hasCoefficients = _readChromaBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      true,
+      frame,
+      segmentId,
+      contexts.contextFor(mbX, blockIndex),
+    );
+    contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+  }
+  for (var block = 0; block < 4; block += 1) {
+    final blockIndex = 20 + block;
+    final hasCoefficients = _readChromaBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      false,
+      frame,
+      segmentId,
+      contexts.contextFor(mbX, blockIndex),
+    );
+    contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+  }
+}
+
+void _readBPredResidual(
+  Vp8BoolDecoder coeffs,
+  _Vp8Planes planes,
+  _Vp8TokenContexts contexts,
+  int mbX,
+  int mbY,
+  _Vp8FrameHeader frame,
+  int segmentId,
+  List<int> bModes,
+) {
+  contexts.setHasCoefficients(mbX, _y2BlockIndex, false);
+  for (var block = 0; block < 16; block += 1) {
+    planes.predictLumaSubblock(mbX, mbY, block, bModes[block]);
+    final hasCoefficients = _readLumaBlock(
+      coeffs,
+      planes,
+      mbX,
+      mbY,
+      block,
+      frame,
+      segmentId,
       contexts.contextFor(mbX, block),
     );
     contexts.setHasCoefficients(mbX, block, hasCoefficients);
@@ -345,6 +444,43 @@ bool _readLumaAcBlock(
   return hasTokenCoefficient;
 }
 
+bool _readLumaBlock(
+  Vp8BoolDecoder coeffs,
+  _Vp8Planes planes,
+  int mbX,
+  int mbY,
+  int block,
+  _Vp8FrameHeader frame,
+  int segmentId,
+  int initialContext,
+) {
+  List<int>? coefficients;
+  var context = initialContext;
+  for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
+    int probabilityAt(int node) =>
+        frame.yProbs.probabilityAt(coefficientIndex, context, node);
+    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+      break;
+    }
+    if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
+      context = 0;
+      continue;
+    }
+    final magnitude = _readDctMagnitude(coeffs, probabilityAt);
+    final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
+    final quant = coefficientIndex == 0
+        ? _yDcQuant(frame.yDcQuantIndex(segmentId))
+        : _yAcQuant(frame.yAcQuantIndex(segmentId));
+    coefficients ??= List<int>.filled(16, 0);
+    coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
+    context = magnitude == 1 ? 1 : 2;
+  }
+  if (coefficients != null) {
+    planes.addLumaDct(mbX, mbY, block, coefficients);
+  }
+  return coefficients != null;
+}
+
 bool _readChromaBlock(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
@@ -426,6 +562,22 @@ final class _Vp8LumaAcProbs {
   _Vp8LumaAcProbs.defaults()
     : _probabilities = [
         for (final band in _defaultYAcProbs)
+          [for (final context in band) List<int>.of(context, growable: false)],
+      ];
+
+  final List<List<List<int>>> _probabilities;
+
+  List<List<int>> operator [](int band) => _probabilities[band];
+
+  int probabilityAt(int coefficientIndex, int context, int node) {
+    return _probabilities[_coefficientBands[coefficientIndex]][context][node];
+  }
+}
+
+final class _Vp8LumaProbs {
+  _Vp8LumaProbs.defaults()
+    : _probabilities = [
+        for (final band in _defaultYProbs)
           [for (final context in band) List<int>.of(context, growable: false)],
       ];
 

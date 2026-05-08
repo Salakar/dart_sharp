@@ -23,6 +23,22 @@ Uint8List lumaAcResidualVp8Webp({
   ),
 );
 
+Uint8List bPredLumaDcResidualVp8Webp({
+  required int width,
+  required int height,
+  int coefficient = 1,
+  int coefficientIndex = 0,
+}) => _simpleWebp(
+  _residualVp8Payload(
+    width: width,
+    height: height,
+    bPred: true,
+    lumaDc: true,
+    coefficient: coefficient,
+    lumaCoefficientIndex: coefficientIndex,
+  ),
+);
+
 const _fixtureCoefficientBands = <int>[
   0,
   1,
@@ -40,6 +56,48 @@ const _fixtureCoefficientBands = <int>[
   6,
   6,
   7,
+];
+const _fixtureYProbs = <List<List<int>>>[
+  [
+    [202, 24, 213, 235, 186, 191, 220, 160, 240, 175, 255],
+    [126, 38, 182, 232, 169, 184, 228, 174, 255, 187, 128],
+    [61, 46, 138, 219, 151, 178, 240, 170, 255, 216, 128],
+  ],
+  [
+    [1, 112, 230, 250, 199, 191, 247, 159, 255, 255, 128],
+    [166, 109, 228, 252, 211, 215, 255, 174, 128, 128, 128],
+    [39, 77, 162, 232, 172, 180, 245, 178, 255, 255, 128],
+  ],
+  [
+    [1, 52, 220, 246, 198, 199, 249, 220, 255, 255, 128],
+    [124, 74, 191, 243, 183, 193, 250, 221, 255, 255, 128],
+    [24, 71, 130, 219, 154, 170, 243, 182, 255, 255, 128],
+  ],
+  [
+    [1, 182, 225, 249, 219, 240, 255, 224, 128, 128, 128],
+    [149, 150, 226, 252, 216, 205, 255, 171, 128, 128, 128],
+    [28, 108, 170, 242, 183, 194, 254, 223, 255, 255, 128],
+  ],
+  [
+    [1, 81, 230, 252, 204, 203, 255, 192, 128, 128, 128],
+    [123, 102, 209, 247, 188, 196, 255, 233, 128, 128, 128],
+    [20, 95, 153, 243, 164, 173, 255, 203, 128, 128, 128],
+  ],
+  [
+    [1, 222, 248, 255, 216, 213, 128, 128, 128, 128, 128],
+    [168, 175, 246, 252, 235, 205, 255, 255, 128, 128, 128],
+    [47, 116, 215, 255, 211, 212, 255, 255, 128, 128, 128],
+  ],
+  [
+    [1, 121, 236, 253, 212, 214, 255, 255, 128, 128, 128],
+    [141, 84, 213, 252, 201, 202, 255, 219, 128, 128, 128],
+    [42, 80, 160, 240, 162, 185, 255, 205, 128, 128, 128],
+  ],
+  [
+    [1, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [244, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+    [238, 1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+  ],
 ];
 const _fixtureYAcProbs = <List<List<int>>>[
   [
@@ -83,6 +141,43 @@ const _fixtureYAcProbs = <List<List<int>>>[
     [255, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
   ],
 ];
+
+void _writeYToken(
+  _BoolWriter coeffs,
+  int coefficient,
+  int coefficientIndex, {
+  int initialContext = 0,
+}) {
+  final magnitude = coefficient.abs();
+  if (magnitude < 1 || magnitude > 2048) {
+    throw ArgumentError.value(coefficient, 'coefficient');
+  }
+  if (coefficientIndex < 0 || coefficientIndex > 15) {
+    throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
+  }
+  var context = initialContext;
+  for (var index = 0; index < coefficientIndex; index += 1) {
+    int probabilityAt(int node) => _fixtureYProbability(index, context, node);
+    coeffs
+      ..prob(probabilityAt(0), true)
+      ..prob(probabilityAt(1), false);
+    context = 0;
+  }
+  int probabilityAt(int node) =>
+      _fixtureYProbability(coefficientIndex, context, node);
+  coeffs
+    ..prob(probabilityAt(0), true)
+    ..prob(probabilityAt(1), true);
+  _writeDctMagnitude(coeffs, magnitude, probabilityAt);
+  final nextIndex = coefficientIndex + 1;
+  coeffs.bit(coefficient.isNegative);
+  if (nextIndex < 16) {
+    coeffs.prob(
+      _fixtureYProbability(nextIndex, magnitude == 1 ? 1 : 2, 0),
+      false,
+    );
+  }
+}
 
 void _writeYAcToken(
   _BoolWriter coeffs,
@@ -329,3 +424,6 @@ int _fixtureYAcProbability(
   }
   return _fixtureYAcProbs[band][context][node];
 }
+
+int _fixtureYProbability(int coefficientIndex, int context, int node) =>
+    _fixtureYProbs[_fixtureCoefficientBands[coefficientIndex]][context][node];

@@ -207,6 +207,8 @@ Uint8List _residualVp8Payload({
   required int height,
   bool y2 = false,
   bool lumaAc = false,
+  bool lumaDc = false,
+  bool bPred = false,
   bool chromaDc = false,
   bool chromaAc = false,
   int qIndex = 0,
@@ -286,7 +288,10 @@ Uint8List _residualVp8Payload({
     if (currentSegmentIds != null) {
       _writeSegmentId(first, currentSegmentIds[i]);
     }
-    _writeYMode(first, 0);
+    _writeYMode(first, bPred ? 4 : 0);
+    if (bPred) {
+      _writeBdcSubblockModes(first);
+    }
     first.prob(142, false);
   }
   final firstPartition = first.finish();
@@ -301,7 +306,9 @@ Uint8List _residualVp8Payload({
     if (mbX == 0) {
       contexts.resetLeft();
     }
-    if (y2 && i == 0) {
+    if (bPred) {
+      contexts.setHasCoefficients(mbX, _fixtureY2BlockIndex, false);
+    } else if (y2 && i == 0) {
       _writeY2Token(
         coeffs,
         coefficient,
@@ -321,7 +328,23 @@ Uint8List _residualVp8Payload({
       contexts.setHasCoefficients(mbX, _fixtureY2BlockIndex, false);
     }
     for (var block = 0; block < 16; block += 1) {
-      if (lumaAc && i == 0 && block == 0) {
+      if (bPred) {
+        if (lumaDc && i == 0 && block == 0) {
+          _writeYToken(
+            coeffs,
+            coefficient,
+            lumaCoefficientIndex,
+            initialContext: contexts.contextFor(mbX, block),
+          );
+          contexts.setHasCoefficients(mbX, block, true);
+        } else {
+          coeffs.prob(
+            _fixtureYProbability(0, contexts.contextFor(mbX, block), 0),
+            false,
+          );
+          contexts.setHasCoefficients(mbX, block, false);
+        }
+      } else if (lumaAc && i == 0 && block == 0) {
         _writeYAcToken(
           coeffs,
           coefficient,

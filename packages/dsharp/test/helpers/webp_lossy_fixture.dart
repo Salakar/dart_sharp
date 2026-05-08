@@ -325,6 +325,9 @@ Uint8List _solidVp8Payload({
   for (var i = 0; i < mbCols * mbRows; i += 1) {
     first.prob(128, true);
     _writeYMode(first, yMode);
+    if (yMode == 4) {
+      _writeBdcSubblockModes(first);
+    }
     first.prob(142, false);
   }
   final firstPartition = first.finish();
@@ -374,6 +377,10 @@ void _writeChunk(_ByteWriter out, String type, Uint8List payload) {
 }
 
 void _writeYMode(_BoolWriter out, int mode) {
+  if (mode == 4) {
+    out.prob(145, false);
+    return;
+  }
   out.prob(145, true);
   switch (mode) {
     case 0:
@@ -394,6 +401,12 @@ void _writeYMode(_BoolWriter out, int mode) {
         ..prob(128, true);
     default:
       throw ArgumentError.value(mode, 'mode');
+  }
+}
+
+void _writeBdcSubblockModes(_BoolWriter out) {
+  for (var block = 0; block < 16; block += 1) {
+    out.prob(231, false);
   }
 }
 
