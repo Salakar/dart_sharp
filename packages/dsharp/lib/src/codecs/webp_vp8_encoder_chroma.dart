@@ -7,12 +7,15 @@ final class _Vp8ChromaAc {
   final int v;
 }
 
-typedef _LossyChromaAcBlocksBuilder =
-    List<_Vp8ChromaAc> Function(
+typedef _LossyChromaAcBlockBuilder =
+    _Vp8ChromaAc Function(
       Uint8List rgba, {
       required int width,
       required int height,
       required int quality,
+      required int mbX,
+      required int mbY,
+      required int block,
     });
 typedef _LossyChromaMixedPredicate = bool Function(int sampleX, int sampleY);
 
@@ -22,26 +25,33 @@ List<List<_Vp8ChromaAc>> _lossyChromaAcBlocks(
   required int height,
   required int quality,
 }) {
-  List<_Vp8ChromaAc> build(_LossyChromaAcBlocksBuilder builder) {
-    return builder(rgba, width: width, height: height, quality: quality);
+  List<_Vp8ChromaAc> build(_LossyChromaAcBlockBuilder builder) {
+    return _lossyChromaAcBlockList(
+      rgba,
+      width: width,
+      height: height,
+      quality: quality,
+      build: builder,
+    );
   }
 
   return <List<_Vp8ChromaAc>>[
-    build(_lossyChromaHorizontalAcBlocks),
-    build(_lossyChromaVerticalAcBlocks),
-    build(_lossyChromaSecondVerticalAcBlocks),
-    build(_lossyChromaDiagonalAcBlocks),
-    build(_lossyChromaSecondHorizontalAcBlocks),
-    build(_lossyChromaThirdHorizontalAcBlocks),
-    build(_lossyChromaSecondHorizontalVerticalAcBlocks),
+    build(_lossyChromaHorizontalAcBlock),
+    build(_lossyChromaVerticalAcBlock),
+    build(_lossyChromaSecondVerticalAcBlock),
+    build(_lossyChromaDiagonalAcBlock),
+    build(_lossyChromaSecondHorizontalAcBlock),
+    build(_lossyChromaThirdHorizontalAcBlock),
+    build(_lossyChromaSecondHorizontalVerticalAcBlock),
   ];
 }
 
-List<_Vp8ChromaAc> _lossyChromaHorizontalAcBlocks(
+List<_Vp8ChromaAc> _lossyChromaAcBlockList(
   Uint8List rgba, {
   required int width,
   required int height,
   required int quality,
+  required _LossyChromaAcBlockBuilder build,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -50,181 +60,7 @@ List<_Vp8ChromaAc> _lossyChromaHorizontalAcBlocks(
     for (var mbX = 0; mbX < mbCols; mbX += 1) {
       for (var block = 0; block < 4; block += 1) {
         blocks.add(
-          _lossyChromaHorizontalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaVerticalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaVerticalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaSecondVerticalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaSecondVerticalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaDiagonalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaDiagonalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaSecondHorizontalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaSecondHorizontalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaThirdHorizontalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaThirdHorizontalAcBlock(
-            rgba,
-            width: width,
-            height: height,
-            quality: quality,
-            mbX: mbX,
-            mbY: mbY,
-            block: block,
-          ),
-        );
-      }
-    }
-  }
-  return blocks;
-}
-
-List<_Vp8ChromaAc> _lossyChromaSecondHorizontalVerticalAcBlocks(
-  Uint8List rgba, {
-  required int width,
-  required int height,
-  required int quality,
-}) {
-  final mbCols = (width + 15) >> 4;
-  final mbRows = (height + 15) >> 4;
-  final blocks = <_Vp8ChromaAc>[];
-  for (var mbY = 0; mbY < mbRows; mbY += 1) {
-    for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      for (var block = 0; block < 4; block += 1) {
-        blocks.add(
-          _lossyChromaSecondHorizontalVerticalAcBlock(
+          build(
             rgba,
             width: width,
             height: height,
