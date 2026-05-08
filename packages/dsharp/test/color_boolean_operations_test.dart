@@ -334,10 +334,16 @@ void main() {
         left,
       ).boolean(operand: right, operator: BooleanOperator.eor),
     );
+    final stringAnd = await pixels(
+      ImagePipeline.fromRawPixels(
+        left,
+      ).boolean(operand: right, operator: 'and'),
+    );
 
     expect(firstBytes(andImage), <int>[0xA0, 0x0A]);
     expect(firstBytes(orImage), <int>[0xFA, 0xAF]);
     expect(firstBytes(eorImage), <int>[0x5A, 0xA5]);
+    expect(firstBytes(stringAnd), firstBytes(andImage));
   });
 
   test('bandBool reduces channels and boolean validates dimensions', () async {
@@ -349,7 +355,7 @@ void main() {
     final sharpAlias = await pixels(
       ImagePipeline.fromRawPixels(
         rawRgb(1, 1, <int>[247, 170, 15]),
-      ).bandbool(BooleanOperator.and),
+      ).bandbool('and'),
     );
 
     expect(firstBytes(band), <int>[2]);
@@ -361,6 +367,11 @@ void main() {
             operator: BooleanOperator.and,
           )
           .toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () =>
+          ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[1])).bandbool('fail'),
       throwsA(isA<OperationValidationException>()),
     );
   });
