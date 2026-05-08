@@ -111,6 +111,13 @@ void main() {
     );
   });
 
+  test('rejects WebP metadata with duplicate image chunks', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_duplicateWebpImageBytes()).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects malformed WebP animation metadata chunks', () async {
     await expectLater(
       ImagePipeline.fromBytes(_truncatedWebpAnimBytes()).metadata(),
@@ -264,6 +271,20 @@ Uint8List _webpHeaderOnlyBytes() {
     ..writeByte(0);
   _writeUint24Le(content, 0);
   _writeUint24Le(content, 0);
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _duplicateWebpImageBytes() {
+  final content = ByteWriter()..writeAscii('WEBP');
+  final vp8l = ByteWriter()
+    ..writeByte(0x2f)
+    ..writeUint32Le(0);
+  _riffChunk(content, 'VP8L', vp8l.toBytes());
+  _riffChunk(content, 'VP8L', vp8l.toBytes());
   final writer = ByteWriter()
     ..writeAscii('RIFF')
     ..writeUint32Le(content.length)
