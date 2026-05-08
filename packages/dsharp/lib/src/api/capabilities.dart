@@ -17,22 +17,26 @@ final class DsharpCapabilities {
           format: ImageFormat.png,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.jpeg: CodecSupport(
           format: ImageFormat.jpeg,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.gif: CodecSupport(
           format: ImageFormat.gif,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
           animation: CodecAvailability.supported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.tiff: CodecSupport(
           format: ImageFormat.tiff,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.webp: CodecSupport(
           format: ImageFormat.webp,

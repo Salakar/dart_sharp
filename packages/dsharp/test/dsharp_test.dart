@@ -12,10 +12,18 @@ void main() {
     expect(capabilities.supportFor(ImageFormat.webp).canDecode, isTrue);
     expect(capabilities.supportFor(ImageFormat.webp).canEncode, isTrue);
     expect(capabilities.supportFor(ImageFormat.avif).canDecode, isFalse);
-    expect(
-      capabilities.supportFor(ImageFormat.webp).metadata,
-      CodecAvailability.supported,
-    );
+    for (final format in <ImageFormat>[
+      ImageFormat.png,
+      ImageFormat.jpeg,
+      ImageFormat.gif,
+      ImageFormat.tiff,
+      ImageFormat.webp,
+    ]) {
+      expect(
+        capabilities.supportFor(format).metadata,
+        CodecAvailability.supported,
+      );
+    }
   });
 
   test('pipeline can be created from bytes and cloned immutably', () {
