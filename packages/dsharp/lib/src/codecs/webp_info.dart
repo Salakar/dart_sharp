@@ -261,10 +261,23 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
 }
 
 WebpImageInfo _vp8Info(Uint8List data) {
-  if (data.length < 10 ||
-      data[3] != 0x9d ||
+  if (data.length < 10) {
+    throw const InvalidImageException('Invalid VP8 key-frame header.');
+  }
+  final tag = data[0] | (data[1] << 8) | (data[2] << 16);
+  if ((tag & 1) != 0) {
+    throw const UnsupportedCodecException(
+      'Only VP8 key frames are supported for WebP still images.',
+    );
+  }
+  if (((tag >> 4) & 1) == 0) {
+    throw const InvalidImageException('VP8 key frame is not displayable.');
+  }
+  final firstPartSize = (tag >> 5) & 0x7ffff;
+  if (data[3] != 0x9d ||
       data[4] != 0x01 ||
-      data[5] != 0x2a) {
+      data[5] != 0x2a ||
+      10 + firstPartSize > data.length) {
     throw const InvalidImageException('Invalid VP8 key-frame header.');
   }
   final width = readUint16Le(data, 6) & 0x3fff;
