@@ -58,6 +58,17 @@ void main() {
     expect(image.firstFrameBytes(), <int>[1, 0, 0, 255]);
   });
 
+  test('last resize call wins', () async {
+    final image = await ImagePipeline.fromRawPixels(raw2x2())
+        .resize(const ResizeOptions(width: 1, height: 1, fit: ResizeFit.fill))
+        .resize(const ResizeOptions(width: 2, height: 2, fit: ResizeFit.fill))
+        .toPixelImage();
+
+    expect(image.width, 2);
+    expect(image.height, 2);
+    expect(image.firstFrameBytes(), orderedEquals(raw2x2().bytes));
+  });
+
   test('extract operation crops a region', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2())
         .extract(const Region(left: 1, top: 1, width: 1, height: 1))

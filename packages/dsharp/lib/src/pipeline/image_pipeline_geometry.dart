@@ -4,7 +4,10 @@ part of 'image_pipeline.dart';
 extension ImagePipelineGeometry on ImagePipeline {
   /// Adds a resize operation.
   ImagePipeline resize(ResizeOptions options) {
-    return _append(ResizeOperation(options));
+    return _appendReplacing(
+      ResizeOperation(options),
+      (step) => step is ResizeOperation,
+    );
   }
 
   /// Adds an extract operation.
