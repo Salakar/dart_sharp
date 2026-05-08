@@ -171,10 +171,18 @@ final class LinearOperation implements PipelineOperation {
   PixelImage apply(PixelImage image) {
     return mapFrames(image, (raw) {
       final output = raw.bytes;
-      for (var i = 0; i < output.length; i += 1) {
-        output[i] = byteClamp(
-          (output[i] * options.multiplier) + options.offset,
-        );
+      final channels = raw.channels.value;
+      options.validate(channels);
+      for (var i = 0; i < output.length; i += channels) {
+        for (var c = 0; c < channels; c += 1) {
+          final multiplier = options.hasChannelValues
+              ? options.multipliers[c]
+              : options.multiplier;
+          final offset = options.hasChannelValues
+              ? options.offsets[c]
+              : options.offset;
+          output[i + c] = byteClamp((output[i + c] * multiplier) + offset);
+        }
       }
       return sameSizeRaw(raw, output, raw.channels);
     });

@@ -93,6 +93,21 @@ void main() {
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).linear(const LinearOptions(multiplier: 2, offset: 10)),
       );
+      final linearNumbers = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).linear(0.5, 2),
+      );
+      final linearOffsetOnly = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).linear(null, 10),
+      );
+      final linearChannels = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).linear(<num>[1, 2, 3], <num>[10, 20, 30]),
+      );
       final tinted = await pixels(
         ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
@@ -120,11 +135,26 @@ void main() {
       );
 
       expect(firstBytes(linear), <int>[30, 50, 70]);
+      expect(firstBytes(linearNumbers), <int>[7, 12, 17]);
+      expect(firstBytes(linearOffsetOnly), <int>[20, 30, 40]);
+      expect(firstBytes(linearChannels), <int>[20, 60, 120]);
       expect(firstBytes(tinted), <int>[60, 20, 130]);
       expect(firstBytes(normalized), <int>[0, 64, 128, 77, 128, 191, 255, 99]);
       expect(firstBytes(recombed), <int>[20, 10, 30]);
       expect(firstBytes(modulated), <int>[20, 40, 60]);
       expect(firstBytes(clahe), <int>[128, 255]);
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).linear(<num>[1, 2], <num>[0]),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).linear(<num>[1, 2], <num>[0, 0]).toPixelImage(),
+        throwsA(isA<OperationValidationException>()),
+      );
     },
   );
 

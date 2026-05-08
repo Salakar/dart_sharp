@@ -145,13 +145,44 @@ final class AffineOptions {
 /// Options for linear channel adjustment.
 final class LinearOptions {
   /// Creates linear options.
-  const LinearOptions({this.multiplier = 1, this.offset = 0});
+  const LinearOptions({
+    this.multiplier = 1,
+    this.offset = 0,
+    this.multipliers = const <num>[],
+    this.offsets = const <num>[],
+  });
 
-  /// Multiplier.
+  /// Scalar multiplier.
   final num multiplier;
 
-  /// Offset.
+  /// Scalar offset.
   final num offset;
+
+  /// Per-channel multipliers.
+  final List<num> multipliers;
+
+  /// Per-channel offsets.
+  final List<num> offsets;
+
+  /// Whether per-channel values are used.
+  bool get hasChannelValues => multipliers.isNotEmpty || offsets.isNotEmpty;
+
+  /// Validates per-channel values against [channels].
+  void validate(int channels) {
+    if (!hasChannelValues) {
+      return;
+    }
+    if (multipliers.length != offsets.length) {
+      throw const OperationValidationException(
+        'Linear multiplier and offset arrays must have the same length.',
+      );
+    }
+    if (multipliers.length != channels) {
+      throw const OperationValidationException(
+        'Linear arrays must match the image channel count.',
+      );
+    }
+  }
 }
 
 /// Options for thresholding.

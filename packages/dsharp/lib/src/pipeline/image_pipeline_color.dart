@@ -47,8 +47,8 @@ extension ImagePipelineColor on ImagePipeline {
   }
 
   /// Applies linear channel adjustment.
-  ImagePipeline linear([LinearOptions options = const LinearOptions()]) {
-    return _append(LinearOperation(options));
+  ImagePipeline linear([Object? a = const LinearOptions(), Object? b]) {
+    return _append(LinearOperation(_linearOptions(a, b)));
   }
 
   /// Tints pixels toward [color].
@@ -96,5 +96,42 @@ extension ImagePipelineColor on ImagePipeline {
   /// Applies CLAHE approximation.
   ImagePipeline clahe([ClaheOptions options = const ClaheOptions()]) {
     return _append(ClaheOperation(options));
+  }
+
+  LinearOptions _linearOptions(Object? a, Object? b) {
+    if (a is LinearOptions) {
+      if (b != null) {
+        throw const OperationValidationException(
+          'Linear options cannot be combined with an offset argument.',
+        );
+      }
+      return a;
+    }
+    if (a == null && b == null) {
+      return const LinearOptions();
+    }
+    if (a == null && b is num) {
+      return LinearOptions(offset: b);
+    }
+    if (a is num && b == null) {
+      return LinearOptions(multiplier: a);
+    }
+    if (a is num && b is num) {
+      return LinearOptions(multiplier: a, offset: b);
+    }
+    if (a is List<num> && b is List<num>) {
+      if (a.isEmpty || b.isEmpty || a.length != b.length) {
+        throw const OperationValidationException(
+          'Linear multiplier and offset arrays must have the same length.',
+        );
+      }
+      return LinearOptions(
+        multipliers: List<num>.unmodifiable(a),
+        offsets: List<num>.unmodifiable(b),
+      );
+    }
+    throw const OperationValidationException(
+      'Linear expects numbers, matching number arrays, or LinearOptions.',
+    );
   }
 }
