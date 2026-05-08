@@ -179,6 +179,35 @@ void main() {
     expect(_webpChunk(webp, 'ICCP'), profile);
   });
 
+  test('Sharp metadata aliases write and keep supported metadata', () async {
+    final exif = _exifTiffOrientation(3);
+    final pipeline = ImagePipeline.fromRawPixels(
+      raw(),
+    ).withExif(exif).withXmp('<xmp><title>Alias</title></xmp>').jpeg();
+    exif.fillRange(0, exif.length, 0);
+
+    final jpeg = await pipeline.toBytes();
+    final jpegMetadata = await ImagePipeline.fromBytes(jpeg).metadata();
+    expect(jpegMetadata.orientation, 3);
+    expect(jpegMetadata.xmpAsString, contains('Alias'));
+
+    final profile = Uint8List.fromList(<int>[4, 5, 6]);
+    final source = await ImagePipeline.fromRawPixels(raw())
+        .withExif(_exifTiffOrientation(6))
+        .withIccProfile(profile)
+        .withXmp('<xmp><title>Keep Alias</title></xmp>')
+        .webp()
+        .toBytes();
+    final kept = await ImagePipeline.fromBytes(
+      source,
+    ).keepMetadata().png().toBytes();
+    final keptMetadata = await ImagePipeline.fromBytes(kept).metadata();
+
+    expect(keptMetadata.orientation, 6);
+    expect(keptMetadata.iccProfile, profile);
+    expect(keptMetadata.xmpAsString, contains('Keep Alias'));
+  });
+
   test('keeps XMP metadata across supported encoded outputs', () async {
     final xmp = XmpMetadata.parse('<xmp><title>Kept</title></xmp>');
     final jpegSource = await ImagePipeline.fromRawPixels(

@@ -70,6 +70,9 @@ extension ImagePipelineOutput on ImagePipeline {
     );
   }
 
+  /// Requests broad metadata preservation.
+  ImagePipeline keepMetadata() => withMetadata();
+
   /// Requests EXIF preservation.
   ImagePipeline keepExif() {
     return _copyPipelineWith(
@@ -102,6 +105,9 @@ extension ImagePipelineOutput on ImagePipeline {
     );
   }
 
+  /// Requests EXIF metadata writing.
+  ImagePipeline withExif(Uint8List exif) => withExifMetadata(exif);
+
   /// Requests ICC profile writing.
   ImagePipeline withIccProfile(Uint8List iccProfile) {
     return _copyPipelineWith(
@@ -118,5 +124,10 @@ extension ImagePipelineOutput on ImagePipeline {
       this,
       metadataWrites: _metadataWrites.copyWith(xmp: xmp),
     );
+  }
+
+  /// Requests XMP metadata writing from an XML string.
+  ImagePipeline withXmp(String xmp) {
+    return withXmpMetadata(XmpMetadata.parse(xmp));
   }
 }
