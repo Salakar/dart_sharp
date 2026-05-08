@@ -334,8 +334,14 @@ void main() {
         rawRgb(1, 1, <int>[247, 170, 15]),
       ).bandBool(BooleanOperator.and),
     );
+    final sharpAlias = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[247, 170, 15]),
+      ).bandbool(BooleanOperator.and),
+    );
 
     expect(firstBytes(band), <int>[2]);
+    expect(firstBytes(sharpAlias), firstBytes(band));
     expect(
       ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[1]))
           .boolean(

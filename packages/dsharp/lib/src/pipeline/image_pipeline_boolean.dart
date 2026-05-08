@@ -14,4 +14,7 @@ extension ImagePipelineBoolean on ImagePipeline {
   ImagePipeline bandBool(BooleanOperator operator) {
     return _append(BandBoolOperation(operator));
   }
+
+  /// Reduces bands with a bitwise operator using sharp's method spelling.
+  ImagePipeline bandbool(BooleanOperator operator) => bandBool(operator);
 }
