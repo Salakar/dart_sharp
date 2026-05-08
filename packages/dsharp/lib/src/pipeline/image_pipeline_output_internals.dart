@@ -107,9 +107,16 @@ EncodedImage _applyMetadataWrites(
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
+  if (xmp != null && encoded.info.format == ImageFormat.jpeg) {
+    final bytes = _writeJpegXmp(encoded.bytes, xmp);
+    return EncodedImage(
+      bytes: bytes,
+      info: _copyOutputInfoWithSize(encoded.info, bytes.length),
+    );
+  }
   if (xmp != null) {
     throw const UnsupportedCodecException(
-      'XMP metadata writing is only implemented for PNG and WebP output.',
+      'XMP metadata writing is only implemented for JPEG, PNG, and WebP output.',
     );
   }
   return encoded;
@@ -305,6 +312,86 @@ void _writeUint24Le(ByteWriter writer, int value) {
     ..writeByte(value)
     ..writeByte(value >> 8)
     ..writeByte(value >> 16);
+}
+
+Uint8List _writeJpegXmp(Uint8List bytes, XmpMetadata xmp) {
+  if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
+    throw const InvalidImageException('Invalid JPEG signature.');
+  }
+  final writer = ByteWriter()
+    ..writeByte(0xff)
+    ..writeByte(0xd8);
+  _writeJpegXmpSegment(writer, xmp);
+  var offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset] != 0xff) {
+      throw const InvalidImageException('Invalid JPEG marker.');
+    }
+    final markerStart = offset;
+    while (offset < bytes.length && bytes[offset] == 0xff) {
+      offset += 1;
+    }
+    if (offset >= bytes.length) {
+      break;
+    }
+    final marker = bytes[offset];
+    offset += 1;
+    if (marker == 0xda || marker == 0xd9) {
+      writer.writeBytes(bytes.sublist(markerStart));
+      break;
+    }
+    if (_jpegStandaloneMarker(marker)) {
+      writer.writeBytes(bytes.sublist(markerStart, offset));
+      continue;
+    }
+    if (offset + 2 > bytes.length) {
+      throw const InvalidImageException('Truncated JPEG marker.');
+    }
+    final length = readUint16Be(bytes, offset);
+    final segmentEnd = offset + length;
+    if (length < 2 || segmentEnd > bytes.length) {
+      throw const InvalidImageException('Invalid JPEG marker length.');
+    }
+    final data = bytes.sublist(offset + 2, segmentEnd);
+    if (marker != 0xe1 || !_isJpegXmpData(data)) {
+      writer.writeBytes(bytes.sublist(markerStart, segmentEnd));
+    }
+    offset = segmentEnd;
+  }
+  return writer.toBytes();
+}
+
+void _writeJpegXmpSegment(ByteWriter writer, XmpMetadata xmp) {
+  final payload = Uint8List.fromList(<int>[
+    ...ascii.encode('http://ns.adobe.com/xap/1.0/'),
+    0,
+    ...utf8.encode(xmp.xmlText),
+  ]);
+  if (payload.length + 2 > 0xffff) {
+    throw const OperationValidationException('JPEG XMP metadata is too large.');
+  }
+  writer
+    ..writeByte(0xff)
+    ..writeByte(0xe1)
+    ..writeUint16Be(payload.length + 2)
+    ..writeBytes(payload);
+}
+
+bool _isJpegXmpData(Uint8List data) {
+  const header = 'http://ns.adobe.com/xap/1.0/';
+  if (data.length <= header.length || data[header.length] != 0) {
+    return false;
+  }
+  for (var i = 0; i < header.length; i += 1) {
+    if (data[i] != header.codeUnitAt(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _jpegStandaloneMarker(int marker) {
+  return marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7);
 }
 
 OutputInfo _copyOutputInfoWithSize(OutputInfo info, int size) {

@@ -116,17 +116,24 @@ void main() {
     expect(kept.info.format, ImageFormat.png);
   });
 
-  test('writes explicit XMP metadata to PNG and WebP output', () async {
+  test('writes explicit XMP metadata to JPEG, PNG, and WebP output', () async {
     final xmp = XmpMetadata.parse('<xmp><title>Test</title></xmp>');
+    final jpeg = await ImagePipeline.fromRawPixels(
+      raw(),
+    ).withXmpMetadata(xmp).jpeg().toBytesWithInfo();
     final png = await ImagePipeline.fromRawPixels(
       raw(),
     ).withXmpMetadata(xmp).png().toBytesWithInfo();
     final webp = await ImagePipeline.fromRawPixels(
       raw(),
     ).withXmpMetadata(xmp).webp().toBytesWithInfo();
+    final jpegMetadata = await ImagePipeline.fromBytes(jpeg.bytes).metadata();
     final pngMetadata = await ImagePipeline.fromBytes(png.bytes).metadata();
     final webpMetadata = await ImagePipeline.fromBytes(webp.bytes).metadata();
 
+    expect(jpeg.info.format, ImageFormat.jpeg);
+    expect(jpeg.info.size, jpeg.bytes.length);
+    expect(jpegMetadata.hasXmp, isTrue);
     expect(png.info.format, ImageFormat.png);
     expect(png.info.size, png.bytes.length);
     expect(pngMetadata.hasXmp, isTrue);
@@ -151,7 +158,7 @@ void main() {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
-      ).withXmpMetadata(XmpMetadata.parse('<xmp />')).jpeg().toBytes(),
+      ).withXmpMetadata(XmpMetadata.parse('<xmp />')).gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
   });
