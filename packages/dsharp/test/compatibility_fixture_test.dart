@@ -402,6 +402,28 @@ void main() {
     expect(image.frames.first.pixels.bytes.length, 13 * 169 * 4);
   });
 
+  test('optional upstream VP8L prefix-code fixtures decode pixels', () async {
+    final paths = <String>[
+      '../../sharp_clone/test/fixtures/expected/gravity-center-height.webp',
+      '../../sharp_clone/test/fixtures/expected/negate-trans.webp',
+      '../../sharp_clone/test/fixtures/expected/webp-alpha-80.webp',
+    ];
+    for (final path in paths) {
+      final fixture = File(path);
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+      final bytes = await fixture.readAsBytes();
+      final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+      final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+      expect(image.width, metadata.width, reason: path);
+      expect(image.height, metadata.height, reason: path);
+      expect(image.firstFrameBytes().length, image.width * image.height * 4);
+    }
+  });
+
   test('optional upstream WebP fixture decodes pixels when present', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {

@@ -119,7 +119,10 @@ Uint8List _decodeImageData(
         width,
       );
       if (dist <= 0 || dist > pixel || pixel + length > width * height) {
-        throw const InvalidImageException('Invalid VP8L backward reference.');
+        throw InvalidImageException(
+          'Invalid VP8L backward reference at pixel $pixel '
+          '(distance $dist, length $length).',
+        );
       }
       for (var i = 0; i < length; i += 1) {
         out.setRange(

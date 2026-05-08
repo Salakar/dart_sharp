@@ -103,17 +103,19 @@ List<int> _readNormalCodeLengths(_BitReader reader, int alphabetSize) {
   for (var i = 0; i < numCodeLengths; i += 1) {
     codeLengthLengths[order[i]] = reader.readBits(3);
   }
-  final codeLengthCode = _CanonicalCode(codeLengthLengths);
-  final maxSymbol = reader.readBits(1) == 0
+  final codeLengthCode = _PrefixCode._fromLengths(codeLengthLengths);
+  final maxLengthCodes = reader.readBits(1) == 0
       ? alphabetSize
       : 2 + reader.readBits(2 + 2 * reader.readBits(3));
-  if (maxSymbol > alphabetSize) {
+  if (maxLengthCodes > alphabetSize) {
     throw const InvalidImageException('Invalid VP8L prefix symbol count.');
   }
-  final lengths = List<int>.filled(maxSymbol, 0);
+  final lengths = List<int>.filled(alphabetSize, 0);
   var index = 0;
   var previous = 8;
-  while (index < maxSymbol) {
+  var codeCount = 0;
+  while (index < alphabetSize && codeCount < maxLengthCodes) {
+    codeCount += 1;
     final symbol = codeLengthCode.decode(reader);
     if (symbol < 16) {
       lengths[index++] = symbol;
@@ -127,7 +129,7 @@ List<int> _readNormalCodeLengths(_BitReader reader, int alphabetSize) {
         18 => 11 + reader.readBits(7),
         _ => throw const InvalidImageException('Invalid VP8L code length.'),
       };
-      if (index + repeat > maxSymbol) {
+      if (index + repeat > alphabetSize) {
         throw const InvalidImageException('Invalid VP8L code length repeat.');
       }
       final value = symbol == 16 ? previous : 0;
