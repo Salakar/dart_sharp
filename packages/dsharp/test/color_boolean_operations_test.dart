@@ -17,10 +17,15 @@ void main() {
       );
       final negated = await pixels(ImagePipeline.fromRawPixels(raw).negate());
       final negatedAlpha = await pixels(
-        ImagePipeline.fromRawPixels(raw).negate(alpha: true),
+        ImagePipeline.fromRawPixels(raw).negate(const NegateOptions()),
       );
-      final negatedDisabled = await pixels(
-        ImagePipeline.fromRawPixels(raw).negate(enabled: false),
+      final negatedPreserveAlpha = await pixels(
+        ImagePipeline.fromRawPixels(
+          raw,
+        ).negate(const NegateOptions(alpha: false)),
+      );
+      final negatedFalse = await pixels(
+        ImagePipeline.fromRawPixels(raw).negate(false),
       );
       final threshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20),
@@ -52,11 +57,12 @@ void main() {
         ImagePipeline.fromRawPixels(raw).grayscale(false).operations,
         isEmpty,
       );
-      expect(firstBytes(negated), <int>[245, 235, 225, 77]);
+      expect(firstBytes(negated), <int>[245, 235, 225, 178]);
       expect(firstBytes(negatedAlpha), <int>[245, 235, 225, 178]);
-      expect(firstBytes(negatedDisabled), <int>[10, 20, 30, 77]);
+      expect(firstBytes(negatedPreserveAlpha), <int>[245, 235, 225, 77]);
+      expect(firstBytes(negatedFalse), <int>[10, 20, 30, 77]);
       expect(
-        ImagePipeline.fromRawPixels(raw).negate(enabled: false).operations,
+        ImagePipeline.fromRawPixels(raw).negate(false).operations,
         isEmpty,
       );
       expect(firstBytes(threshold), <int>[0, 0, 0, 77]);
@@ -79,6 +85,10 @@ void main() {
       );
       expect(
         () => ImagePipeline.fromRawPixels(raw).threshold(20, 'false'),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).negate('false'),
         throwsA(isA<OperationValidationException>()),
       );
       expect(

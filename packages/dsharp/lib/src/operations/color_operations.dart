@@ -67,7 +67,7 @@ final class ColourspaceOperation implements PipelineOperation {
 /// Negates pixel channels.
 final class NegateOperation implements PipelineOperation {
   /// Creates a negate operation.
-  const NegateOperation({this.negateAlpha = false});
+  const NegateOperation({this.negateAlpha = true});
 
   /// Whether alpha should also be negated.
   final bool negateAlpha;

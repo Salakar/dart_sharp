@@ -32,9 +32,20 @@ extension ImagePipelineColor on ImagePipeline {
     return toColourspace(colorspace);
   }
 
-  /// Negates pixel channels when [enabled] is true.
-  ImagePipeline negate({bool alpha = false, bool enabled = true}) {
-    return enabled ? _append(NegateOperation(negateAlpha: alpha)) : this;
+  /// Negates pixel channels.
+  ImagePipeline negate([Object? options]) {
+    if (options == false) {
+      return this;
+    }
+    if (options == null || options == true) {
+      return _append(const NegateOperation());
+    }
+    if (options is NegateOptions) {
+      return _append(NegateOperation(negateAlpha: options.alpha));
+    }
+    throw const OperationValidationException(
+      'Negate expects a boolean or NegateOptions.',
+    );
   }
 
   /// Applies a threshold when enabled.

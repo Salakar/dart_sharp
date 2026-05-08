@@ -296,6 +296,15 @@ final class ThresholdOptions {
   }
 }
 
+/// Options for negating image channels.
+final class NegateOptions {
+  /// Creates negate options.
+  const NegateOptions({this.alpha = true});
+
+  /// Whether alpha channels should be negated.
+  final bool alpha;
+}
+
 /// Options for percentile-based normalization.
 final class NormalizeOptions {
   /// Creates normalize options.
