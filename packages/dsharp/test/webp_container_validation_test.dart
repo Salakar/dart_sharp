@@ -138,6 +138,23 @@ void main() {
     }
   });
 
+  test('rejects extended metadata chunks without VP8X', () async {
+    for (final type in <String>['ICCP', 'EXIF', 'XMP ']) {
+      final bytes = _appendChunk(solidVp8Webp(width: 1, height: 1), type, <int>[
+        1,
+      ]);
+
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects animation frames before ANIM header', () async {
     final ordered = animatedVp8Webp(width: 1, height: 1);
     final reordered = Uint8List.fromList(<int>[
@@ -228,4 +245,17 @@ void main() {
       );
     },
   );
+}
+
+Uint8List _appendChunk(Uint8List webp, String type, List<int> payload) {
+  final padding = payload.length.isOdd ? 1 : 0;
+  final out = Uint8List(webp.length + 8 + payload.length + padding)
+    ..setAll(0, webp);
+  final offset = webp.length;
+  out.setAll(offset, type.codeUnits);
+  final words = ByteData.sublistView(out);
+  words.setUint32(offset + 4, payload.length, Endian.little);
+  out.setAll(offset + 8, payload);
+  words.setUint32(4, out.length - 8, Endian.little);
+  return out;
 }

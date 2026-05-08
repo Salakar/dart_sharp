@@ -209,6 +209,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   if (parsed == null) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
   }
+  if (!hasVp8x && (hasProfileChunk || hasExifChunk || hasXmpChunk)) {
+    throw const InvalidImageException('WebP metadata chunks require VP8X.');
+  }
   if (parsed.compression == WebpCompression.extended &&
       !parsed.isAnimated &&
       imageChunkCount != 1) {
