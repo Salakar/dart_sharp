@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:dsharp/dsharp.dart';
+import 'package:dsharp/src/codecs/binary_io.dart';
 import 'package:test/test.dart';
 
 import 'pipeline_test_helpers.dart';
@@ -54,6 +57,49 @@ void main() {
       expect(redBytes(image), <int>[1, 2, 3, 4]);
     },
   );
+
+  test('autoOrient applies encoded EXIF orientation', () async {
+    final jpeg = await ImagePipeline.fromRawPixels(
+      rawRgb(3, 2, <int>[
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        255,
+        255,
+        0,
+        255,
+        0,
+        255,
+        0,
+        255,
+        255,
+      ]),
+    ).jpeg().toBytes();
+    final bytes = _withExifOrientation(jpeg, 6);
+
+    final sourceMetadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(
+      bytes,
+    ).autoOrient().toPixelImage();
+    final orientedMetadata = await ImagePipeline.fromBytes(
+      bytes,
+    ).autoOrient().metadata();
+
+    expect(sourceMetadata.width, 3);
+    expect(sourceMetadata.height, 2);
+    expect(sourceMetadata.orientation, 6);
+    expect(image.width, 2);
+    expect(image.height, 3);
+    expect(orientedMetadata.width, 2);
+    expect(orientedMetadata.height, 3);
+    expect(orientedMetadata.orientation, isNull);
+  });
 
   test(
     'arbitrary rotate expands bounds and affine validates matrices',
@@ -132,4 +178,38 @@ void main() {
       throwsA(isA<OperationValidationException>()),
     );
   });
+}
+
+Uint8List _withExifOrientation(Uint8List jpeg, int orientation) {
+  final writer = ByteWriter()
+    ..writeByte(0xff)
+    ..writeByte(0xd8);
+  _jpegSegment(writer, 0xe1, _exifOrientation(orientation));
+  writer.writeBytes(jpeg.sublist(2));
+  return writer.toBytes();
+}
+
+void _jpegSegment(ByteWriter writer, int marker, List<int> data) {
+  writer
+    ..writeByte(0xff)
+    ..writeByte(marker)
+    ..writeUint16Be(data.length + 2)
+    ..writeBytes(data);
+}
+
+Uint8List _exifOrientation(int orientation) {
+  final writer = ByteWriter()
+    ..writeAscii('Exif')
+    ..writeUint16Be(0)
+    ..writeAscii('II')
+    ..writeUint16Le(42)
+    ..writeUint32Le(8)
+    ..writeUint16Le(1)
+    ..writeUint16Le(0x0112)
+    ..writeUint16Le(3)
+    ..writeUint32Le(1)
+    ..writeUint16Le(orientation)
+    ..writeUint16Le(0)
+    ..writeUint32Le(0);
+  return writer.toBytes();
 }

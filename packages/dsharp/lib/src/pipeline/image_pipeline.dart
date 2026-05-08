@@ -126,9 +126,14 @@ final class ImagePipeline {
     };
     token?.throwIfCancelled();
     var image = decoded;
+    final orientation = _steps.any((step) => step is AutoOrientOperation)
+        ? _sourceOrientation()
+        : null;
     for (final step in _steps) {
       token?.throwIfCancelled();
-      image = step.apply(image);
+      image = step is AutoOrientOperation
+          ? step.applyOrientation(image, orientation)
+          : step.apply(image);
     }
     token?.throwIfCancelled();
     return image;
@@ -271,6 +276,14 @@ final class ImagePipeline {
       BytesImageSource(:final bytes) => bytes.length,
       _ => null,
     };
+  }
+
+  int? _sourceOrientation() {
+    if (source case BytesImageSource(:final bytes)) {
+      final metadata = readEncodedImageMetadata(bytes, sniffImageFormat(bytes));
+      return metadata?.orientation;
+    }
+    return null;
   }
 }
 

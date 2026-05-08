@@ -92,6 +92,54 @@ final class AutoOrientOperation implements PipelineOperation {
 
   @override
   PixelImage apply(PixelImage image) => image;
+
+  /// Applies [orientation] from encoded metadata when available.
+  PixelImage applyOrientation(PixelImage image, int? orientation) {
+    final value = orientation ?? 1;
+    if (value <= 1 || value > 8) {
+      return image;
+    }
+    return mapFrames(image, (raw) => _orient(raw, value));
+  }
+}
+
+RawPixels _orient(RawPixels raw, int orientation) {
+  final channels = raw.channels.value;
+  final swapsAxes = orientation >= 5;
+  final outWidth = swapsAxes ? raw.height : raw.width;
+  final outHeight = swapsAxes ? raw.width : raw.height;
+  final output = Uint8List(outWidth * outHeight * channels);
+  for (var y = 0; y < raw.height; y += 1) {
+    for (var x = 0; x < raw.width; x += 1) {
+      final target = _orientedPoint(raw.width, raw.height, x, y, orientation);
+      final sourceOffset = ((y * raw.width) + x) * channels;
+      final targetOffset = ((target.y * outWidth) + target.x) * channels;
+      for (var c = 0; c < channels; c += 1) {
+        output[targetOffset + c] = raw.bytes[sourceOffset + c];
+      }
+    }
+  }
+  return RawPixels(
+    bytes: output,
+    width: outWidth,
+    height: outHeight,
+    channels: raw.channels,
+    depth: raw.depth,
+    premultiplication: raw.premultiplication,
+  );
+}
+
+_Point _orientedPoint(int width, int height, int x, int y, int orientation) {
+  return switch (orientation) {
+    2 => _Point(width - 1 - x, y),
+    3 => _Point(width - 1 - x, height - 1 - y),
+    4 => _Point(x, height - 1 - y),
+    5 => _Point(y, x),
+    6 => _Point(height - 1 - y, x),
+    7 => _Point(height - 1 - y, width - 1 - x),
+    8 => _Point(y, width - 1 - x),
+    _ => _Point(x, y),
+  };
 }
 
 RawPixels _rotate(RawPixels raw, int degrees) {
@@ -214,4 +262,11 @@ void _copySample(
   for (var c = 0; c < channels; c += 1) {
     output[target + c] = input[source + c];
   }
+}
+
+final class _Point {
+  const _Point(this.x, this.y);
+
+  final int x;
+  final int y;
 }

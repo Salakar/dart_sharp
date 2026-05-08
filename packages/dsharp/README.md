@@ -18,8 +18,8 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   bitstreams.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
   alpha/channel operations, filters, convolution, color math, boolean ops,
-  compositing, tiling, frame-aware joins, encoded header metadata reads, and
-  stats.
+  compositing, tiling, frame-aware joins, EXIF auto-orient, encoded header
+  metadata reads, and stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
   `toImageBytesResult`, format-specific chain methods, cancellation, timeout,
   and VM-only `writeToFile`.
