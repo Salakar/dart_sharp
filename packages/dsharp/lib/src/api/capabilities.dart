@@ -107,9 +107,9 @@ final class DsharpCapabilities {
         ),
         ImageFormat.fits: CodecSupport(
           format: ImageFormat.fits,
-          input: CodecAvailability.unsupported,
-          output: CodecAvailability.unsupported,
-          reason: 'FITS decoding is not implemented in pure Dart.',
+          input: CodecAvailability.supported,
+          output: CodecAvailability.supported,
+          metadata: CodecAvailability.unsupported,
         ),
         ImageFormat.rad: CodecSupport(
           format: ImageFormat.rad,

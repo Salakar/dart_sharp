@@ -29,6 +29,10 @@ void main() {
       sniffImageFormat(Uint8List.fromList('#?RADIANCE\n'.codeUnits)),
       ImageFormat.rad,
     );
+    expect(
+      sniffImageFormat(Uint8List.fromList('SIMPLE  ='.codeUnits)),
+      ImageFormat.fits,
+    );
     expect(sniffImageFormat(Uint8List(0)), ImageFormat.unknown);
   });
 
@@ -539,7 +543,6 @@ void main() {
       ImageFormat.openSlide,
       ImageFormat.magick,
       ImageFormat.dcraw,
-      ImageFormat.fits,
       ImageFormat.vips,
       ImageFormat.deepZoom,
     ]) {

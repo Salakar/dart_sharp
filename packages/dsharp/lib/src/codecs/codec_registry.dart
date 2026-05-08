@@ -6,6 +6,7 @@ import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'codec.dart';
 import 'encoder_options.dart';
+import 'fits_codec.dart';
 import 'format_sniffer.dart';
 import 'gif_codec.dart';
 import 'image_format.dart';
@@ -38,6 +39,7 @@ final class CodecRegistry {
       const WebpImageCodec(),
       const PpmImageCodec(),
       const RadImageCodec(),
+      const FitsImageCodec(),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',
@@ -73,10 +75,6 @@ final class CodecRegistry {
       const UnsupportedImageCodec(
         ImageFormat.dcraw,
         reason: 'Camera raw decoding is not implemented in pure Dart.',
-      ),
-      const UnsupportedImageCodec(
-        ImageFormat.fits,
-        reason: 'FITS decoding is not implemented in pure Dart.',
       ),
       const UnsupportedImageCodec(
         ImageFormat.vips,

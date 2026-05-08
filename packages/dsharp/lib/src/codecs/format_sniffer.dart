@@ -45,6 +45,9 @@ ImageFormat sniffImageFormat(Uint8List bytes) {
   if (_startsWith(bytes, '%PDF'.codeUnits)) {
     return ImageFormat.pdf;
   }
+  if (_startsWith(bytes, 'SIMPLE  ='.codeUnits)) {
+    return ImageFormat.fits;
+  }
   if (_startsWith(bytes, '#?RADIANCE'.codeUnits) ||
       _startsWith(bytes, '#?RGBE'.codeUnits)) {
     return ImageFormat.rad;
