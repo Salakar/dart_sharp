@@ -155,6 +155,51 @@ void main() {
     expect(decoded.height, 1);
   });
 
+  test('gif codec encodes animated frames', () async {
+    final image = PixelImage(
+      frames: <ImageFrame>[
+        ImageFrame(
+          pixels: RawPixels(
+            bytes: Uint8List.fromList(<int>[255, 0, 0, 255]),
+            width: 1,
+            height: 1,
+            channels: ChannelCount.four,
+          ),
+          delay: const Duration(milliseconds: 10),
+        ),
+        ImageFrame(
+          pixels: RawPixels(
+            bytes: Uint8List.fromList(<int>[0, 0, 255, 255]),
+            width: 1,
+            height: 1,
+            channels: ChannelCount.four,
+          ),
+          delay: const Duration(milliseconds: 20),
+        ),
+      ],
+      loopCount: 3,
+    );
+
+    final encoded = await ImagePipeline.fromPixelImage(
+      image,
+    ).gif().toBytesWithInfo();
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+
+    expect(encoded.info.frames, 2);
+    expect(encoded.info.loopCount, 3);
+    expect(encoded.info.frameDelays, <Duration>[
+      const Duration(milliseconds: 10),
+      const Duration(milliseconds: 20),
+    ]);
+    expect(decoded.isAnimated, isTrue);
+    expect(decoded.frames.length, 2);
+    expect(decoded.loopCount, 3);
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 10));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 20));
+    expect(decoded.frames[0].pixels.bytes, <int>[255, 0, 0, 255]);
+    expect(decoded.frames[1].pixels.bytes, <int>[0, 0, 255, 255]);
+  });
+
   test('tiff codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(

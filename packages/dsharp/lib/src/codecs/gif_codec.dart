@@ -78,8 +78,12 @@ final class GifImageCodec implements ImageCodec {
   @override
   EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     final raw = image.firstFrame.pixels;
-    final rgba = rawToRgba(raw);
-    final palette = GifPalette.fromRgba(rgba);
+    final frameRgba = <Uint8List>[
+      for (final frame in image.frames) rawToRgba(frame.pixels),
+    ];
+    final palette = GifPalette.fromRgba(
+      Uint8List.fromList(<int>[for (final rgba in frameRgba) ...rgba]),
+    );
     final minCodeSize = _minCodeSize(palette.size);
     final writer = ByteWriter()
       ..writeAscii('GIF89a')
@@ -92,7 +96,24 @@ final class GifImageCodec implements ImageCodec {
     if (image.loopCount != null) {
       _writeLoopExtension(writer, image.loopCount!);
     }
-    _writeFrame(writer, image.firstFrame, palette, minCodeSize);
+    var indexOffset = 0;
+    for (var i = 0; i < image.frames.length; i += 1) {
+      final frame = image.frames[i];
+      final pixelCount = frame.width * frame.height;
+      _writeFrame(
+        writer,
+        frame,
+        GifPalette(
+          palette.bytes,
+          palette.indices.sublist(indexOffset, indexOffset + pixelCount),
+          palette.size,
+          palette.tablePower,
+          palette.transparentIndex,
+        ),
+        minCodeSize,
+      );
+      indexOffset += pixelCount;
+    }
     writer.writeByte(0x3b);
     final bytes = writer.toBytes();
     return EncodedImage(
