@@ -192,6 +192,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       hasAnimationHeader = true;
       loopCount = readUint16Le(data, 4);
     } else if (type == 'ANMF') {
+      if (!hasAnimationHeader) {
+        throw const InvalidImageException(
+          'WebP animation frame precedes ANIM.',
+        );
+      }
       frames.add(_frameInfo(data));
     }
     offset = end + (length.isOdd ? 1 : 0);

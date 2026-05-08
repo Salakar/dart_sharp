@@ -122,6 +122,24 @@ void main() {
     }
   });
 
+  test('rejects animation frames before ANIM header', () async {
+    final ordered = animatedVp8Webp(width: 1, height: 1);
+    final reordered = Uint8List.fromList(<int>[
+      ...ordered.sublist(0, 30),
+      ...ordered.sublist(44),
+      ...ordered.sublist(30, 44),
+    ]);
+
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;
