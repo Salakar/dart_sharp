@@ -21,15 +21,16 @@ final class TiffImageCodec implements ImageCodec {
 
   @override
   PixelImage decode(Uint8List bytes) {
-    if (bytes.length < 8 || bytes[0] != 0x49 || bytes[1] != 0x49) {
+    final endian = _TiffEndian.fromHeader(bytes);
+    if (endian == null) {
       throw const UnsupportedCodecException(
-        'Only little-endian baseline TIFF is supported.',
+        'Only baseline TIFF byte orders are supported.',
       );
     }
-    if (readUint16Le(bytes, 2) != 42) {
+    if (endian.readUint16(bytes, 2) != 42) {
       throw const InvalidImageException('Invalid TIFF header.');
     }
-    final tags = _readIfd(bytes, readUint32Le(bytes, 4));
+    final tags = _readIfd(bytes, endian.readUint32(bytes, 4), endian);
     final width = tags.value(256);
     final height = tags.value(257);
     final compression = tags.value(259);
@@ -160,22 +161,53 @@ final class _Ifd {
   }
 }
 
-_Ifd _readIfd(Uint8List bytes, int offset) {
-  final count = readUint16Le(bytes, offset);
+_Ifd _readIfd(Uint8List bytes, int offset, _TiffEndian endian) {
+  final count = endian.readUint16(bytes, offset);
   final tags = <int, int>{};
   for (var i = 0; i < count; i += 1) {
     final entry = offset + 2 + i * 12;
-    final tag = readUint16Le(bytes, entry);
-    final type = readUint16Le(bytes, entry + 2);
-    final itemCount = readUint32Le(bytes, entry + 4);
-    final rawValue = readUint32Le(bytes, entry + 8);
+    final tag = endian.readUint16(bytes, entry);
+    final type = endian.readUint16(bytes, entry + 2);
+    final itemCount = endian.readUint32(bytes, entry + 4);
+    final rawValue = endian.readUint32(bytes, entry + 8);
     if (itemCount == 1) {
-      tags[tag] = type == 3 ? readUint16Le(bytes, entry + 8) : rawValue;
+      tags[tag] = type == 3 ? endian.readUint16(bytes, entry + 8) : rawValue;
     } else {
       tags[tag] = rawValue;
     }
   }
   return _Ifd(tags);
+}
+
+final class _TiffEndian {
+  const _TiffEndian._({required this.isBigEndian});
+
+  final bool isBigEndian;
+
+  static _TiffEndian? fromHeader(Uint8List bytes) {
+    if (bytes.length < 8) {
+      return null;
+    }
+    if (bytes[0] == 0x49 && bytes[1] == 0x49) {
+      return const _TiffEndian._(isBigEndian: false);
+    }
+    if (bytes[0] == 0x4d && bytes[1] == 0x4d) {
+      return const _TiffEndian._(isBigEndian: true);
+    }
+    return null;
+  }
+
+  int readUint16(Uint8List bytes, int offset) {
+    return isBigEndian
+        ? readUint16Be(bytes, offset)
+        : readUint16Le(bytes, offset);
+  }
+
+  int readUint32(Uint8List bytes, int offset) {
+    return isBigEndian
+        ? readUint32Be(bytes, offset)
+        : readUint32Le(bytes, offset);
+  }
 }
 
 List<int> _toRgba(

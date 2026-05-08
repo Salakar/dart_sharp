@@ -412,6 +412,16 @@ void main() {
     expect(decoded.height, 1);
   });
 
+  test('tiff decoder reads big-endian baseline bytes', () async {
+    final bytes = _bigEndianTiffRgb();
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(sniffImageFormat(bytes), ImageFormat.tiff);
+    expect(decoded.width, 2);
+    expect(decoded.height, 1);
+    expect(decoded.firstFrameBytes(), <int>[255, 0, 0, 255, 0, 255, 0, 255]);
+  });
+
   test('tiff encoder deflate compression round trips pixels', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -594,4 +604,56 @@ int _readUint32Le(Uint8List bytes, int offset) {
       (bytes[offset + 1] << 8) |
       (bytes[offset + 2] << 16) |
       (bytes[offset + 3] << 24);
+}
+
+Uint8List _bigEndianTiffRgb() {
+  final bytes = <int>[];
+  void u16(int value) {
+    bytes
+      ..add((value >> 8) & 0xff)
+      ..add(value & 0xff);
+  }
+
+  void u32(int value) {
+    bytes
+      ..add((value >> 24) & 0xff)
+      ..add((value >> 16) & 0xff)
+      ..add((value >> 8) & 0xff)
+      ..add(value & 0xff);
+  }
+
+  void entry(int tag, int type, int count, int value) {
+    u16(tag);
+    u16(type);
+    u32(count);
+    if (type == 3 && count == 1) {
+      u16(value);
+      u16(0);
+    } else {
+      u32(value);
+    }
+  }
+
+  const entryCount = 10;
+  const ifdOffset = 8;
+  const bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
+  const pixelOffset = bitsOffset + 6;
+  bytes.addAll(<int>[0x4d, 0x4d]);
+  u16(42);
+  u32(ifdOffset);
+  u16(entryCount);
+  entry(256, 4, 1, 2);
+  entry(257, 4, 1, 1);
+  entry(258, 3, 3, bitsOffset);
+  entry(259, 3, 1, 1);
+  entry(262, 3, 1, 2);
+  entry(273, 4, 1, pixelOffset);
+  entry(277, 3, 1, 3);
+  entry(278, 4, 1, 1);
+  entry(279, 4, 1, 6);
+  entry(284, 3, 1, 1);
+  u32(0);
+  bytes.addAll(<int>[0, 8, 0, 8, 0, 8]);
+  bytes.addAll(<int>[255, 0, 0, 0, 255, 0]);
+  return Uint8List.fromList(bytes);
 }
