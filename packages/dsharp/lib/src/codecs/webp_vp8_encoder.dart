@@ -95,6 +95,12 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaSecondVerticalAcBlocks = _lossyLumaSecondVerticalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   final lumaDiagonalAcBlocks = _lossyLumaDiagonalAcBlocks(
     rgba,
     width: width,
@@ -113,6 +119,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaBlocks: lumaBlocks,
     lumaAcBlocks: lumaAcBlocks,
     lumaVerticalAcBlocks: lumaVerticalAcBlocks,
+    lumaSecondVerticalAcBlocks: lumaSecondVerticalAcBlocks,
     lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
     lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
     chromaBlocks: chromaBlocks,
@@ -191,6 +198,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaBlocks,
   required List<int> lumaAcBlocks,
   required List<int> lumaVerticalAcBlocks,
+  required List<int> lumaSecondVerticalAcBlocks,
   required List<int> lumaDiagonalAcBlocks,
   required List<int> lumaSecondHorizontalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
@@ -240,6 +248,7 @@ Uint8List _encodeVp8SolidPayload({
               2,
           lumaAcBlocks[blockOffset],
           lumaVerticalAcBlocks[blockOffset],
+          lumaSecondVerticalAcBlocks[blockOffset],
           lumaDiagonalAcBlocks[blockOffset],
           lumaSecondHorizontalAcBlocks[blockOffset],
         );
@@ -303,6 +312,7 @@ void _writeLumaDct(
   int dcCoefficient,
   int acCoefficient,
   int verticalAcCoefficient,
+  int secondVerticalAcCoefficient,
   int diagonalAcCoefficient,
   int secondHorizontalAcCoefficient,
 ) {
@@ -314,7 +324,7 @@ void _writeLumaDct(
       dcCoefficient,
       acCoefficient,
       verticalAcCoefficient,
-      0,
+      secondVerticalAcCoefficient,
       diagonalAcCoefficient,
       secondHorizontalAcCoefficient,
     ],
@@ -329,6 +339,7 @@ void _writeLumaDct(
     dcCoefficient != 0 ||
         acCoefficient != 0 ||
         verticalAcCoefficient != 0 ||
+        secondVerticalAcCoefficient != 0 ||
         diagonalAcCoefficient != 0 ||
         secondHorizontalAcCoefficient != 0,
   );
