@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../pipeline/pipeline_operation.dart';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
@@ -21,13 +22,19 @@ final class BlurOperation implements PipelineOperation {
 /// Applies a median filter.
 final class MedianOperation implements PipelineOperation {
   /// Creates a median operation.
-  const MedianOperation();
+  const MedianOperation([this.size = 3]);
+
+  /// Square mask size.
+  final int size;
 
   @override
   String get name => 'median';
 
   @override
-  PixelImage apply(PixelImage image) => mapFrames(image, _median);
+  PixelImage apply(PixelImage image) {
+    _validateSize('Median size', size, max: 1000);
+    return mapFrames(image, (raw) => _median(raw, size));
+  }
 }
 
 /// Applies a convolution kernel.
@@ -71,27 +78,37 @@ final class SharpenOperation implements PipelineOperation {
 /// Applies a max filter.
 final class DilateOperation implements PipelineOperation {
   /// Creates a dilate operation.
-  const DilateOperation();
+  const DilateOperation([this.width = 1]);
+
+  /// Expansion width in pixels.
+  final int width;
 
   @override
   String get name => 'dilate';
 
   @override
-  PixelImage apply(PixelImage image) =>
-      mapFrames(image, (raw) => _morph(raw, true));
+  PixelImage apply(PixelImage image) {
+    _validateSize('Dilate width', width);
+    return mapFrames(image, (raw) => _morph(raw, true, width));
+  }
 }
 
 /// Applies a min filter.
 final class ErodeOperation implements PipelineOperation {
   /// Creates an erode operation.
-  const ErodeOperation();
+  const ErodeOperation([this.width = 1]);
+
+  /// Contraction width in pixels.
+  final int width;
 
   @override
   String get name => 'erode';
 
   @override
-  PixelImage apply(PixelImage image) =>
-      mapFrames(image, (raw) => _morph(raw, false));
+  PixelImage apply(PixelImage image) {
+    _validateSize('Erode width', width);
+    return mapFrames(image, (raw) => _morph(raw, false, width));
+  }
 }
 
 RawPixels _blur(RawPixels raw) {
@@ -106,17 +123,19 @@ RawPixels _blur(RawPixels raw) {
   );
 }
 
-RawPixels _median(RawPixels raw) {
+RawPixels _median(RawPixels raw, int size) {
   final channels = raw.channels.value;
   final input = raw.bytes;
   final output = Uint8List(input.length);
+  final before = size ~/ 2;
+  final after = size - before - 1;
   for (var y = 0; y < raw.height; y += 1) {
     for (var x = 0; x < raw.width; x += 1) {
       final target = ((y * raw.width) + x) * channels;
       for (var c = 0; c < channels; c += 1) {
         final values = <int>[];
-        for (var yy = -1; yy <= 1; yy += 1) {
-          for (var xx = -1; xx <= 1; xx += 1) {
+        for (var yy = -before; yy <= after; yy += 1) {
+          for (var xx = -before; xx <= after; xx += 1) {
             values.add(input[clampedOffset(raw, x + xx, y + yy) + c]);
           }
         }
@@ -155,7 +174,7 @@ RawPixels _convolve(RawPixels raw, ConvolutionKernel kernel) {
   return sameSizeRaw(raw, output, raw.channels);
 }
 
-RawPixels _morph(RawPixels raw, bool useMax) {
+RawPixels _morph(RawPixels raw, bool useMax, int width) {
   final channels = raw.channels.value;
   final input = raw.bytes;
   final output = Uint8List(input.length);
@@ -164,8 +183,8 @@ RawPixels _morph(RawPixels raw, bool useMax) {
       final target = ((y * raw.width) + x) * channels;
       for (var c = 0; c < channels; c += 1) {
         var value = useMax ? 0 : 255;
-        for (var yy = -1; yy <= 1; yy += 1) {
-          for (var xx = -1; xx <= 1; xx += 1) {
+        for (var yy = -width; yy <= width; yy += 1) {
+          for (var xx = -width; xx <= width; xx += 1) {
             final sample = input[clampedOffset(raw, x + xx, y + yy) + c];
             value = useMax
                 ? sample > value
@@ -181,4 +200,14 @@ RawPixels _morph(RawPixels raw, bool useMax) {
     }
   }
   return sameSizeRaw(raw, output, raw.channels);
+}
+
+void _validateSize(String label, int value, {int? max}) {
+  if (value <= 0 || (max != null && value > max)) {
+    throw OperationValidationException(
+      max == null
+          ? '$label must be a positive integer.'
+          : '$label must be an integer between 1 and $max.',
+    );
+  }
 }

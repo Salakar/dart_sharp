@@ -200,20 +200,50 @@ void main() {
 
   test('blur, median, dilate, and erode handle tiny edge pixels', () async {
     final raw = rawGray(3, 3, <int>[0, 0, 0, 0, 255, 0, 0, 0, 0]);
+    final wide = rawGray(5, 1, <int>[0, 0, 255, 0, 0]);
+    final erodeWide = rawGray(5, 1, <int>[255, 255, 0, 255, 255]);
     final blurred = await pixels(ImagePipeline.fromRawPixels(raw).blur());
     final blurDisabled = await pixels(
       ImagePipeline.fromRawPixels(raw).blur(false),
     );
     final median = await pixels(ImagePipeline.fromRawPixels(raw).median());
+    final medianUnit = await pixels(
+      ImagePipeline.fromRawPixels(wide).median(1),
+    );
     final dilated = await pixels(ImagePipeline.fromRawPixels(raw).dilate());
+    final dilatedWide = await pixels(
+      ImagePipeline.fromRawPixels(wide).dilate(2),
+    );
     final eroded = await pixels(ImagePipeline.fromRawPixels(raw).erode());
+    final erodedWide = await pixels(
+      ImagePipeline.fromRawPixels(erodeWide).erode(2),
+    );
 
     expect(firstBytes(blurred)[4], 28);
     expect(firstBytes(blurDisabled), raw.bytes);
     expect(ImagePipeline.fromRawPixels(raw).blur(false).operations, isEmpty);
     expect(firstBytes(median)[4], 0);
+    expect(firstBytes(medianUnit), wide.bytes);
     expect(firstBytes(dilated)[0], 255);
+    expect(firstBytes(dilatedWide), <int>[255, 255, 255, 255, 255]);
     expect(firstBytes(eroded)[4], 0);
+    expect(firstBytes(erodedWide), <int>[0, 0, 0, 0, 0]);
+    expect(
+      () => ImagePipeline.fromRawPixels(raw).median(0),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(raw).median(1001),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(raw).dilate(0),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(raw).erode(0),
+      throwsA(isA<OperationValidationException>()),
+    );
   });
 
   test('convolve supports scale and rejects invalid kernels', () async {
