@@ -78,8 +78,13 @@ final class PngImageCodec implements ImageCodec {
       }
       offset = dataEnd + 4;
     }
-    if (width <= 0 || height <= 0 || bitDepth != 8) {
-      throw const UnsupportedCodecException('Only 8-bit PNG images supported.');
+    if (width <= 0 || height <= 0) {
+      throw const InvalidImageException('Invalid PNG dimensions.');
+    }
+    if (!_supportsPngBitDepth(colorType, bitDepth)) {
+      throw const UnsupportedCodecException(
+        'Unsupported PNG colour type or bit depth.',
+      );
     }
     final inflated = zlibDecode(Uint8List.fromList(idat));
     final rgba = interlace == 1
@@ -87,6 +92,7 @@ final class PngImageCodec implements ImageCodec {
             inflated,
             width,
             height,
+            bitDepth,
             colorType,
             palette,
             transparency,
@@ -95,6 +101,7 @@ final class PngImageCodec implements ImageCodec {
             inflated,
             width,
             height,
+            bitDepth,
             colorType,
             palette,
             transparency,
@@ -114,9 +121,14 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
-    if (pngOptions.bitDepth != 8) {
+    if (!pngOptions.palette && pngOptions.bitDepth != 8) {
       throw const UnsupportedCodecException(
-        'PNG encoding currently supports 8-bit output only.',
+        'PNG non-palette encoding currently supports 8-bit output only.',
+      );
+    }
+    if (pngOptions.palette && !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
+      throw const UnsupportedCodecException(
+        'PNG palette encoding supports bit depths 1, 2, 4, and 8.',
       );
     }
     final raw = image.firstFrame.pixels;
@@ -173,12 +185,18 @@ EncodedImage _encodePalettePng(
   Uint8List rgba,
   PngEncoderOptions options,
 ) {
-  final palette = GifPalette.fromRgba(rgba);
+  final palette = GifPalette.fromRgba(rgba, maxColors: 1 << options.bitDepth);
   final writer = ByteWriter()..writeBytes(PngImageCodec._signature);
   _writeChunk(
     writer,
     'IHDR',
-    _ihdr(width, height, colorType: 3, interlace: options.progressive ? 1 : 0),
+    _ihdr(
+      width,
+      height,
+      bitDepth: options.bitDepth,
+      colorType: 3,
+      interlace: options.progressive ? 1 : 0,
+    ),
   );
   _writeChunk(writer, 'PLTE', _pngPaletteBytes(palette));
   final transparency = _pngTransparency(palette);
@@ -189,6 +207,7 @@ EncodedImage _encodePalettePng(
     width,
     height,
     palette.indices,
+    bitDepth: options.bitDepth,
     interlaced: options.progressive,
   );
   _writeChunk(
@@ -216,22 +235,17 @@ Uint8List _decodeScanlines(
   Uint8List inflated,
   int width,
   int height,
+  int bitDepth,
   int colorType,
   List<int>? palette,
   List<int>? transparency,
 ) {
-  final channels = switch (colorType) {
-    0 => 1,
-    2 => 3,
-    3 => 1,
-    4 => 2,
-    6 => 4,
-    _ => 0,
-  };
+  final channels = _pngChannels(colorType);
   if (channels == 0) {
     throw const UnsupportedCodecException('Unsupported PNG colour type.');
   }
-  final rowLength = width * channels;
+  final rowLength = _scanlineBytes(width, channels, bitDepth);
+  final bpp = _filterBytesPerPixel(channels, bitDepth);
   final output = Uint8List(width * height * 4);
   var sourceOffset = 0;
   var previous = Uint8List(rowLength);
@@ -240,8 +254,18 @@ Uint8List _decodeScanlines(
     final row = Uint8List.fromList(
       inflated.sublist(sourceOffset, sourceOffset + rowLength),
     );
-    _unfilter(row, previous, channels, filter);
-    _writeRgbaRow(output, y, width, colorType, row, palette, transparency);
+    _unfilter(row, previous, bpp, filter);
+    final samples = bitDepth < 8 ? _unpackSamples(row, width, bitDepth) : row;
+    _writeRgbaRow(
+      output,
+      y,
+      width,
+      bitDepth,
+      colorType,
+      samples,
+      palette,
+      transparency,
+    );
     previous = row;
     sourceOffset += rowLength;
   }
@@ -252,6 +276,7 @@ Uint8List _decodeAdam7(
   Uint8List inflated,
   int width,
   int height,
+  int bitDepth,
   int colorType,
   List<int>? palette,
   List<int>? transparency,
@@ -268,14 +293,18 @@ Uint8List _decodeAdam7(
     if (passWidth == 0 || passHeight == 0) {
       continue;
     }
-    final rowLength = passWidth * channels;
+    final rowLength = _scanlineBytes(passWidth, channels, bitDepth);
+    final bpp = _filterBytesPerPixel(channels, bitDepth);
     var previous = Uint8List(rowLength);
     for (var rowIndex = 0; rowIndex < passHeight; rowIndex += 1) {
       final filter = inflated[sourceOffset++];
       final row = Uint8List.fromList(
         inflated.sublist(sourceOffset, sourceOffset + rowLength),
       );
-      _unfilter(row, previous, channels, filter);
+      _unfilter(row, previous, bpp, filter);
+      final samples = bitDepth < 8
+          ? _unpackSamples(row, passWidth, bitDepth)
+          : row;
       final y = pass.yStart + rowIndex * pass.yStep;
       for (var col = 0; col < passWidth; col += 1) {
         final x = pass.start + col * pass.step;
@@ -284,8 +313,9 @@ Uint8List _decodeAdam7(
           x,
           y,
           width,
+          bitDepth,
           colorType,
-          row,
+          samples,
           col,
           palette,
           transparency,
@@ -318,6 +348,7 @@ void _writeRgbaRow(
   Uint8List output,
   int y,
   int width,
+  int bitDepth,
   int colorType,
   Uint8List row,
   List<int>? palette,
@@ -329,6 +360,7 @@ void _writeRgbaRow(
       x,
       y,
       width,
+      bitDepth,
       colorType,
       row,
       x,
@@ -343,6 +375,7 @@ void _writeRgbaPixel(
   int x,
   int y,
   int width,
+  int bitDepth,
   int colorType,
   Uint8List row,
   int column,
@@ -357,9 +390,10 @@ void _writeRgbaPixel(
     _ => column * 4,
   };
   if (colorType == 0) {
-    output[target] = row[source];
-    output[target + 1] = row[source];
-    output[target + 2] = row[source];
+    final gray = _scaleSample(row[source], bitDepth);
+    output[target] = gray;
+    output[target + 1] = gray;
+    output[target + 2] = gray;
     output[target + 3] = 255;
   } else if (colorType == 3) {
     final index = row[source];
@@ -394,6 +428,47 @@ int _pngChannels(int colorType) {
     6 => 4,
     _ => 0,
   };
+}
+
+bool _supportsPngBitDepth(int colorType, int bitDepth) {
+  return switch (colorType) {
+    0 || 3 => bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8,
+    2 || 4 || 6 => bitDepth == 8,
+    _ => false,
+  };
+}
+
+bool _supportsPaletteBitDepth(int bitDepth) {
+  return bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8;
+}
+
+int _scanlineBytes(int width, int channels, int bitDepth) {
+  return ((width * channels * bitDepth) + 7) >> 3;
+}
+
+int _filterBytesPerPixel(int channels, int bitDepth) {
+  final bytes = (channels * bitDepth + 7) >> 3;
+  return bytes < 1 ? 1 : bytes;
+}
+
+Uint8List _unpackSamples(Uint8List packed, int sampleCount, int bitDepth) {
+  final samples = Uint8List(sampleCount);
+  final mask = (1 << bitDepth) - 1;
+  for (var sample = 0; sample < sampleCount; sample += 1) {
+    final bitOffset = sample * bitDepth;
+    final byte = packed[bitOffset >> 3];
+    final shift = 8 - bitDepth - (bitOffset & 7);
+    samples[sample] = (byte >> shift) & mask;
+  }
+  return samples;
+}
+
+int _scaleSample(int sample, int bitDepth) {
+  if (bitDepth == 8) {
+    return sample;
+  }
+  final max = (1 << bitDepth) - 1;
+  return (sample * 255 + max ~/ 2) ~/ max;
 }
 
 int _paeth(int left, int up, int upLeft) {
@@ -445,13 +520,14 @@ Uint8List _indexedScanlines(
   int width,
   int height,
   List<int> indices, {
+  required int bitDepth,
   required bool interlaced,
 }) {
   final scanlines = ByteWriter();
   if (!interlaced) {
     for (var y = 0; y < height; y += 1) {
       scanlines.writeByte(0);
-      scanlines.writeBytes(indices.sublist(y * width, (y + 1) * width));
+      _writeIndexedRow(scanlines, indices, y * width, width, bitDepth);
     }
     return scanlines.toBytes();
   }
@@ -464,20 +540,55 @@ Uint8List _indexedScanlines(
     for (var row = 0; row < passHeight; row += 1) {
       final y = pass.yStart + row * pass.yStep;
       scanlines.writeByte(0);
-      for (var col = 0; col < passWidth; col += 1) {
-        final x = pass.start + col * pass.step;
-        scanlines.writeByte(indices[y * width + x]);
-      }
+      final rowIndices = <int>[
+        for (var col = 0; col < passWidth; col += 1)
+          indices[y * width + pass.start + col * pass.step],
+      ];
+      _writeIndexedRow(scanlines, rowIndices, 0, passWidth, bitDepth);
     }
   }
   return scanlines.toBytes();
 }
 
-Uint8List _ihdr(int width, int height, {int colorType = 6, int interlace = 0}) {
+void _writeIndexedRow(
+  ByteWriter writer,
+  List<int> indices,
+  int offset,
+  int width,
+  int bitDepth,
+) {
+  if (bitDepth == 8) {
+    writer.writeBytes(indices.sublist(offset, offset + width));
+    return;
+  }
+  final mask = (1 << bitDepth) - 1;
+  var byte = 0;
+  var bits = 0;
+  for (var i = 0; i < width; i += 1) {
+    byte = (byte << bitDepth) | (indices[offset + i] & mask);
+    bits += bitDepth;
+    if (bits == 8) {
+      writer.writeByte(byte);
+      byte = 0;
+      bits = 0;
+    }
+  }
+  if (bits > 0) {
+    writer.writeByte(byte << (8 - bits));
+  }
+}
+
+Uint8List _ihdr(
+  int width,
+  int height, {
+  int bitDepth = 8,
+  int colorType = 6,
+  int interlace = 0,
+}) {
   return (ByteWriter()
         ..writeUint32Be(width)
         ..writeUint32Be(height)
-        ..writeByte(8)
+        ..writeByte(bitDepth)
         ..writeByte(colorType)
         ..writeByte(0)
         ..writeByte(0)

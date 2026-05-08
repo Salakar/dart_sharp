@@ -89,6 +89,12 @@ void main() {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
+      ).png(const PngEncoderOptions(bitDepth: 4)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
       ).png(const PngEncoderOptions(bitDepth: 16)).toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );

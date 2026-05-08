@@ -382,9 +382,15 @@ void main() {
     final interlaced = await ImagePipeline.fromRawPixels(
       raw,
     ).png(const PngEncoderOptions(palette: true, progressive: true)).toBytes();
+    final lowBitDepth = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(palette: true, bitDepth: 2)).toBytes();
     final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
     final interlacedDecoded = await ImagePipeline.fromBytes(
       interlaced,
+    ).toPixelImage();
+    final lowBitDepthDecoded = await ImagePipeline.fromBytes(
+      lowBitDepth,
     ).toPixelImage();
 
     expect(_pngColorType(encoded), 3);
@@ -393,6 +399,9 @@ void main() {
     expect(_pngColorType(interlaced), 3);
     expect(_pngInterlace(interlaced), 1);
     expect(interlacedDecoded.firstFrameBytes(), raw.bytes);
+    expect(_pngColorType(lowBitDepth), 3);
+    expect(_pngBitDepth(lowBitDepth), 2);
+    expect(lowBitDepthDecoded.firstFrameBytes(), raw.bytes);
   });
 
   test('tiff codec encodes decodable bytes', () async {
@@ -536,6 +545,8 @@ List<int> _jpegSofSampling(Uint8List bytes) {
 }
 
 int _pngColorType(Uint8List bytes) => bytes[25];
+
+int _pngBitDepth(Uint8List bytes) => bytes[24];
 
 int _pngInterlace(Uint8List bytes) => bytes[28];
 
