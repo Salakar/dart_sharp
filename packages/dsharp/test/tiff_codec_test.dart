@@ -14,6 +14,36 @@ void main() {
     expect(image.firstFrameBytes(), <int>[10, 20, 30, 255, 15, 25, 35, 255]);
   });
 
+  test('decodes TIFF LZW after 9-bit dictionary growth', () async {
+    const width = 520;
+    final samples = Uint8List.fromList(<int>[
+      for (var i = 0; i < width; i += 1) (i * 37) & 0xff,
+    ]);
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: width,
+        height: 1,
+        samples: 1,
+        compression: 5,
+        photometric: 1,
+        bitsPerSample: const <int>[8],
+        strip: _lzwEncodeTiff(samples),
+      ),
+    ).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(rgba.length, width * 4);
+    for (final x in <int>[0, 1, 255, 256, 519]) {
+      final sample = samples[x];
+      expect(rgba.sublist(x * 4, x * 4 + 4), <int>[
+        sample,
+        sample,
+        sample,
+        255,
+      ]);
+    }
+  });
+
   test('decodes TIFF PackBits literal and replicated runs', () async {
     final image = await ImagePipeline.fromBytes(_packBitsTiff()).toPixelImage();
 
@@ -226,6 +256,23 @@ void main() {
     expect(image.firstFrameBytes(), _rgbaGray(<int>[0, 128, 255]));
   });
 
+  test('decodes 16-bit TIFF horizontal predictor rows', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 3,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 1,
+        bitsPerSample: const <int>[16],
+        predictor: 2,
+        strip: Uint8List.fromList(<int>[0x00, 0x00, 0x80, 0x80, 0x7f, 0x7f]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), _rgbaGray(<int>[0, 128, 255]));
+  });
+
   test('decodes 16-bit RGB TIFF samples', () async {
     final image = await ImagePipeline.fromBytes(
       _littleEndianTiff(
@@ -240,6 +287,22 @@ void main() {
     ).toPixelImage();
 
     expect(image.firstFrameBytes(), <int>[18, 128, 255, 255]);
+  });
+
+  test('decodes CIELab TIFF samples to sRGB', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 2,
+        height: 1,
+        samples: 3,
+        compression: 1,
+        photometric: 8,
+        bitsPerSample: const <int>[8, 8, 8],
+        strip: Uint8List.fromList(<int>[0, 128, 128, 255, 128, 128]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[0, 0, 0, 255, 255, 255, 255, 255]);
   });
 
   test('encodes TIFF PackBits compression', () async {
@@ -311,6 +374,23 @@ void main() {
     );
   });
 
+  test('rejects unsupported TIFF photometric modes', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 1,
+          height: 1,
+          samples: 4,
+          compression: 1,
+          photometric: 5,
+          bitsPerSample: const <int>[8, 8, 8, 8],
+          strip: Uint8List.fromList(<int>[0, 255, 255, 0]),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('rejects truncated paletted TIFF color maps', () async {
     await expectLater(
       ImagePipeline.fromBytes(
@@ -345,7 +425,7 @@ Uint8List _packBitsTiff({
 }
 
 Uint8List _lzwPredictorTiff() {
-  final compressed = _lzwLiteralBytes(<int>[10, 20, 30, 5, 5, 5]);
+  final compressed = _lzwEncodeTiff(<int>[10, 20, 30, 5, 5, 5]);
   return _littleEndianTiff(
     width: 2,
     height: 1,
@@ -487,34 +567,6 @@ Uint8List _littleEndianTiff({
   return Uint8List.fromList(bytes);
 }
 
-Uint8List _lzwLiteralBytes(List<int> values) {
-  final bytes = <int>[];
-  var buffer = 0;
-  var bits = 0;
-
-  void write(int code) {
-    for (var bit = 8; bit >= 0; bit -= 1) {
-      buffer = (buffer << 1) | ((code >> bit) & 1);
-      bits += 1;
-      if (bits == 8) {
-        bytes.add(buffer);
-        buffer = 0;
-        bits = 0;
-      }
-    }
-  }
-
-  write(256);
-  for (final value in values) {
-    write(value);
-  }
-  write(257);
-  if (bits > 0) {
-    bytes.add(buffer << (8 - bits));
-  }
-  return Uint8List.fromList(bytes);
-}
-
 int _tiffShortTagValue(Uint8List bytes, int tag) {
   final ifd = bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);
   final count = bytes[ifd] | (bytes[ifd + 1] << 8);
@@ -526,6 +578,63 @@ int _tiffShortTagValue(Uint8List bytes, int tag) {
     }
   }
   throw StateError('TIFF tag $tag not found.');
+}
+
+Uint8List _lzwEncodeTiff(List<int> values) {
+  final writer = _MsbCodeWriter()..write(256, 9);
+  final dictionary = <String, int>{
+    for (var i = 0; i < 256; i += 1) String.fromCharCode(i): i,
+  };
+  var nextCode = 258;
+  var codeWidth = 9;
+  var current = '';
+  for (final value in values) {
+    final char = String.fromCharCode(value);
+    final candidate = current + char;
+    if (dictionary.containsKey(candidate)) {
+      current = candidate;
+      continue;
+    }
+    writer.write(dictionary[current]!, codeWidth);
+    if (nextCode < 4096) {
+      dictionary[candidate] = nextCode;
+      nextCode += 1;
+      if (nextCode == (1 << codeWidth) && codeWidth < 12) {
+        codeWidth += 1;
+      }
+    }
+    current = char;
+  }
+  if (current.isNotEmpty) {
+    writer.write(dictionary[current]!, codeWidth);
+  }
+  writer.write(257, codeWidth);
+  return writer.finish();
+}
+
+final class _MsbCodeWriter {
+  final _bytes = <int>[];
+  var _buffer = 0;
+  var _bits = 0;
+
+  void write(int value, int count) {
+    for (var bit = count - 1; bit >= 0; bit -= 1) {
+      _buffer = (_buffer << 1) | ((value >> bit) & 1);
+      _bits += 1;
+      if (_bits == 8) {
+        _bytes.add(_buffer);
+        _buffer = 0;
+        _bits = 0;
+      }
+    }
+  }
+
+  Uint8List finish() {
+    if (_bits > 0) {
+      _bytes.add(_buffer << (8 - _bits));
+    }
+    return Uint8List.fromList(_bytes);
+  }
 }
 
 List<int> _rgbaGray(List<int> values) {

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../api/exceptions.dart';
@@ -12,6 +13,7 @@ import 'image_format.dart';
 import 'output.dart';
 
 part 'tiff_samples.dart';
+part 'tiff_color.dart';
 
 /// First-party baseline TIFF codec for chunky, grayscale, and palette images.
 final class TiffImageCodec implements ImageCodec {
@@ -52,12 +54,21 @@ final class TiffImageCodec implements ImageCodec {
           'TIFF horizontal predictor is not supported for palette images.',
         );
       }
-      if (!_allTiffBitsPerSample(bitsPerSample, 8)) {
+      final predictorBitDepth = bitsPerSample.first;
+      if (!_allTiffBitsPerSample(bitsPerSample, 8) &&
+          !_allTiffBitsPerSample(bitsPerSample, 16)) {
         throw const UnsupportedCodecException(
-          'TIFF horizontal predictor requires 8-bit samples.',
+          'TIFF horizontal predictor requires 8-bit or 16-bit samples.',
         );
       }
-      _undoHorizontalPredictor(source, width, height, samples);
+      _undoHorizontalPredictor(
+        source,
+        width,
+        height,
+        samples,
+        predictorBitDepth,
+        endian,
+      );
     } else if (predictor != 1) {
       throw const UnsupportedCodecException(
         'Only TIFF predictors 1 and 2 are supported.',
@@ -76,6 +87,24 @@ final class TiffImageCodec implements ImageCodec {
         width * height,
         tags.values(320),
         bitsPerSample.first,
+      );
+      return PixelImage.fromRawPixels(
+        RawPixels(
+          bytes: Uint8List.fromList(rgba),
+          width: width,
+          height: height,
+          channels: ChannelCount.four,
+        ),
+      );
+    }
+    if (photometric == 8) {
+      final rgba = _cielabToRgba(
+        source,
+        width,
+        height,
+        samples,
+        bitsPerSample,
+        endian,
       );
       return PixelImage.fromRawPixels(
         RawPixels(
@@ -327,6 +356,16 @@ final class _TiffEndian {
         ? readUint32Be(bytes, offset)
         : readUint32Le(bytes, offset);
   }
+
+  void writeUint16(Uint8List bytes, int offset, int value) {
+    if (isBigEndian) {
+      bytes[offset] = (value >> 8) & 0xff;
+      bytes[offset + 1] = value & 0xff;
+    } else {
+      bytes[offset] = value & 0xff;
+      bytes[offset + 1] = (value >> 8) & 0xff;
+    }
+  }
 }
 
 List<int> _toRgba(
@@ -347,6 +386,11 @@ List<int> _toRgba(
       output[dst + 2] = gray;
       output[dst + 3] = 255;
     } else if (samples >= 3) {
+      if (photometric != 2) {
+        throw UnsupportedCodecException(
+          'Unsupported TIFF photometric interpretation $photometric.',
+        );
+      }
       output[dst] = source[src];
       output[dst + 1] = source[src + 1];
       output[dst + 2] = source[src + 2];
@@ -418,7 +462,7 @@ Uint8List _tiffLzwDecode(Uint8List bytes) {
     out.addAll(entry);
     if (previous != null && nextCode < 4096) {
       table[nextCode++] = <int>[...previous, entry.first];
-      if (nextCode == (1 << codeWidth) && codeWidth < 12) {
+      if (nextCode == (1 << codeWidth) - 1 && codeWidth < 12) {
         codeWidth += 1;
       }
     }
@@ -534,7 +578,23 @@ void _undoHorizontalPredictor(
   int width,
   int height,
   int samples,
+  int bitDepth,
+  _TiffEndian endian,
 ) {
+  if (bitDepth == 16) {
+    final rowSamples = width * samples;
+    final rowBytes = rowSamples * 2;
+    for (var y = 0; y < height; y += 1) {
+      final row = y * rowBytes;
+      for (var x = samples; x < rowSamples; x += 1) {
+        final offset = row + x * 2;
+        final previous = endian.readUint16(bytes, offset - samples * 2);
+        final value = (endian.readUint16(bytes, offset) + previous) & 0xffff;
+        endian.writeUint16(bytes, offset, value);
+      }
+    }
+    return;
+  }
   final rowBytes = width * samples;
   for (var y = 0; y < height; y += 1) {
     final row = y * rowBytes;

@@ -89,6 +89,25 @@ void main() {
     expect(rgba.sublist(166499 * 4, 166500 * 4), <int>[35, 55, 15, 255]);
   });
 
+  test('optional upstream CIELab TIFF fixture decodes pixels', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/cielab-dagams.tiff');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final bytes = await fixture.readAsBytes();
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.format, ImageFormat.tiff);
+    expect(metadata.width, 400);
+    expect(metadata.height, 266);
+    expect(image.width, 400);
+    expect(image.height, 266);
+    expect(image.firstFrameBytes().length, 400 * 266 * 4);
+  });
+
   test('optional upstream WebP fixture exposes metadata', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {
