@@ -119,6 +119,17 @@ void main() {
     expect(decoded.frames[1].delay, const Duration(milliseconds: 70));
   });
 
+  test('GIF colours alias maps to palette size', () async {
+    final raw = _twoColorRaw();
+    final bytes = await ImagePipeline.fromRawPixels(
+      raw,
+    ).gif(const GifEncoderOptions(colours: 2)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(_gifGlobalColorCount(bytes), 2);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('GIF animation option ranges are validated', () {
     expect(
       ImagePipeline.fromPixelImage(
@@ -172,6 +183,20 @@ RawPixels _solid(int red, int green, int blue) {
     height: 1,
     channels: ChannelCount.four,
   );
+}
+
+RawPixels _twoColorRaw() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[255, 0, 0, 255, 0, 255, 0, 255]),
+    width: 2,
+    height: 1,
+    channels: ChannelCount.four,
+  );
+}
+
+int _gifGlobalColorCount(Uint8List bytes) {
+  final packed = bytes[10];
+  return 1 << ((packed & 0x07) + 1);
 }
 
 final class _GifFrame {

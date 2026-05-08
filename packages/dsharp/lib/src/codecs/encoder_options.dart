@@ -122,7 +122,8 @@ final class GifEncoderOptions extends EncoderOptions {
   const GifEncoderOptions({
     this.reuse = true,
     this.progressive = false,
-    this.colors = 256,
+    int colors = 256,
+    int? colours,
     this.keepDuplicateFrames = false,
     int? loopCount,
     int? loop,
@@ -131,7 +132,8 @@ final class GifEncoderOptions extends EncoderOptions {
     List<Duration>? frameDelays,
     List<Duration>? delays,
     super.force,
-  }) : loopCount = loopCount ?? loop,
+  }) : colors = colours ?? colors,
+       loopCount = loopCount ?? loop,
        frameDelay = frameDelay ?? delay,
        frameDelays = frameDelays ?? delays ?? const <Duration>[];
 
