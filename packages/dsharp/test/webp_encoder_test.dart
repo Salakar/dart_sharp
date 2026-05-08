@@ -121,6 +121,30 @@ void main() {
     expect(pixels[7], 128);
   });
 
+  test('WebP lossy encoder preserves separate macroblock colors', () async {
+    final bytes = <int>[
+      for (var i = 0; i < 16; i += 1) ...<int>[255, 0, 0, 255],
+      for (var i = 0; i < 16; i += 1) ...<int>[0, 0, 255, 255],
+    ];
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(bytes),
+      width: 32,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    final decoded = await ImagePipeline.fromRawPixels(raw)
+        .webp(const WebpEncoderOptions(lossless: false, quality: 100))
+        .toBytes()
+        .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+    final pixels = decoded.firstFrameBytes();
+
+    expect(pixels[0], greaterThan(180));
+    expect(pixels[2], lessThan(80));
+    expect(pixels[31 * 4], lessThan(80));
+    expect(pixels[31 * 4 + 2], greaterThan(180));
+  });
+
   test('WebP lossy encoder writes animated VP8 frames', () async {
     final encoded = await ImagePipeline.fromPixelImage(_animation(loopCount: 2))
         .webp(

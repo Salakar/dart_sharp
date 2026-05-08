@@ -63,13 +63,13 @@ Uint8List _encodeVp8SolidFromRgba(
   required int height,
   required int quality,
 }) {
-  final average = _averageLossyColor(rgba);
-  final quantized = _quantizeLossyColor(average, quality);
-  return _encodeVp8SolidPayload(
+  final colors = _lossyMacroblockColors(
+    rgba,
     width: width,
     height: height,
-    color: _rgbToVp8Yuv(quantized),
+    quality: quality,
   );
+  return _encodeVp8SolidPayload(width: width, height: height, colors: colors);
 }
 
 Uint8List _lossyAnimationPayload(int loopCount) {
@@ -138,15 +138,54 @@ bool _hasLossyAnimationAlpha(PixelImage image) {
   return false;
 }
 
-_Rgb _averageLossyColor(Uint8List rgba) {
+List<_Vp8Yuv> _lossyMacroblockColors(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final colors = <_Vp8Yuv>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      final average = _averageLossyMacroblock(
+        rgba,
+        width: width,
+        height: height,
+        mbX: mbX,
+        mbY: mbY,
+      );
+      colors.add(_rgbToVp8Yuv(_quantizeLossyColor(average, quality)));
+    }
+  }
+  return colors;
+}
+
+_Rgb _averageLossyMacroblock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int mbX,
+  required int mbY,
+}) {
   var red = 0;
   var green = 0;
   var blue = 0;
-  final pixels = rgba.length ~/ 4;
-  for (var offset = 0; offset < rgba.length; offset += 4) {
-    red += rgba[offset];
-    green += rgba[offset + 1];
-    blue += rgba[offset + 2];
+  var pixels = 0;
+  final xStart = mbX * 16;
+  final yStart = mbY * 16;
+  final xEnd = xStart + 16 < width ? xStart + 16 : width;
+  final yEnd = yStart + 16 < height ? yStart + 16 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      red += rgba[offset];
+      green += rgba[offset + 1];
+      blue += rgba[offset + 2];
+      pixels += 1;
+      offset += 4;
+    }
   }
   return _Rgb(
     (red + pixels ~/ 2) ~/ pixels,
@@ -176,7 +215,7 @@ _Vp8Yuv _rgbToVp8Yuv(_Rgb color) {
 Uint8List _encodeVp8SolidPayload({
   required int width,
   required int height,
-  required _Vp8Yuv color,
+  required List<_Vp8Yuv> colors,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -208,12 +247,14 @@ Uint8List _encodeVp8SolidPayload({
   for (var mbY = 0; mbY < mbRows; mbY += 1) {
     contexts.resetLeft();
     for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      final firstMacroblock = mbX == 0 && mbY == 0;
+      final color = colors[mbY * mbCols + mbX];
       _writeY2Dc(
         coeffs,
         contexts,
         mbX,
-        firstMacroblock ? (color.y - 128) * 8 : 0,
+        (color.y -
+                _predictedMacroblockDc(colors, mbCols, mbX, mbY, (c) => c.y)) *
+            8,
       );
       for (var block = 0; block < 16; block += 1) {
         _writeLumaAcEob(coeffs, contexts, mbX, block);
@@ -224,7 +265,15 @@ Uint8List _encodeVp8SolidPayload({
           contexts,
           mbX,
           16 + block,
-          firstMacroblock ? (color.u - 128) * 2 : 0,
+          (color.u -
+                  _predictedMacroblockDc(
+                    colors,
+                    mbCols,
+                    mbX,
+                    mbY,
+                    (c) => c.u,
+                  )) *
+              2,
         );
       }
       for (var block = 0; block < 4; block += 1) {
@@ -233,7 +282,15 @@ Uint8List _encodeVp8SolidPayload({
           contexts,
           mbX,
           20 + block,
-          firstMacroblock ? (color.v - 128) * 2 : 0,
+          (color.v -
+                  _predictedMacroblockDc(
+                    colors,
+                    mbCols,
+                    mbX,
+                    mbY,
+                    (c) => c.v,
+                  )) *
+              2,
         );
       }
     }
@@ -251,6 +308,29 @@ Uint8List _encodeVp8SolidPayload({
     ..writeBytes(firstPartition)
     ..writeBytes(tokenPartition);
   return writer.toBytes();
+}
+
+int _predictedMacroblockDc(
+  List<_Vp8Yuv> colors,
+  int mbCols,
+  int mbX,
+  int mbY,
+  int Function(_Vp8Yuv color) sample,
+) {
+  final hasTop = mbY > 0;
+  final hasLeft = mbX > 0;
+  if (!hasTop && !hasLeft) {
+    return 128;
+  }
+  if (hasTop && hasLeft) {
+    final top = sample(colors[(mbY - 1) * mbCols + mbX]);
+    final left = sample(colors[mbY * mbCols + mbX - 1]);
+    return (top + left + 1) >> 1;
+  }
+  if (hasTop) {
+    return sample(colors[(mbY - 1) * mbCols + mbX]);
+  }
+  return sample(colors[mbY * mbCols + mbX - 1]);
 }
 
 void _writeY2Dc(
