@@ -34,6 +34,7 @@ import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
 import '../source/generated_image.dart';
 import '../source/image_source.dart';
+import '../source/input_options.dart';
 import '../source/raw_pixels.dart';
 import 'cancellation.dart';
 import 'pipeline_operation.dart';
@@ -61,54 +62,89 @@ final class ImagePipeline {
     EncoderOptions? encoderOptions,
     Duration? timeout,
     CancellationToken? cancellationToken,
+    InputSafetyLimits inputLimits = const InputSafetyLimits(),
     MetadataWriteOptions metadataWrites = const MetadataWriteOptions(),
   }) : _steps = steps,
        _outputFormat = outputFormat,
        _encoderOptions = encoderOptions,
        _timeout = timeout,
        _cancellationToken = cancellationToken,
+       _inputLimits = inputLimits,
        _metadataWrites = metadataWrites;
 
   /// Creates a pipeline from encoded bytes.
-  factory ImagePipeline.fromBytes(Uint8List bytes) {
-    return ImagePipeline.fromSource(ImageSource.bytes(bytes));
+  factory ImagePipeline.fromBytes(
+    Uint8List bytes, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.bytes(bytes), limits: limits);
   }
 
   /// Creates a pipeline from an encoded byte buffer.
-  factory ImagePipeline.fromByteBuffer(ByteBuffer buffer) {
-    return ImagePipeline.fromSource(ImageSource.byteBuffer(buffer));
+  factory ImagePipeline.fromByteBuffer(
+    ByteBuffer buffer, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(
+      ImageSource.byteBuffer(buffer),
+      limits: limits,
+    );
   }
 
   /// Creates a pipeline from encoded byte data.
-  factory ImagePipeline.fromByteData(ByteData data) {
-    return ImagePipeline.fromSource(ImageSource.byteData(data));
+  factory ImagePipeline.fromByteData(
+    ByteData data, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.byteData(data), limits: limits);
   }
 
   /// Creates a pipeline from an encoded byte stream.
-  factory ImagePipeline.fromStream(Stream<List<int>> stream, {int? maxBytes}) {
+  factory ImagePipeline.fromStream(
+    Stream<List<int>> stream, {
+    int? maxBytes,
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
     return ImagePipeline.fromSource(
-      ImageSource.stream(stream, maxBytes: maxBytes),
+      ImageSource.stream(stream, maxBytes: maxBytes ?? limits.maxBytes),
+      limits: limits,
     );
   }
 
   /// Creates a pipeline from raw pixels.
-  factory ImagePipeline.fromRawPixels(RawPixels pixels) {
-    return ImagePipeline.fromSource(ImageSource.raw(pixels));
+  factory ImagePipeline.fromRawPixels(
+    RawPixels pixels, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.raw(pixels), limits: limits);
   }
 
   /// Creates a pipeline from decoded pixels.
-  factory ImagePipeline.fromPixelImage(PixelImage image) {
-    return ImagePipeline.fromSource(ImageSource.pixels(image));
+  factory ImagePipeline.fromPixelImage(
+    PixelImage image, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.pixels(image), limits: limits);
   }
 
   /// Creates a pipeline from a generated image descriptor.
-  factory ImagePipeline.create(CreateImage image) {
-    return ImagePipeline.fromSource(ImageSource.create(image));
+  factory ImagePipeline.create(
+    CreateImage image, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.create(image), limits: limits);
   }
 
   /// Creates a pipeline from an arbitrary web-safe source.
-  factory ImagePipeline.fromSource(ImageSource source) {
-    return ImagePipeline._(source: source, steps: const <PipelineOperation>[]);
+  factory ImagePipeline.fromSource(
+    ImageSource source, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline._(
+      source: source,
+      inputLimits: limits,
+      steps: const <PipelineOperation>[],
+    );
   }
 
   /// Source for this pipeline.
@@ -119,6 +155,7 @@ final class ImagePipeline {
   final EncoderOptions? _encoderOptions;
   final Duration? _timeout;
   final CancellationToken? _cancellationToken;
+  final InputSafetyLimits _inputLimits;
   final MetadataWriteOptions _metadataWrites;
 
   /// Operations recorded on this pipeline.
@@ -138,12 +175,13 @@ final class ImagePipeline {
     final token = cancellationToken ?? _cancellationToken;
     token?.throwIfCancelled();
     final decoded = switch (source) {
-      BytesImageSource(:final bytes) => codecs.decode(bytes),
-      final StreamImageSource source => codecs.decode(
+      BytesImageSource(:final bytes) => _decodeBytes(codecs, bytes),
+      final StreamImageSource source => _decodeBytes(
+        codecs,
         await source.collectBytes(),
       ),
-      RawImageSource(:final pixels) => codecs.decodeRaw(pixels),
-      PixelImageSource(:final image) => image,
+      RawImageSource(:final pixels) => _decodeRawPixels(codecs, pixels),
+      PixelImageSource(:final image) => _checkedPixelImage(image),
       GeneratedImageSource(:final image) => _createPixels(image),
       TextImageSource() => throw const UnsupportedCodecException(
         'Text rendering is not implemented yet.',
@@ -266,6 +304,7 @@ final class ImagePipeline {
       encoderOptions: _encoderOptions,
       timeout: _timeout,
       cancellationToken: _cancellationToken,
+      inputLimits: _inputLimits,
       metadataWrites: _metadataWrites,
     );
   }
@@ -282,6 +321,7 @@ final class ImagePipeline {
       encoderOptions: _encoderOptions,
       timeout: _timeout,
       cancellationToken: _cancellationToken,
+      inputLimits: _inputLimits,
       metadataWrites: _metadataWrites,
       steps: List<PipelineOperation>.unmodifiable(<PipelineOperation>[
         ..._steps,
@@ -300,6 +340,7 @@ final class ImagePipeline {
       encoderOptions: _encoderOptions,
       timeout: _timeout,
       cancellationToken: _cancellationToken,
+      inputLimits: _inputLimits,
       metadataWrites: _metadataWrites,
       steps: List<PipelineOperation>.unmodifiable(<PipelineOperation>[
         for (final step in _steps)
@@ -331,12 +372,41 @@ final class ImagePipeline {
       encoderOptions: _encoderOptions,
       timeout: _timeout,
       cancellationToken: _cancellationToken,
+      inputLimits: _inputLimits,
       metadataWrites: _metadataWrites,
       steps: List<PipelineOperation>.unmodifiable(updated),
     );
   }
 
+  PixelImage _decodeBytes(CodecRegistry codecs, Uint8List bytes) {
+    _inputLimits.checkBytes(bytes.length);
+    return _checkedPixelImage(codecs.decode(bytes));
+  }
+
+  PixelImage _decodeRawPixels(CodecRegistry codecs, RawPixels pixels) {
+    _inputLimits.checkImage(
+      width: pixels.width,
+      height: pixels.height,
+      frames: 1,
+    );
+    return _checkedPixelImage(codecs.decodeRaw(pixels));
+  }
+
+  PixelImage _checkedPixelImage(PixelImage image) {
+    _inputLimits.checkImage(
+      width: image.width,
+      height: image.height,
+      frames: image.frames.length,
+    );
+    return image;
+  }
+
   PixelImage _createPixels(CreateImage image) {
+    _inputLimits.checkImage(
+      width: image.width,
+      height: image.height,
+      frames: 1,
+    );
     if (image.channels != 3 && image.channels != 4) {
       throw const OperationValidationException(
         'Generated images require 3 or 4 channels.',

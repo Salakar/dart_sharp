@@ -25,6 +25,7 @@ ImagePipeline _copyPipelineWith(
     cancellationToken: clearCancellationToken
         ? null
         : cancellationToken ?? pipeline._cancellationToken,
+    inputLimits: pipeline._inputLimits,
     metadataWrites: metadataWrites ?? pipeline._metadataWrites,
   );
 }

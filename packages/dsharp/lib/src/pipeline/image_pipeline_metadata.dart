@@ -6,11 +6,17 @@ extension ImagePipelineMetadata on ImagePipeline {
   Future<ImageMetadata> metadata({CodecRegistry? registry}) async {
     if (_steps.isEmpty) {
       if (source case BytesImageSource(:final bytes)) {
+        _inputLimits.checkBytes(bytes.length);
         final metadata = readEncodedImageMetadata(
           bytes,
           sniffImageFormat(bytes),
         );
         if (metadata != null) {
+          _inputLimits.checkImage(
+            width: metadata.width,
+            height: metadata.height,
+            frames: metadata.frames,
+          );
           return metadata;
         }
       }

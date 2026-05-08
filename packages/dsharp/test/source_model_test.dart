@@ -52,6 +52,58 @@ void main() {
     expect(source.collectBytes, throwsA(isA<ImageLimitException>()));
   });
 
+  test('pipeline input limits apply across web-safe sources', () async {
+    final encoded = await ImagePipeline.create(
+      const CreateImage(
+        width: 2,
+        height: 1,
+        channels: 4,
+        background: RgbaColor.white,
+      ),
+    ).png().toBytes();
+
+    await expectLater(
+      ImagePipeline.fromBytes(
+        encoded,
+        limits: InputSafetyLimits(maxBytes: encoded.length - 1),
+      ).metadata(),
+      throwsA(isA<ImageLimitException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(
+        encoded,
+        limits: const InputSafetyLimits(maxPixels: 1),
+      ).metadata(),
+      throwsA(isA<ImageLimitException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromStream(
+        Stream<List<int>>.fromIterable(<List<int>>[encoded]),
+        limits: const InputSafetyLimits(maxBytes: 2),
+      ).toPixelImage(),
+      throwsA(isA<ImageLimitException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromRawPixels(
+        _raw(),
+        limits: const InputSafetyLimits(maxPixels: 0),
+      ).toPixelImage(),
+      throwsA(isA<ImageLimitException>()),
+    );
+    await expectLater(
+      ImagePipeline.create(
+        const CreateImage(
+          width: 2,
+          height: 1,
+          channels: 4,
+          background: RgbaColor.white,
+        ),
+        limits: const InputSafetyLimits(maxPixels: 1),
+      ).toPixelImage(),
+      throwsA(isA<ImageLimitException>()),
+    );
+  });
+
   test('pipeline accepts byte buffer, byte data, and stream sources', () async {
     final encoded = await ImagePipeline.fromRawPixels(_raw()).png().toBytes();
     final byteDataBytes = Uint8List.fromList(<int>[9, ...encoded, 9]);

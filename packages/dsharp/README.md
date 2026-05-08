@@ -97,9 +97,10 @@ More runnable examples live in `example/`.
 
 ## Security Limits
 
-Use bounded streams for untrusted input. Raw pixel descriptors validate layout
-before processing. Unsupported codecs, malformed images, invalid operations, and
-cancelled pipelines throw typed `ImageProcessingException` subclasses.
+Use `InputSafetyLimits` with byte, stream, raw, decoded, and generated sources
+for untrusted input. Raw pixel descriptors validate layout before processing.
+Unsupported codecs, malformed images, invalid operations, and cancelled
+pipelines throw typed `ImageProcessingException` subclasses.
 
 ## Development
 
