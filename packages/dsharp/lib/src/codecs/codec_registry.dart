@@ -12,6 +12,7 @@ import 'image_format.dart';
 import 'jpeg_codec.dart';
 import 'output.dart';
 import 'png_codec.dart';
+import 'ppm_codec.dart';
 import 'raw_codec.dart';
 import 'tiff_codec.dart';
 import 'unsupported_codec.dart';
@@ -34,6 +35,7 @@ final class CodecRegistry {
       const GifImageCodec(),
       const TiffImageCodec(),
       const WebpImageCodec(),
+      const PpmImageCodec(),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',

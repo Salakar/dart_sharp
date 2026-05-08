@@ -45,6 +45,15 @@ ImageFormat sniffImageFormat(Uint8List bytes) {
   if (_startsWith(bytes, '%PDF'.codeUnits)) {
     return ImageFormat.pdf;
   }
+  if (bytes.length >= 3 &&
+      bytes[0] == 0x50 &&
+      (bytes[1] == 0x32 ||
+          bytes[1] == 0x33 ||
+          bytes[1] == 0x35 ||
+          bytes[1] == 0x36) &&
+      _isWhitespace(bytes[2])) {
+    return ImageFormat.ppm;
+  }
   return ImageFormat.unknown;
 }
 
@@ -62,4 +71,13 @@ bool _rangeEquals(Uint8List bytes, int offset, List<int> expected) {
     }
   }
   return true;
+}
+
+bool _isWhitespace(int byte) {
+  return byte == 0x20 ||
+      byte == 0x09 ||
+      byte == 0x0a ||
+      byte == 0x0b ||
+      byte == 0x0c ||
+      byte == 0x0d;
 }

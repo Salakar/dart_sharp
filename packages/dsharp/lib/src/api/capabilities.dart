@@ -45,6 +45,12 @@ final class DsharpCapabilities {
           animation: CodecAvailability.supported,
           metadata: CodecAvailability.supported,
         ),
+        ImageFormat.ppm: CodecSupport(
+          format: ImageFormat.ppm,
+          input: CodecAvailability.supported,
+          output: CodecAvailability.supported,
+          metadata: CodecAvailability.unsupported,
+        ),
         ImageFormat.avif: CodecSupport(
           format: ImageFormat.avif,
           input: CodecAvailability.unsupported,
