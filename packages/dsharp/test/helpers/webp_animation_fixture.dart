@@ -154,9 +154,19 @@ Uint8List animatedVp8lWebpWithoutAnimationFlag() {
   return _invalidAnimatedVp8lWebp(vp8xFlags: 0, includeAnim: true);
 }
 
+/// Builds an invalid animated WebP missing all ANMF frames.
+Uint8List animatedVp8lWebpWithoutFrames() {
+  return _invalidAnimatedVp8lWebp(
+    vp8xFlags: 0x02,
+    includeAnim: true,
+    includeFrame: false,
+  );
+}
+
 Uint8List _invalidAnimatedVp8lWebp({
   required int vp8xFlags,
   required bool includeAnim,
+  bool includeFrame = true,
 }) {
   final frame = _vp8lPayload(
     width: 1,
@@ -185,20 +195,22 @@ Uint8List _invalidAnimatedVp8lWebp({
           .finish(),
     );
   }
-  _writeChunk(
-    chunks,
-    'ANMF',
-    _animationFramePayload(
-      x: 0,
-      y: 0,
-      width: 1,
-      height: 1,
-      durationMs: 10,
-      dispose: false,
-      blend: false,
-      vp8l: frame,
-    ),
-  );
+  if (includeFrame) {
+    _writeChunk(
+      chunks,
+      'ANMF',
+      _animationFramePayload(
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        durationMs: 10,
+        dispose: false,
+        blend: false,
+        vp8l: frame,
+      ),
+    );
+  }
   final payload = chunks.finish();
   return (_ByteWriter()
         ..ascii('RIFF')

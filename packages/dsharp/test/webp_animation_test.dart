@@ -161,4 +161,17 @@ void main() {
       throwsA(isA<InvalidImageException>()),
     );
   });
+
+  test('rejects animated WebP without frames', () async {
+    final bytes = animatedVp8lWebpWithoutFrames();
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
 }
