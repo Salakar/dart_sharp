@@ -30,7 +30,10 @@ extension ImagePipelineTransform on ImagePipeline {
         'Rotate options must be RotateOptions.',
       ),
     };
-    return _append(RotateOperation(angle, rotateOptions));
+    return _appendReplacing(
+      RotateOperation(angle, rotateOptions),
+      (step) => step is RotateOperation,
+    );
   }
 
   /// Adds a metadata-driven auto-orient hook.

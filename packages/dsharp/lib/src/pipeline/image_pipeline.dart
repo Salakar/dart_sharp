@@ -240,6 +240,25 @@ final class ImagePipeline {
     );
   }
 
+  ImagePipeline _appendReplacing(
+    PipelineOperation operation,
+    bool Function(PipelineOperation step) replace,
+  ) {
+    return ImagePipeline._(
+      source: source,
+      outputFormat: _outputFormat,
+      encoderOptions: _encoderOptions,
+      timeout: _timeout,
+      cancellationToken: _cancellationToken,
+      metadataWrites: _metadataWrites,
+      steps: List<PipelineOperation>.unmodifiable(<PipelineOperation>[
+        for (final step in _steps)
+          if (!replace(step)) step,
+        operation,
+      ]),
+    );
+  }
+
   PixelImage _createPixels(CreateImage image) {
     if (image.channels != 3 && image.channels != 4) {
       throw const OperationValidationException(

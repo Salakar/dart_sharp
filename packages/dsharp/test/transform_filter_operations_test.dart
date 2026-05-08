@@ -168,6 +168,15 @@ void main() {
           raw2x2(),
         ).rotate(45, const RotateOptions(background: RgbaColor.white)),
       );
+      final multipleRotateCardinal = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).rotate(45).rotate(90),
+      );
+      final multipleRotateNonCardinal = ImagePipeline.fromRawPixels(
+        raw2x2(),
+      ).rotate(90).rotate(45, const RotateOptions(background: RgbaColor.white));
+      final multipleRotateNonCardinalPixels = await pixels(
+        multipleRotateNonCardinal,
+      );
       final affine = await pixels(
         ImagePipeline.fromRawPixels(
           raw2x2(),
@@ -186,6 +195,16 @@ void main() {
       expect(rotated.width, 3);
       expect(rotated.height, 3);
       expect(firstBytes(rotatedBackground).take(4), <int>[255, 255, 255, 255]);
+      expect(redBytes(multipleRotateCardinal), <int>[3, 1, 4, 2]);
+      expect(multipleRotateNonCardinal.operations, <String>['rotate']);
+      expect(multipleRotateNonCardinalPixels.width, 3);
+      expect(multipleRotateNonCardinalPixels.height, 3);
+      expect(firstBytes(multipleRotateNonCardinalPixels).take(4), <int>[
+        255,
+        255,
+        255,
+        255,
+      ]);
       expect(affine.width, 4);
       expect(affine.height, 4);
       expect(affineFlat.width, 4);
