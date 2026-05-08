@@ -407,12 +407,6 @@ void main() {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
-      ).webp(const WebpEncoderOptions(lossless: false)).toBytes(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
-    expect(
-      ImagePipeline.fromRawPixels(
-        raw(),
       ).withXmpMetadata(XmpMetadata.parse('<xmp />')).gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );

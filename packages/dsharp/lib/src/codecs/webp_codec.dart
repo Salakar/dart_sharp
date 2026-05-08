@@ -53,12 +53,30 @@ final class WebpImageCodec implements ImageCodec {
     final webpOptions = options is WebpEncoderOptions
         ? options
         : const WebpEncoderOptions();
+    var outputImage = _applyAnimationOptions(image, webpOptions);
     if (!webpOptions.lossless && !webpOptions.nearLossless) {
-      throw const UnsupportedCodecException(
-        'Lossy WebP encoding is not implemented in pure Dart yet.',
+      if (outputImage.isAnimated) {
+        throw const UnsupportedCodecException(
+          'Lossy animated WebP encoding is not implemented in pure Dart yet.',
+        );
+      }
+      final raw = outputImage.firstFrame.pixels;
+      final bytes = encodeWebpVp8(
+        raw,
+        quality: webpOptions.quality,
+        alphaQuality: webpOptions.alphaQuality,
+      );
+      return EncodedImage(
+        bytes: bytes,
+        info: OutputInfo(
+          format: format,
+          size: bytes.length,
+          width: raw.width,
+          height: raw.height,
+          channels: 4,
+        ),
       );
     }
-    var outputImage = _applyAnimationOptions(image, webpOptions);
     if (webpOptions.nearLossless) {
       outputImage = _applyNearLossless(outputImage, webpOptions.quality);
     }

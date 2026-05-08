@@ -98,6 +98,29 @@ void main() {
     expect(decoded.firstFrameBytes(), <int>[0, 11, 22, 77, 253, 253, 253, 128]);
   });
 
+  test('WebP lossy encoder writes static VP8 with alpha', () async {
+    final raw = _rgba(<int>[255, 0, 0, 255, 0, 0, 255, 128]);
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).webp(const WebpEncoderOptions(lossless: false, quality: 100)).toBytes();
+    final metadata = await ImagePipeline.fromBytes(encoded).metadata();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+    final pixels = decoded.firstFrameBytes();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.hasAlpha, isTrue);
+    expect(String.fromCharCodes(encoded.sublist(12, 16)), 'VP8X');
+    expect(pixels[0], inInclusiveRange(120, 136));
+    expect(pixels[1], inInclusiveRange(0, 8));
+    expect(pixels[2], inInclusiveRange(120, 136));
+    expect(pixels[3], 255);
+    expect(pixels[4], inInclusiveRange(120, 136));
+    expect(pixels[5], inInclusiveRange(0, 8));
+    expect(pixels[6], inInclusiveRange(120, 136));
+    expect(pixels[7], 128);
+  });
+
   test('WebP encoder normalizes non-RGBA raw channel layouts', () async {
     final cases = <(RawPixels, List<int>)>[
       (

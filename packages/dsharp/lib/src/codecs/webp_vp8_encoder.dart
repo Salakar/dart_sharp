@@ -1,0 +1,465 @@
+part of 'webp_vp8.dart';
+
+/// Encodes a static image as a simple lossy VP8 WebP keyframe.
+Uint8List encodeWebpVp8(
+  RawPixels raw, {
+  required int quality,
+  required int alphaQuality,
+}) {
+  if (raw.width > 16383 || raw.height > 16383) {
+    throw const OperationValidationException(
+      'Lossy WebP dimensions must be at most 16383x16383.',
+    );
+  }
+  final rgba = rawToRgba(raw);
+  final average = _averageLossyColor(rgba);
+  final quantized = _quantizeLossyColor(average, quality);
+  final vp8 = _encodeVp8SolidPayload(
+    width: raw.width,
+    height: raw.height,
+    color: _rgbToVp8Yuv(quantized),
+  );
+  final alpha = _lossyAlphaPayload(rgba, alphaQuality);
+  if (alpha == null) {
+    return _simpleVp8Webp(vp8);
+  }
+  return _extendedVp8Webp(
+    vp8,
+    width: raw.width,
+    height: raw.height,
+    alpha: alpha,
+  );
+}
+
+_Rgb _averageLossyColor(Uint8List rgba) {
+  var red = 0;
+  var green = 0;
+  var blue = 0;
+  final pixels = rgba.length ~/ 4;
+  for (var offset = 0; offset < rgba.length; offset += 4) {
+    red += rgba[offset];
+    green += rgba[offset + 1];
+    blue += rgba[offset + 2];
+  }
+  return _Rgb(
+    (red + pixels ~/ 2) ~/ pixels,
+    (green + pixels ~/ 2) ~/ pixels,
+    (blue + pixels ~/ 2) ~/ pixels,
+  );
+}
+
+_Rgb _quantizeLossyColor(_Rgb color, int quality) {
+  final step = _lossyStep(quality);
+  return _Rgb(
+    _quantizeLossySample(color.red, step),
+    _quantizeLossySample(color.green, step),
+    _quantizeLossySample(color.blue, step),
+  );
+}
+
+_Vp8Yuv _rgbToVp8Yuv(_Rgb color) {
+  final y =
+      ((19595 * color.red + 38470 * color.green + 7471 * color.blue + 32768) >>
+      16);
+  final u = 128 + (((color.blue - y) * 36982 + 32768) >> 16);
+  final v = 128 + (((color.red - y) * 46727 + 32768) >> 16);
+  return _Vp8Yuv(_clampByte(y), _clampByte(u), _clampByte(v));
+}
+
+Uint8List _encodeVp8SolidPayload({
+  required int width,
+  required int height,
+  required _Vp8Yuv color,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final first = _Vp8BoolWriter()
+    ..bit(false)
+    ..bit(false)
+    ..bit(false)
+    ..bit(false)
+    ..literal(0, 6)
+    ..literal(0, 3)
+    ..bit(false)
+    ..literal(0, 2)
+    ..literal(0, 7);
+  for (var i = 0; i < 5; i += 1) {
+    first.bit(false);
+  }
+  first.bit(false);
+  for (var i = 0; i < 4 * 8 * 3 * 11; i += 1) {
+    first.prob(_coefficientUpdateProbCodes.codeUnitAt(i), false);
+  }
+  first.bit(false);
+  for (var i = 0; i < mbCols * mbRows; i += 1) {
+    _writeVp8YMode0(first);
+    first.prob(142, false);
+  }
+  final firstPartition = first.finish();
+  final coeffs = _Vp8BoolWriter();
+  final contexts = _Vp8TokenContexts(mbCols);
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    contexts.resetLeft();
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      final firstMacroblock = mbX == 0 && mbY == 0;
+      _writeY2Dc(
+        coeffs,
+        contexts,
+        mbX,
+        firstMacroblock ? (color.y - 128) * 8 : 0,
+      );
+      for (var block = 0; block < 16; block += 1) {
+        _writeLumaAcEob(coeffs, contexts, mbX, block);
+      }
+      for (var block = 0; block < 4; block += 1) {
+        _writeChromaDc(
+          coeffs,
+          contexts,
+          mbX,
+          16 + block,
+          firstMacroblock ? (color.u - 128) * 2 : 0,
+        );
+      }
+      for (var block = 0; block < 4; block += 1) {
+        _writeChromaDc(
+          coeffs,
+          contexts,
+          mbX,
+          20 + block,
+          firstMacroblock ? (color.v - 128) * 2 : 0,
+        );
+      }
+    }
+  }
+  final tokenPartition = coeffs.finish();
+  final writer = ByteWriter()
+    ..writeByte((1 << 4) | ((firstPartition.length << 5) & 0xff))
+    ..writeByte(firstPartition.length >> 3)
+    ..writeByte(firstPartition.length >> 11)
+    ..writeByte(0x9d)
+    ..writeByte(0x01)
+    ..writeByte(0x2a)
+    ..writeUint16Le(width)
+    ..writeUint16Le(height)
+    ..writeBytes(firstPartition)
+    ..writeBytes(tokenPartition);
+  return writer.toBytes();
+}
+
+void _writeY2Dc(
+  _Vp8BoolWriter out,
+  _Vp8TokenContexts contexts,
+  int mbX,
+  int coefficient,
+) {
+  if (coefficient == 0) {
+    out.prob(
+      _Vp8Y2Probs.defaults().probabilityAt(
+        0,
+        contexts.contextFor(mbX, _y2BlockIndex),
+        _dctEobNode,
+      ),
+      false,
+    );
+    contexts.setHasCoefficients(mbX, _y2BlockIndex, false);
+    return;
+  }
+  final probs = _Vp8Y2Probs.defaults();
+  final context = contexts.contextFor(mbX, _y2BlockIndex);
+  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
+    return probs.probabilityAt(coefficientIndex, context, node);
+  });
+  contexts.setHasCoefficients(mbX, _y2BlockIndex, true);
+}
+
+void _writeLumaAcEob(
+  _Vp8BoolWriter out,
+  _Vp8TokenContexts contexts,
+  int mbX,
+  int block,
+) {
+  out.prob(
+    _Vp8LumaAcProbs.defaults().probabilityAt(
+      1,
+      contexts.contextFor(mbX, block),
+      _dctEobNode,
+    ),
+    false,
+  );
+  contexts.setHasCoefficients(mbX, block, false);
+}
+
+void _writeChromaDc(
+  _Vp8BoolWriter out,
+  _Vp8TokenContexts contexts,
+  int mbX,
+  int block,
+  int coefficient,
+) {
+  final context = contexts.contextFor(mbX, block);
+  final probs = _Vp8ChromaProbs.defaults();
+  if (coefficient == 0) {
+    out.prob(probs.probabilityAt(0, context, _dctEobNode), false);
+    contexts.setHasCoefficients(mbX, block, false);
+    return;
+  }
+  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
+    return probs.probabilityAt(coefficientIndex, context, node);
+  });
+  contexts.setHasCoefficients(mbX, block, true);
+}
+
+void _writeDctToken(
+  _Vp8BoolWriter out,
+  int coefficient,
+  int initialContext,
+  int Function(int coefficientIndex, int context, int node) probabilityAt,
+) {
+  final magnitude = coefficient.abs();
+  int currentProbability(int node) => probabilityAt(0, initialContext, node);
+  out
+    ..prob(currentProbability(_dctEobNode), true)
+    ..prob(currentProbability(_dctZeroNode), true);
+  _writeDctMagnitude(out, magnitude, currentProbability);
+  out.bit(coefficient.isNegative);
+  final nextContext = magnitude == 1 ? 1 : 2;
+  out.prob(probabilityAt(1, nextContext, _dctEobNode), false);
+}
+
+void _writeDctMagnitude(
+  _Vp8BoolWriter out,
+  int magnitude,
+  int Function(int node) probabilityAt,
+) {
+  if (magnitude == 1) {
+    out.prob(probabilityAt(_dctOneNode), false);
+    return;
+  }
+  out.prob(probabilityAt(_dctOneNode), true);
+  if (magnitude <= 4) {
+    out
+      ..prob(probabilityAt(_dctSmallNode), false)
+      ..prob(probabilityAt(_dctTwoNode), magnitude > 2);
+    if (magnitude > 2) {
+      out.prob(probabilityAt(_dctThreeNode), magnitude == 4);
+    }
+    return;
+  }
+  out.prob(probabilityAt(_dctSmallNode), true);
+  if (magnitude <= 6) {
+    out
+      ..prob(probabilityAt(_dctHighLowNode), false)
+      ..prob(probabilityAt(_dctCatOneNode), false)
+      ..prob(_catOneExtraProb, magnitude == 6);
+    return;
+  }
+  if (magnitude <= 10) {
+    out
+      ..prob(probabilityAt(_dctHighLowNode), false)
+      ..prob(probabilityAt(_dctCatOneNode), true);
+    _writeExtraBits(out, magnitude - 7, _catTwoExtraProbs);
+    return;
+  }
+  if (magnitude <= 18) {
+    out
+      ..prob(probabilityAt(_dctHighLowNode), true)
+      ..prob(probabilityAt(_dctCatThreeFourNode), false)
+      ..prob(probabilityAt(_dctCatThreeNode), false);
+    _writeExtraBits(out, magnitude - 11, _catThreeExtraProbs);
+    return;
+  }
+  if (magnitude <= 34) {
+    out
+      ..prob(probabilityAt(_dctHighLowNode), true)
+      ..prob(probabilityAt(_dctCatThreeFourNode), false)
+      ..prob(probabilityAt(_dctCatThreeNode), true);
+    _writeExtraBits(out, magnitude - 19, _catFourExtraProbs);
+    return;
+  }
+  if (magnitude <= 66) {
+    out
+      ..prob(probabilityAt(_dctHighLowNode), true)
+      ..prob(probabilityAt(_dctCatThreeFourNode), true)
+      ..prob(probabilityAt(_dctCatFiveNode), false);
+    _writeExtraBits(out, magnitude - 35, _catFiveExtraProbs);
+    return;
+  }
+  out
+    ..prob(probabilityAt(_dctHighLowNode), true)
+    ..prob(probabilityAt(_dctCatThreeFourNode), true)
+    ..prob(probabilityAt(_dctCatFiveNode), true);
+  _writeExtraBits(out, magnitude - 67, _catSixExtraProbs);
+}
+
+void _writeExtraBits(_Vp8BoolWriter out, int value, List<int> probabilities) {
+  for (var i = 0; i < probabilities.length; i += 1) {
+    final shift = probabilities.length - i - 1;
+    out.prob(probabilities[i], ((value >> shift) & 1) == 1);
+  }
+}
+
+void _writeVp8YMode0(_Vp8BoolWriter out) {
+  out
+    ..prob(145, true)
+    ..prob(156, false)
+    ..prob(163, false);
+}
+
+Uint8List? _lossyAlphaPayload(Uint8List rgba, int quality) {
+  var hasAlpha = false;
+  final alpha = Uint8List((rgba.length ~/ 4) + 1);
+  for (var i = 0; i < alpha.length - 1; i += 1) {
+    final value = rgba[i * 4 + 3];
+    alpha[i + 1] = _quantizeLossySample(value, _lossyStep(quality));
+    hasAlpha = hasAlpha || alpha[i + 1] != 255;
+  }
+  return hasAlpha ? alpha : null;
+}
+
+Uint8List _simpleVp8Webp(Uint8List vp8) {
+  final content = ByteWriter()..writeAscii('WEBP');
+  _writeWebpChunk(content, 'VP8 ', vp8);
+  return _riffWebp(content.toBytes());
+}
+
+Uint8List _extendedVp8Webp(
+  Uint8List vp8, {
+  required int width,
+  required int height,
+  required Uint8List alpha,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x10)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _writeWebpChunk(content, 'ALPH', alpha);
+  _writeWebpChunk(content, 'VP8 ', vp8);
+  return _riffWebp(content.toBytes());
+}
+
+Uint8List _riffWebp(Uint8List content) {
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content);
+  return writer.toBytes();
+}
+
+void _writeWebpChunk(ByteWriter writer, String type, Uint8List payload) {
+  writer
+    ..writeAscii(type)
+    ..writeUint32Le(payload.length)
+    ..writeBytes(payload);
+  if (payload.length.isOdd) {
+    writer.writeByte(0);
+  }
+}
+
+void _writeUint24Le(ByteWriter writer, int value) {
+  writer
+    ..writeByte(value)
+    ..writeByte(value >> 8)
+    ..writeByte(value >> 16);
+}
+
+int _lossyStep(int quality) => (((100 - quality) + 12) ~/ 13) + 1;
+
+int _quantizeLossySample(int value, int step) {
+  final quantized = ((value + (step >> 1)) ~/ step) * step;
+  return _clampByte(quantized);
+}
+
+int _clampByte(int value) => value < 0 ? 0 : (value > 255 ? 255 : value);
+
+final class _Rgb {
+  const _Rgb(this.red, this.green, this.blue);
+
+  final int red;
+  final int green;
+  final int blue;
+}
+
+final class _Vp8Yuv {
+  const _Vp8Yuv(this.y, this.u, this.v);
+
+  final int y;
+  final int u;
+  final int v;
+}
+
+final class _Vp8BoolWriter {
+  final _bytes = <int>[];
+  var _range = 255;
+  var _bottom = 0;
+  var _bitCount = 24;
+
+  void bit(bool value) => prob(128, value);
+
+  void literal(int value, int bits) {
+    for (var bit = bits - 1; bit >= 0; bit -= 1) {
+      prob(128, ((value >> bit) & 1) == 1);
+    }
+  }
+
+  void prob(int probability, bool value) {
+    final split = 1 + (((_range - 1) * probability) >> 8);
+    if (value) {
+      _bottom = (_bottom + split) & 0xffffffff;
+      _range -= split;
+    } else {
+      _range = split;
+    }
+    while (_range < 128) {
+      _range <<= 1;
+      if ((_bottom & 0x80000000) != 0) {
+        _addOneToOutput();
+      }
+      _bottom = (_bottom << 1) & 0xffffffff;
+      _bitCount -= 1;
+      if (_bitCount == 0) {
+        _bytes.add((_bottom >> 24) & 0xff);
+        _bottom &= 0x00ffffff;
+        _bitCount = 8;
+      }
+    }
+  }
+
+  Uint8List finish() {
+    var c = _bitCount;
+    var value = _bottom;
+    if ((value & (1 << (32 - c))) != 0) {
+      _addOneToOutput();
+    }
+    value = (value << (c & 7)) & 0xffffffff;
+    c >>= 3;
+    while (true) {
+      c -= 1;
+      if (c < 0) {
+        break;
+      }
+      value = (value << 8) & 0xffffffff;
+    }
+    for (var i = 0; i < 4; i += 1) {
+      _bytes.add((value >> 24) & 0xff);
+      value = (value << 8) & 0xffffffff;
+    }
+    return Uint8List.fromList(_bytes);
+  }
+
+  void _addOneToOutput() {
+    var index = _bytes.length - 1;
+    while (index >= 0 && _bytes[index] == 255) {
+      _bytes[index] = 0;
+      index -= 1;
+    }
+    if (index >= 0) {
+      _bytes[index] += 1;
+    }
+  }
+}

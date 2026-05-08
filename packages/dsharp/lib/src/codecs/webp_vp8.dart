@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import '../api/exceptions.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
+import 'codec_pixels.dart';
 import 'webp_riff.dart';
 import 'webp_vp8_bool.dart';
 
+part 'webp_vp8_encoder.dart';
 part 'webp_vp8_prediction.dart';
 part 'webp_vp8_quant.dart';
 part 'webp_vp8_residual.dart';
