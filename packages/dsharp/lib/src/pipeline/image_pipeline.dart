@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import '../api/capabilities.dart';
@@ -407,6 +408,10 @@ final class ImagePipeline {
       height: image.height,
       frames: 1,
     );
+    final noise = image.noise;
+    if (noise != null) {
+      return _createNoisePixels(image, noise);
+    }
     if (image.channels != 3 && image.channels != 4) {
       throw const OperationValidationException(
         'Generated images require 3 or 4 channels.',
@@ -431,6 +436,55 @@ final class ImagePipeline {
         pageHeight: image.pageHeight,
       ),
     );
+  }
+
+  PixelImage _createNoisePixels(CreateImage image, CreateNoise noise) {
+    if (image.channels < 1 || image.channels > 4) {
+      throw const OperationValidationException(
+        'Generated noise images require 1 to 4 channels.',
+      );
+    }
+    _validateCreateNoise(noise);
+    final random = Random(noise.seed);
+    final bytes = Uint8List(image.width * image.height * image.channels);
+    for (var i = 0; i < bytes.length; i += 1) {
+      bytes[i] = _gaussianByte(random, noise.mean, noise.sigma);
+    }
+    return PixelImage.fromRawPixels(
+      RawPixels(
+        bytes: bytes,
+        width: image.width,
+        height: image.height,
+        channels: ChannelCount.fromInt(image.channels),
+        pageHeight: image.pageHeight,
+      ),
+    );
+  }
+
+  void _validateCreateNoise(CreateNoise noise) {
+    if (noise.mean.isNaN ||
+        !noise.mean.isFinite ||
+        noise.mean < 0 ||
+        noise.mean > 10000) {
+      throw const OperationValidationException(
+        'Create noise mean must be between 0 and 10000.',
+      );
+    }
+    if (noise.sigma.isNaN ||
+        !noise.sigma.isFinite ||
+        noise.sigma < 0 ||
+        noise.sigma > 10000) {
+      throw const OperationValidationException(
+        'Create noise sigma must be between 0 and 10000.',
+      );
+    }
+  }
+
+  int _gaussianByte(Random random, num mean, num sigma) {
+    final u1 = max(random.nextDouble(), 1e-12);
+    final u2 = random.nextDouble();
+    final z = sqrt(-2 * log(u1)) * cos(2 * pi * u2);
+    return ((mean + sigma * z).round()).clamp(0, 255).toInt();
   }
 
   ImageFormat _sourceFormat() {

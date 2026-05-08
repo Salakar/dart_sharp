@@ -42,6 +42,70 @@ void main() {
     expect(animation.frames[1].pixels.width, 2);
   });
 
+  test('created images support deterministic Gaussian noise', () async {
+    final gray = await ImagePipeline.create(
+      const CreateImage(
+        width: 2,
+        height: 1,
+        channels: 1,
+        noise: CreateNoise(mean: 10, sigma: 0),
+      ),
+    ).toPixelImage();
+    final seededA = await ImagePipeline.create(
+      const CreateImage(
+        width: 2,
+        height: 1,
+        channels: 3,
+        noise: CreateNoise(seed: 7, mean: 128, sigma: 20),
+      ),
+    ).toPixelImage();
+    final seededB = await ImagePipeline.create(
+      const CreateImage(
+        width: 2,
+        height: 1,
+        channels: 3,
+        noise: CreateNoise(seed: 7, mean: 128, sigma: 20),
+      ),
+    ).toPixelImage();
+
+    expect(gray.channels, ChannelCount.one);
+    expect(gray.firstFrameBytes(), <int>[10, 10]);
+    expect(seededA.firstFrameBytes(), seededB.firstFrameBytes());
+    expect(
+      ImagePipeline.create(
+        const CreateImage(
+          width: 1,
+          height: 1,
+          channels: 5,
+          noise: CreateNoise(),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.create(
+        const CreateImage(
+          width: 1,
+          height: 1,
+          channels: 1,
+          noise: CreateNoise(mean: -1),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.create(
+        const CreateImage(
+          width: 1,
+          height: 1,
+          channels: 1,
+          noise: CreateNoise(sigma: double.nan),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
   test('malformed byte fixtures fail with typed exceptions', () async {
     for (final bytes in GeneratedFixtures.malformedBytes()) {
       expect(

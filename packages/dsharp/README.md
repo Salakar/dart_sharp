@@ -10,7 +10,7 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
 ## Supported Today
 
 - Inputs: encoded bytes, `ByteBuffer`, `ByteData`, bounded byte streams, raw
-  pixels, decoded `PixelImage`, and generated solid images.
+  pixels, decoded `PixelImage`, and generated solid/noise images.
 - Codecs: raw plus first-party PNG, JPEG, GIF, TIFF, WebP, PNM, Radiance
   HDR/RGBE, and FITS support without runtime package dependencies. PNG,
   baseline/progressive/lossless JPEG, GIF, TIFF, WebP VP8 lossy
