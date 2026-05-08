@@ -154,6 +154,80 @@ Uint8List? _readWebpExif(Uint8List bytes) {
   return null;
 }
 
+Uint8List _exifWithOrientation(Uint8List? exif, int orientation) {
+  if (exif != null) {
+    final updated = _updateExifOrientation(_stripExifHeader(exif), orientation);
+    if (updated != null) {
+      return updated;
+    }
+  }
+  return _createExifOrientation(orientation);
+}
+
+Uint8List? _updateExifOrientation(Uint8List exif, int orientation) {
+  if (exif.length < 8) {
+    return null;
+  }
+  final little = exif[0] == 0x49 && exif[1] == 0x49;
+  final big = exif[0] == 0x4d && exif[1] == 0x4d;
+  if (!little && !big || _exifTiffRead16(exif, 2, little) != 42) {
+    return null;
+  }
+  final ifd = _exifTiffRead32(exif, 4, little);
+  if (ifd + 2 > exif.length) {
+    return null;
+  }
+  final count = _exifTiffRead16(exif, ifd, little);
+  final entriesStart = ifd + 2;
+  final entriesEnd = entriesStart + count * 12;
+  if (entriesEnd > exif.length) {
+    return null;
+  }
+  for (var i = 0; i < count; i += 1) {
+    final entry = entriesStart + i * 12;
+    if (_exifTiffRead16(exif, entry, little) == 0x0112) {
+      final updated = Uint8List.fromList(exif);
+      _exifTiffWrite16(updated, entry + 8, orientation, little);
+      _exifTiffWrite16(updated, entry + 10, 0, little);
+      return updated;
+    }
+  }
+  return null;
+}
+
+Uint8List _createExifOrientation(int orientation) {
+  final writer = ByteWriter()
+    ..writeAscii('II')
+    ..writeUint16Le(42)
+    ..writeUint32Le(8)
+    ..writeUint16Le(1)
+    ..writeUint16Le(0x0112)
+    ..writeUint16Le(3)
+    ..writeUint32Le(1)
+    ..writeUint16Le(orientation)
+    ..writeUint16Le(0)
+    ..writeUint32Le(0);
+  return writer.toBytes();
+}
+
+int _exifTiffRead16(Uint8List bytes, int offset, bool little) {
+  return little ? readUint16Le(bytes, offset) : readUint16Be(bytes, offset);
+}
+
+int _exifTiffRead32(Uint8List bytes, int offset, bool little) {
+  return little ? readUint32Le(bytes, offset) : readUint32Be(bytes, offset);
+}
+
+void _exifTiffWrite16(Uint8List bytes, int offset, int value, bool little) {
+  if (little) {
+    bytes[offset] = value & 0xff;
+    bytes[offset + 1] = value >> 8;
+  } else {
+    bytes[offset] = value >> 8;
+    bytes[offset + 1] = value & 0xff;
+  }
+}
+
 Uint8List _writeJpegExif(Uint8List bytes, Uint8List exif) {
   if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
     throw const InvalidImageException('Invalid JPEG signature.');

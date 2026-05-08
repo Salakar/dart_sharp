@@ -113,14 +113,17 @@ extension ImagePipelineOutput on ImagePipeline {
   }
 
   /// Requests broad metadata preservation.
-  ImagePipeline withMetadata({num? density}) {
+  ImagePipeline withMetadata({num? density, int? orientation}) {
     final resolvedDensity = _resolveMetadataDensity(density);
+    final resolvedOrientation = _resolveMetadataOrientation(orientation);
     return _copyPipelineWith(
       this,
       metadataWrites: _metadataWrites.copyWith(
         withMetadata: true,
         density: resolvedDensity,
         clearDensity: density == null,
+        orientation: resolvedOrientation,
+        clearOrientation: orientation == null,
       ),
     );
   }
@@ -250,4 +253,16 @@ double? _resolveMetadataDensity(num? density) {
     );
   }
   return density.toDouble();
+}
+
+int? _resolveMetadataOrientation(int? orientation) {
+  if (orientation == null) {
+    return null;
+  }
+  if (orientation < 1 || orientation > 8) {
+    throw const OperationValidationException(
+      'Metadata orientation must be an integer between 1 and 8.',
+    );
+  }
+  return orientation;
 }

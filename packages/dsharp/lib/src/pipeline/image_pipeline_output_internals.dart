@@ -84,7 +84,8 @@ bool _isSupportedMetadataWrite(MetadataWriteOptions writes) {
       writes.keepExif ||
       writes.keepIcc ||
       writes.withMetadata ||
-      writes.density != null;
+      writes.density != null ||
+      writes.orientation != null;
 }
 
 EncodedImage _applyMetadataWrites(
@@ -98,9 +99,12 @@ EncodedImage _applyMetadataWrites(
   final keepAll = writes.withMetadata;
   final xmp =
       writes.xmp ?? (writes.keepXmp || keepAll ? _sourceXmp(pipeline) : null);
-  final exif =
+  final sourceExif =
       writes.exif ??
       (writes.keepExif || keepAll ? _sourceExif(pipeline) : null);
+  final exif = writes.orientation == null
+      ? sourceExif
+      : _exifWithOrientation(sourceExif, writes.orientation!);
   final icc =
       writes.iccProfile ??
       (writes.keepIcc || keepAll ? _sourceIcc(pipeline) : null);

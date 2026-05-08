@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
@@ -44,4 +46,63 @@ void main() {
       throwsA(isA<UnsupportedCodecException>()),
     );
   });
+
+  test('withMetadata orientation writes EXIF orientation', () async {
+    final outputs = <Uint8List>[
+      await ImagePipeline.fromRawPixels(
+        raw(),
+      ).withMetadata(orientation: 6).jpeg().toBytes(),
+      await ImagePipeline.fromRawPixels(
+        raw(),
+      ).withMetadata(orientation: 6).png().toBytes(),
+      await ImagePipeline.fromRawPixels(
+        raw(),
+      ).withMetadata(orientation: 6).webp().toBytes(),
+    ];
+
+    for (final output in outputs) {
+      final metadata = await ImagePipeline.fromBytes(output).metadata();
+      expect(metadata.hasExif, isTrue);
+      expect(metadata.orientation, 6);
+    }
+  });
+
+  test(
+    'withMetadata orientation overrides existing EXIF orientation',
+    () async {
+      final source = await ImagePipeline.fromRawPixels(
+        raw(),
+      ).withMetadata(orientation: 6).jpeg().toBytes();
+      final output = await ImagePipeline.fromBytes(
+        source,
+      ).withMetadata(orientation: 3).png().toBytes();
+
+      final metadata = await ImagePipeline.fromBytes(output).metadata();
+      expect(metadata.hasExif, isTrue);
+      expect(metadata.orientation, 3);
+    },
+  );
+
+  test('withMetadata orientation validates numeric range', () {
+    for (final orientation in <int>[0, -1, 9]) {
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          raw(),
+        ).withMetadata(orientation: orientation),
+        throwsA(isA<OperationValidationException>()),
+      );
+    }
+  });
+
+  test(
+    'withMetadata orientation fails clearly for unsupported output formats',
+    () {
+      expect(
+        ImagePipeline.fromRawPixels(
+          raw(),
+        ).withMetadata(orientation: 1).gif().toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    },
+  );
 }
