@@ -168,15 +168,52 @@ void main() {
           raw2x2(),
         ).affine(const AffineOptions(a: 2, b: 0, c: 0, d: 2)),
       );
+      final affineFlat = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).affine(const <num>[2, 0, 0, 2]),
+      );
+      final affineNested = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).affine(const <List<num>>[
+          <num>[1, 0],
+          <num>[0, 1],
+        ], const AffineTransformOptions(background: RgbaColor.white)),
+      );
 
       expect(rotated.width, 3);
       expect(rotated.height, 3);
       expect(affine.width, 4);
       expect(affine.height, 4);
+      expect(affineFlat.width, 4);
+      expect(affineFlat.height, 4);
+      expect(redBytes(affineNested), <int>[1, 2, 3, 4]);
       expect(
         ImagePipeline.fromRawPixels(
           raw2x2(),
         ).affine(const AffineOptions(a: 1, b: 1, c: 1, d: 1)).toPixelImage(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw2x2()).affine(
+          const AffineOptions(a: 2, b: 0, c: 0, d: 2),
+          const AffineTransformOptions(),
+        ),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () =>
+            ImagePipeline.fromRawPixels(raw2x2()).affine(const <num>[1, 0, 0]),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          raw2x2(),
+        ).affine(const <num>[1, 0, 0, 1], 'invalid options'),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw2x2()).affine(const <Object?>[
+          <Object?>[1, 0],
+          <Object?>[null, 1],
+        ]),
         throwsA(isA<OperationValidationException>()),
       );
     },

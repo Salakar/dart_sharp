@@ -226,6 +226,33 @@ final class AffineOptions {
   final double ody;
 }
 
+/// Non-matrix options for affine transforms.
+final class AffineTransformOptions {
+  /// Creates affine transform options.
+  const AffineTransformOptions({
+    this.background = RgbaColor.black,
+    this.idx = 0,
+    this.idy = 0,
+    this.odx = 0,
+    this.ody = 0,
+  });
+
+  /// Background color.
+  final RgbaColor background;
+
+  /// Input horizontal offset.
+  final double idx;
+
+  /// Input vertical offset.
+  final double idy;
+
+  /// Output horizontal offset.
+  final double odx;
+
+  /// Output vertical offset.
+  final double ody;
+}
+
 void _validateRange(String label, num value, num min, num max) {
   if (value < min || value > max) {
     throw OperationValidationException('$label must be between $min and $max.');
