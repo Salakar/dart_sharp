@@ -98,6 +98,32 @@ void main() {
     expect(decoded.firstFrameBytes(), <int>[0, 11, 22, 77, 253, 253, 253, 128]);
   });
 
+  test('WebP encoder normalizes non-RGBA raw channel layouts', () async {
+    final cases = <(RawPixels, List<int>)>[
+      (
+        _raw(<int>[7, 9], channels: ChannelCount.one),
+        <int>[7, 7, 7, 255, 9, 9, 9, 255],
+      ),
+      (
+        _raw(<int>[7, 11, 9, 13], channels: ChannelCount.two),
+        <int>[7, 7, 7, 11, 9, 9, 9, 13],
+      ),
+      (
+        _raw(<int>[1, 2, 3, 4, 5, 6], channels: ChannelCount.three),
+        <int>[1, 2, 3, 255, 4, 5, 6, 255],
+      ),
+    ];
+
+    for (final (raw, expected) in cases) {
+      final decoded = await ImagePipeline.fromRawPixels(raw)
+          .webp()
+          .toBytes()
+          .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+
+      expect(decoded.firstFrameBytes(), expected);
+    }
+  });
+
   test(
     'WebP parity options validate and unsupported modes fail clearly',
     () async {
@@ -185,10 +211,14 @@ PixelImage _animation({int? loopCount}) {
 }
 
 RawPixels _rgba(List<int> bytes) {
+  return _raw(bytes, channels: ChannelCount.four);
+}
+
+RawPixels _raw(List<int> bytes, {required ChannelCount channels}) {
   return RawPixels(
     bytes: Uint8List.fromList(bytes),
     width: 2,
     height: 1,
-    channels: ChannelCount.four,
+    channels: channels,
   );
 }
