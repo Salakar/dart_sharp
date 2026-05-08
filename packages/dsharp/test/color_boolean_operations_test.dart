@@ -231,6 +231,11 @@ void main() {
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).modulate(brightness: 2),
       );
+      final modulatedOptions = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).modulate(options: const ModulateOptions(brightness: 2)),
+      );
       final clahe = await pixels(
         ImagePipeline.fromRawPixels(
           rawGray(2, 1, <int>[10, 200]),
@@ -258,6 +263,7 @@ void main() {
       expect(firstBytes(recombedNested), <int>[20, 10, 30]);
       expect(firstBytes(recombedRgba), <int>[20, 10, 30, 40]);
       expect(firstBytes(modulated), <int>[20, 40, 60]);
+      expect(firstBytes(modulatedOptions), firstBytes(modulated));
       expect(firstBytes(clahe), <int>[128, 255]);
       expect(
         () => ImagePipeline.fromRawPixels(
@@ -299,6 +305,12 @@ void main() {
         () => ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).recomb(const <num>[1, 2, 3]),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).modulate(options: const ModulateOptions(), brightness: 2),
         throwsA(isA<OperationValidationException>()),
       );
     },

@@ -87,11 +87,20 @@ extension ImagePipelineColor on ImagePipeline {
 
   /// Applies brightness modulation.
   ImagePipeline modulate({
+    ModulateOptions? options,
     double brightness = 1,
     double saturation = 1,
     double hue = 0,
     double lightness = 0,
   }) {
+    if (options != null) {
+      if (brightness != 1 || saturation != 1 || hue != 0 || lightness != 0) {
+        throw const OperationValidationException(
+          'Modulate options cannot be combined with named arguments.',
+        );
+      }
+      return _append(ModulateOperation(options));
+    }
     return _append(
       ModulateOperation(
         ModulateOptions(
