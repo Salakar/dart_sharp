@@ -35,31 +35,28 @@ final class TiffImageCodec implements ImageCodec {
     final height = tags.value(257);
     final compression = tags.value(259);
     final photometric = tags.value(262);
-    final stripOffset = tags.value(273);
     final samples = tags.value(277, fallback: 1);
-    final byteCount = tags.value(279);
     final predictor = tags.value(317, fallback: 1);
     if (photometric == 3) {
       throw const UnsupportedCodecException(
         'Paletted TIFF decoding is not implemented yet.',
       );
     }
-    final strip = bytes.sublist(stripOffset, stripOffset + byteCount);
-    final source = switch (compression) {
-      1 => strip,
-      5 => _tiffLzwDecode(strip),
-      8 || 32946 => zlibDecode(Uint8List.fromList(strip)),
-      32773 => _tiffPackBitsDecode(strip),
-      _ => throw const UnsupportedCodecException(
-        'Only uncompressed, LZW, PackBits, and deflate TIFF are supported.',
-      ),
-    };
+    final source = _decodeTiffStrips(
+      bytes,
+      tags.values(273),
+      tags.values(279),
+      compression,
+    );
     if (predictor == 2) {
       _undoHorizontalPredictor(source, width, height, samples);
     } else if (predictor != 1) {
       throw const UnsupportedCodecException(
         'Only TIFF predictors 1 and 2 are supported.',
       );
+    }
+    if (source.length < width * height * samples) {
+      throw const InvalidImageException('Truncated TIFF pixel data.');
     }
     final rgba = _toRgba(source, width, height, samples, photometric);
     return PixelImage.fromRawPixels(
@@ -162,38 +159,107 @@ final class TiffImageCodec implements ImageCodec {
 }
 
 final class _Ifd {
-  _Ifd(this.tags);
+  _Ifd(this.tags, this.bytes, this.endian);
 
-  final Map<int, int> tags;
+  final Map<int, _IfdEntry> tags;
+  final Uint8List bytes;
+  final _TiffEndian endian;
 
   int value(int tag, {int? fallback}) {
-    final value = tags[tag];
-    if (value == null) {
+    final entry = tags[tag];
+    if (entry == null) {
       if (fallback != null) {
         return fallback;
       }
       throw InvalidImageException('Missing TIFF tag $tag.');
     }
-    return value;
+    return entry.value(bytes, endian);
+  }
+
+  List<int> values(int tag, {List<int>? fallback}) {
+    final entry = tags[tag];
+    if (entry == null) {
+      if (fallback != null) {
+        return fallback;
+      }
+      throw InvalidImageException('Missing TIFF tag $tag.');
+    }
+    return entry.values(bytes, endian, tag);
   }
 }
 
 _Ifd _readIfd(Uint8List bytes, int offset, _TiffEndian endian) {
   final count = endian.readUint16(bytes, offset);
-  final tags = <int, int>{};
+  final tags = <int, _IfdEntry>{};
   for (var i = 0; i < count; i += 1) {
     final entry = offset + 2 + i * 12;
     final tag = endian.readUint16(bytes, entry);
     final type = endian.readUint16(bytes, entry + 2);
     final itemCount = endian.readUint32(bytes, entry + 4);
     final rawValue = endian.readUint32(bytes, entry + 8);
-    if (itemCount == 1) {
-      tags[tag] = type == 3 ? endian.readUint16(bytes, entry + 8) : rawValue;
-    } else {
-      tags[tag] = rawValue;
-    }
+    tags[tag] = _IfdEntry(
+      type: type,
+      count: itemCount,
+      rawValue: rawValue,
+      inlineOffset: entry + 8,
+    );
   }
-  return _Ifd(tags);
+  return _Ifd(tags, bytes, endian);
+}
+
+final class _IfdEntry {
+  const _IfdEntry({
+    required this.type,
+    required this.count,
+    required this.rawValue,
+    required this.inlineOffset,
+  });
+
+  final int type;
+  final int count;
+  final int rawValue;
+  final int inlineOffset;
+
+  int value(Uint8List bytes, _TiffEndian endian) {
+    if (count == 1) {
+      return _readTiffValue(bytes, endian, type, inlineOffset);
+    }
+    return rawValue;
+  }
+
+  List<int> values(Uint8List bytes, _TiffEndian endian, int tag) {
+    if (count == 1) {
+      return <int>[value(bytes, endian)];
+    }
+    final typeSize = _tiffTypeSize(type);
+    final byteCount = count * typeSize;
+    final start = byteCount <= 4 ? inlineOffset : rawValue;
+    if (start + byteCount > bytes.length) {
+      throw InvalidImageException('Truncated TIFF tag $tag values.');
+    }
+    return <int>[
+      for (var i = 0; i < count; i += 1)
+        _readTiffValue(bytes, endian, type, start + i * typeSize),
+    ];
+  }
+}
+
+int _readTiffValue(Uint8List bytes, _TiffEndian endian, int type, int offset) {
+  return switch (type) {
+    1 => bytes[offset],
+    3 => endian.readUint16(bytes, offset),
+    4 => endian.readUint32(bytes, offset),
+    _ => throw InvalidImageException('Unsupported TIFF tag type $type.'),
+  };
+}
+
+int _tiffTypeSize(int type) {
+  return switch (type) {
+    1 => 1,
+    3 => 2,
+    4 => 4,
+    _ => throw InvalidImageException('Unsupported TIFF tag type $type.'),
+  };
 }
 
 final class _TiffEndian {
@@ -254,6 +320,36 @@ List<int> _toRgba(
     }
   }
   return output;
+}
+
+Uint8List _decodeTiffStrips(
+  Uint8List bytes,
+  List<int> offsets,
+  List<int> byteCounts,
+  int compression,
+) {
+  if (offsets.isEmpty || offsets.length != byteCounts.length) {
+    throw const InvalidImageException('Invalid TIFF strip layout.');
+  }
+  final output = <int>[];
+  for (var i = 0; i < offsets.length; i += 1) {
+    final offset = offsets[i];
+    final byteCount = byteCounts[i];
+    if (offset + byteCount > bytes.length) {
+      throw const InvalidImageException('Truncated TIFF strip.');
+    }
+    final strip = bytes.sublist(offset, offset + byteCount);
+    output.addAll(switch (compression) {
+      1 => strip,
+      5 => _tiffLzwDecode(strip),
+      8 || 32946 => zlibDecode(Uint8List.fromList(strip)),
+      32773 => _tiffPackBitsDecode(strip),
+      _ => throw const UnsupportedCodecException(
+        'Only uncompressed, LZW, PackBits, and deflate TIFF are supported.',
+      ),
+    });
+  }
+  return Uint8List.fromList(output);
 }
 
 Uint8List _tiffLzwDecode(Uint8List bytes) {

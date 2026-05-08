@@ -47,6 +47,45 @@ void main() {
     ]);
   });
 
+  test('decodes multi-strip TIFF rows', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 2,
+        height: 2,
+        samples: 3,
+        compression: 1,
+        photometric: 2,
+        bitsPerSample: const <int>[8, 8, 8],
+        strips: <Uint8List>[
+          Uint8List.fromList(<int>[1, 2, 3, 4, 5, 6]),
+          Uint8List.fromList(<int>[7, 8, 9, 10, 11, 12]),
+        ],
+        rowsPerStrip: 1,
+      ),
+    ).toPixelImage();
+
+    expect(image.width, 2);
+    expect(image.height, 2);
+    expect(image.firstFrameBytes(), <int>[
+      1,
+      2,
+      3,
+      255,
+      4,
+      5,
+      6,
+      255,
+      7,
+      8,
+      9,
+      255,
+      10,
+      11,
+      12,
+      255,
+    ]);
+  });
+
   test('encodes TIFF PackBits compression', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -118,9 +157,12 @@ Uint8List _littleEndianTiff({
   required int compression,
   required int photometric,
   required List<int> bitsPerSample,
-  required Uint8List strip,
+  Uint8List? strip,
+  List<Uint8List>? strips,
   int? predictor,
+  int? rowsPerStrip,
 }) {
+  final stripList = strips ?? <Uint8List>[strip!];
   final bytes = <int>[];
 
   void u16(int value) {
@@ -151,9 +193,20 @@ Uint8List _littleEndianTiff({
 
   final entryCount = predictor == null ? 10 : 11;
   const ifdOffset = 8;
-  final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
-  final stripOffset =
+  final extraOffset = ifdOffset + 2 + entryCount * 12 + 4;
+  final bitsOffset = extraOffset;
+  final stripOffsetsOffset =
       bitsOffset + (bitsPerSample.length > 1 ? bitsPerSample.length * 2 : 0);
+  final stripByteCountsOffset =
+      stripOffsetsOffset + (stripList.length > 1 ? stripList.length * 4 : 0);
+  final firstStripOffset =
+      stripByteCountsOffset + (stripList.length > 1 ? stripList.length * 4 : 0);
+  final stripOffsets = <int>[];
+  var nextStripOffset = firstStripOffset;
+  for (final currentStrip in stripList) {
+    stripOffsets.add(nextStripOffset);
+    nextStripOffset += currentStrip.length;
+  }
   bytes.addAll(<int>[0x49, 0x49]);
   u16(42);
   u32(ifdOffset);
@@ -167,10 +220,20 @@ Uint8List _littleEndianTiff({
   }
   entry(259, 3, 1, compression);
   entry(262, 3, 1, photometric);
-  entry(273, 4, 1, stripOffset);
+  entry(
+    273,
+    4,
+    stripList.length,
+    stripList.length == 1 ? stripOffsets.single : stripOffsetsOffset,
+  );
   entry(277, 3, 1, samples);
-  entry(278, 4, 1, height);
-  entry(279, 4, 1, strip.length);
+  entry(278, 4, 1, rowsPerStrip ?? height);
+  entry(
+    279,
+    4,
+    stripList.length,
+    stripList.length == 1 ? stripList.single.length : stripByteCountsOffset,
+  );
   entry(284, 3, 1, 1);
   if (predictor != null) {
     entry(317, 3, 1, predictor);
@@ -181,7 +244,17 @@ Uint8List _littleEndianTiff({
       u16(bits);
     }
   }
-  bytes.addAll(strip);
+  if (stripList.length > 1) {
+    for (final offset in stripOffsets) {
+      u32(offset);
+    }
+    for (final currentStrip in stripList) {
+      u32(currentStrip.length);
+    }
+  }
+  for (final currentStrip in stripList) {
+    bytes.addAll(currentStrip);
+  }
   return Uint8List.fromList(bytes);
 }
 
