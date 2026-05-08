@@ -46,6 +46,7 @@ List<List<_Vp8ChromaAc>> _lossyChromaAcBlocks(
     build(_lossyChromaHorizontalSecondVerticalAcBlock),
     build(_lossyChromaThirdVerticalAcBlock),
     build(_lossyChromaHorizontalThirdVerticalAcBlock),
+    build(_lossyChromaSecondHorizontalSecondVerticalAcBlock),
   ];
 }
 
@@ -352,6 +353,32 @@ _Vp8ChromaAc _lossyChromaHorizontalThirdVerticalAcBlock(
     positive: (sampleX, sampleY) {
       final isLeft = sampleX < 2;
       return isLeft == sampleY.isEven;
+    },
+    scale: 2,
+  );
+}
+
+_Vp8ChromaAc _lossyChromaSecondHorizontalSecondVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyChromaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (sampleX, sampleY) {
+      final isOuterColumn = sampleX == 0 || sampleX == 3;
+      final isOuterRow = sampleY == 0 || sampleY == 3;
+      return isOuterColumn == isOuterRow;
     },
     scale: 2,
   );
