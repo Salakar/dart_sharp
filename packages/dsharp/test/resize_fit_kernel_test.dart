@@ -79,6 +79,52 @@ void main() {
 
     expect(image.firstFrameBytes(), <int>[0, 128, 255]);
   });
+
+  test('kernel helpers expose distinct MKS and Mitchell weights', () {
+    expect(kernelRadius(ResizeKernel.mks2013), 2.5);
+    expect(kernelRadius(ResizeKernel.mks2021), 4.5);
+    expect(kernelWeight(ResizeKernel.cubic, 0), 1);
+    expect(kernelWeight(ResizeKernel.mitchell, 0), closeTo(8 / 9, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2013, 0), closeTo(1.0625, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2013, 1.5), closeTo(-0.125, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2013, 2), closeTo(-0.03125, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2021, 0), closeTo(577 / 576, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2021, 1.5), closeTo(-29 / 288, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2021, 3.5), closeTo(-1 / 288, 1e-12));
+    expect(kernelWeight(ResizeKernel.mks2021, 4), closeTo(-1 / 1152, 1e-12));
+  });
+
+  test(
+    'MKS kernels fall back to cubic interpolation when upsampling',
+    () async {
+      final raw = RawPixels(
+        bytes: Uint8List.fromList(<int>[0, 64, 255]),
+        width: 3,
+        height: 1,
+        channels: ChannelCount.one,
+      );
+
+      Future<Uint8List> resizeWith(ResizeKernel kernel) async {
+        final image = await ImagePipeline.fromRawPixels(raw)
+            .resize(
+              ResizeOptions(
+                width: 7,
+                height: 1,
+                fit: ResizeFit.fill,
+                kernel: kernel,
+              ),
+            )
+            .toPixelImage();
+        return image.firstFrameBytes();
+      }
+
+      final cubic = await resizeWith(ResizeKernel.cubic);
+
+      expect(await resizeWith(ResizeKernel.mitchell), cubic);
+      expect(await resizeWith(ResizeKernel.mks2013), cubic);
+      expect(await resizeWith(ResizeKernel.mks2021), cubic);
+    },
+  );
 }
 
 RawPixels _redRamp(int width, int height) {

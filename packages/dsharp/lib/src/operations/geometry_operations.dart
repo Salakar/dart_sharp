@@ -248,8 +248,9 @@ RawPixels _resizeKernel(
   final input = raw.bytes;
   final horizontal = Float64List(width * raw.height * channels);
   final scaleX = raw.width / width;
+  final kernelX = _resamplingKernel(kernel, scaleX);
   final filterScaleX = max(1.0, scaleX);
-  final radiusX = kernelRadius(kernel) * filterScaleX;
+  final radiusX = kernelRadius(kernelX) * filterScaleX;
   for (var y = 0; y < raw.height; y += 1) {
     for (var x = 0; x < width; x += 1) {
       final sourceX = ((x + 0.5) * scaleX) - 0.5;
@@ -261,7 +262,7 @@ RawPixels _resizeKernel(
         end: end,
         center: sourceX,
         filterScale: filterScaleX,
-        kernel: kernel,
+        kernel: kernelX,
         channels: channels,
         sampleOffset: (sample) => ((y * raw.width) + sample) * channels,
         maxSample: raw.width - 1,
@@ -273,8 +274,9 @@ RawPixels _resizeKernel(
 
   final output = Uint8List(width * height * channels);
   final scaleY = raw.height / height;
+  final kernelY = _resamplingKernel(kernel, scaleY);
   final filterScaleY = max(1.0, scaleY);
-  final radiusY = kernelRadius(kernel) * filterScaleY;
+  final radiusY = kernelRadius(kernelY) * filterScaleY;
   for (var y = 0; y < height; y += 1) {
     final sourceY = ((y + 0.5) * scaleY) - 0.5;
     final start = (sourceY - radiusY).floor();
@@ -286,7 +288,7 @@ RawPixels _resizeKernel(
         end: end,
         center: sourceY,
         filterScale: filterScaleY,
-        kernel: kernel,
+        kernel: kernelY,
         channels: channels,
         sampleOffset: (sample) => ((sample * width) + x) * channels,
         maxSample: raw.height - 1,
@@ -303,6 +305,20 @@ RawPixels _resizeKernel(
     height: height,
     channels: raw.channels,
   );
+}
+
+ResizeKernel _resamplingKernel(ResizeKernel kernel, double scale) {
+  if (scale >= 1) {
+    return kernel;
+  }
+  return switch (kernel) {
+    ResizeKernel.nearest || ResizeKernel.linear || ResizeKernel.cubic => kernel,
+    ResizeKernel.mitchell ||
+    ResizeKernel.lanczos2 ||
+    ResizeKernel.lanczos3 ||
+    ResizeKernel.mks2013 ||
+    ResizeKernel.mks2021 => ResizeKernel.cubic,
+  };
 }
 
 void _accumulateSamples({
