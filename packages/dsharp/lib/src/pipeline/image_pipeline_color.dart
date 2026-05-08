@@ -88,9 +88,10 @@ extension ImagePipelineColor on ImagePipeline {
     );
   }
 
-  /// Applies a 3x3 recombination matrix.
-  ImagePipeline recomb(List<num> matrix) {
-    return _append(RecombOperation(matrix));
+  /// Applies a 3x3 or 4x4 recombination matrix.
+  ImagePipeline recomb(Object matrix) {
+    final parsed = _recombMatrix(matrix);
+    return _append(RecombOperation(parsed.values, dimension: parsed.dimension));
   }
 
   /// Applies CLAHE approximation.
@@ -132,6 +133,55 @@ extension ImagePipelineColor on ImagePipeline {
     }
     throw const OperationValidationException(
       'Linear expects numbers, matching number arrays, or LinearOptions.',
+    );
+  }
+
+  ({int dimension, List<num> values}) _recombMatrix(Object matrix) {
+    if (matrix is List<num>) {
+      return switch (matrix.length) {
+        9 => (dimension: 3, values: List<num>.unmodifiable(matrix)),
+        16 => (dimension: 4, values: List<num>.unmodifiable(matrix)),
+        _ => throw const OperationValidationException(
+          'Recombination matrix must be 3x3 or 4x4.',
+        ),
+      };
+    }
+    if (matrix is List<Object?>) {
+      final rows = <List<num>>[];
+      for (final row in matrix) {
+        if (row is! List<Object?>) {
+          throw const OperationValidationException(
+            'Recombination matrix rows must contain numbers.',
+          );
+        }
+        rows.add(<num>[
+          for (final value in row)
+            if (value is num)
+              value
+            else
+              throw const OperationValidationException(
+                'Recombination matrix rows must contain numbers.',
+              ),
+        ]);
+      }
+      final dimension = rows.length;
+      if (dimension != 3 && dimension != 4) {
+        throw const OperationValidationException(
+          'Recombination matrix must be 3x3 or 4x4.',
+        );
+      }
+      if (rows.any((row) => row.length != dimension)) {
+        throw const OperationValidationException(
+          'Recombination matrix must be square.',
+        );
+      }
+      return (
+        dimension: dimension,
+        values: List<num>.unmodifiable(rows.expand((row) => row)),
+      );
+    }
+    throw const OperationValidationException(
+      'Recombination matrix must be a numeric 3x3 or 4x4 matrix.',
     );
   }
 }

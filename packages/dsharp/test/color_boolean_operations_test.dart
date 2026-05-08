@@ -123,6 +123,25 @@ void main() {
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).recomb(const <num>[0, 1, 0, 1, 0, 0, 0, 0, 1]),
       );
+      final recombedNested = await pixels(
+        ImagePipeline.fromRawPixels(rawRgb(1, 1, <int>[10, 20, 30])).recomb(
+          const <List<num>>[
+            <num>[0, 1, 0],
+            <num>[1, 0, 0],
+            <num>[0, 0, 1],
+          ],
+        ),
+      );
+      final recombedRgba = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgba(1, 1, <int>[10, 20, 30, 40]),
+        ).recomb(const <List<num>>[
+          <num>[0, 1, 0, 0],
+          <num>[1, 0, 0, 0],
+          <num>[0, 0, 1, 0],
+          <num>[0, 0, 0, 1],
+        ]),
+      );
       final modulated = await pixels(
         ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
@@ -141,6 +160,8 @@ void main() {
       expect(firstBytes(tinted), <int>[60, 20, 130]);
       expect(firstBytes(normalized), <int>[0, 64, 128, 77, 128, 191, 255, 99]);
       expect(firstBytes(recombed), <int>[20, 10, 30]);
+      expect(firstBytes(recombedNested), <int>[20, 10, 30]);
+      expect(firstBytes(recombedRgba), <int>[20, 10, 30, 40]);
       expect(firstBytes(modulated), <int>[20, 40, 60]);
       expect(firstBytes(clahe), <int>[128, 255]);
       expect(
@@ -153,6 +174,12 @@ void main() {
         ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).linear(<num>[1, 2], <num>[0, 0]).toPixelImage(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).recomb(const <num>[1, 2, 3]),
         throwsA(isA<OperationValidationException>()),
       );
     },

@@ -284,10 +284,13 @@ final class NormalizeOperation implements PipelineOperation {
 /// Applies a simple RGB recombination matrix.
 final class RecombOperation implements PipelineOperation {
   /// Creates a recombination operation.
-  const RecombOperation(this.matrix);
+  const RecombOperation(this.matrix, {this.dimension = 3});
 
-  /// Row-major 3x3 matrix.
+  /// Row-major matrix values.
   final List<num> matrix;
+
+  /// Matrix width and height.
+  final int dimension;
 
   @override
   String get name => 'recomb';
@@ -295,23 +298,22 @@ final class RecombOperation implements PipelineOperation {
   @override
   PixelImage apply(PixelImage image) {
     return mapFrames(image, (raw) {
-      if (raw.channels.value < 3 || matrix.length != 9) {
+      final channels = raw.channels.value;
+      if (channels < dimension) {
         return raw;
       }
       final output = raw.bytes;
-      for (var i = 0; i < output.length; i += raw.channels.value) {
-        final r = output[i];
-        final g = output[i + 1];
-        final b = output[i + 2];
-        output[i] = byteClamp(
-          (r * matrix[0]) + (g * matrix[1]) + (b * matrix[2]),
-        );
-        output[i + 1] = byteClamp(
-          (r * matrix[3]) + (g * matrix[4]) + (b * matrix[5]),
-        );
-        output[i + 2] = byteClamp(
-          (r * matrix[6]) + (g * matrix[7]) + (b * matrix[8]),
-        );
+      for (var i = 0; i < output.length; i += channels) {
+        final source = <int>[
+          for (var c = 0; c < dimension; c += 1) output[i + c],
+        ];
+        for (var row = 0; row < dimension; row += 1) {
+          var value = 0.0;
+          for (var column = 0; column < dimension; column += 1) {
+            value += source[column] * matrix[(row * dimension) + column];
+          }
+          output[i + row] = byteClamp(value);
+        }
       }
       return sameSizeRaw(raw, output, raw.channels);
     });
