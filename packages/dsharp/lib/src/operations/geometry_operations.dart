@@ -7,6 +7,7 @@ import '../geometry/resize_geometry.dart';
 import '../pipeline/pipeline_operation.dart';
 import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
+import '../resize/kernels.dart';
 import '../source/raw_pixels.dart';
 
 /// Resize operation.
@@ -27,10 +28,7 @@ final class ResizeOperation implements PipelineOperation {
       sourceHeight: image.height,
       options: options,
     );
-    return _mapFrames(
-      image,
-      (raw) => _resizeNearest(raw, resolved.width, resolved.height),
-    );
+    return _mapFrames(image, (raw) => _resize(raw, resolved, options));
   }
 }
 
@@ -100,6 +98,123 @@ PixelImage _mapFrames(PixelImage image, RawPixels Function(RawPixels) apply) {
   );
 }
 
+RawPixels _resize(
+  RawPixels raw,
+  ResolvedResize resolved,
+  ResizeOptions options,
+) {
+  if (options.fit == ResizeFit.cover &&
+      options.width != null &&
+      options.height != null) {
+    return _resizeCover(raw, resolved.width, resolved.height, options);
+  }
+  if (options.fit == ResizeFit.contain &&
+      options.width != null &&
+      options.height != null) {
+    return _resizeContain(raw, resolved.width, resolved.height, options);
+  }
+  return _resizeRaw(raw, resolved.width, resolved.height, options.kernel);
+}
+
+RawPixels _resizeCover(
+  RawPixels raw,
+  int width,
+  int height,
+  ResizeOptions options,
+) {
+  final widthRatio = width / raw.width;
+  final heightRatio = height / raw.height;
+  final scale = max(widthRatio, heightRatio);
+  final scaledWidth = max(1, (raw.width * scale).round());
+  final scaledHeight = max(1, (raw.height * scale).round());
+  final scaled = _resizeRaw(raw, scaledWidth, scaledHeight, options.kernel);
+  if (scaled.width == width && scaled.height == height) {
+    return scaled;
+  }
+  final offset = _gravityOffset(
+    outerWidth: scaled.width,
+    outerHeight: scaled.height,
+    innerWidth: width,
+    innerHeight: height,
+    gravity: options.gravity,
+  );
+  return _crop(
+    scaled,
+    Region(left: offset.x, top: offset.y, width: width, height: height),
+  );
+}
+
+RawPixels _resizeContain(
+  RawPixels raw,
+  int width,
+  int height,
+  ResizeOptions options,
+) {
+  final widthRatio = width / raw.width;
+  final heightRatio = height / raw.height;
+  final scale = min(widthRatio, heightRatio);
+  final scaledWidth = max(1, (raw.width * scale).round());
+  final scaledHeight = max(1, (raw.height * scale).round());
+  final scaled = _resizeRaw(raw, scaledWidth, scaledHeight, options.kernel);
+  if (scaled.width == width && scaled.height == height) {
+    return scaled;
+  }
+  final offset = _gravityOffset(
+    outerWidth: width,
+    outerHeight: height,
+    innerWidth: scaled.width,
+    innerHeight: scaled.height,
+    gravity: options.gravity,
+  );
+  return _embed(
+    scaled,
+    width: width,
+    height: height,
+    left: offset.x,
+    top: offset.y,
+    background: options.background,
+  );
+}
+
+({int x, int y}) _gravityOffset({
+  required int outerWidth,
+  required int outerHeight,
+  required int innerWidth,
+  required int innerHeight,
+  required Gravity gravity,
+}) {
+  final extraX = max(0, outerWidth - innerWidth);
+  final extraY = max(0, outerHeight - innerHeight);
+  final centerX = extraX ~/ 2;
+  final centerY = extraY ~/ 2;
+  return switch (gravity) {
+    Gravity.north => (x: centerX, y: 0),
+    Gravity.east => (x: extraX, y: centerY),
+    Gravity.south => (x: centerX, y: extraY),
+    Gravity.west => (x: 0, y: centerY),
+    Gravity.northeast => (x: extraX, y: 0),
+    Gravity.southeast => (x: extraX, y: extraY),
+    Gravity.southwest => (x: 0, y: extraY),
+    Gravity.northwest => (x: 0, y: 0),
+    Gravity.center => (x: centerX, y: centerY),
+  };
+}
+
+RawPixels _resizeRaw(
+  RawPixels raw,
+  int width,
+  int height,
+  ResizeKernel kernel,
+) {
+  if (raw.width == width && raw.height == height) {
+    return raw;
+  }
+  if (kernel == ResizeKernel.nearest) {
+    return _resizeNearest(raw, width, height);
+  }
+  return _resizeKernel(raw, width, height, kernel);
+}
+
 RawPixels _resizeNearest(RawPixels raw, int width, int height) {
   final channels = raw.channels.value;
   final input = raw.bytes;
@@ -123,6 +238,111 @@ RawPixels _resizeNearest(RawPixels raw, int width, int height) {
   );
 }
 
+RawPixels _resizeKernel(
+  RawPixels raw,
+  int width,
+  int height,
+  ResizeKernel kernel,
+) {
+  final channels = raw.channels.value;
+  final input = raw.bytes;
+  final horizontal = Float64List(width * raw.height * channels);
+  final scaleX = raw.width / width;
+  final filterScaleX = max(1.0, scaleX);
+  final radiusX = kernelRadius(kernel) * filterScaleX;
+  for (var y = 0; y < raw.height; y += 1) {
+    for (var x = 0; x < width; x += 1) {
+      final sourceX = ((x + 0.5) * scaleX) - 0.5;
+      final start = (sourceX - radiusX).floor();
+      final end = (sourceX + radiusX).ceil();
+      final target = ((y * width) + x) * channels;
+      _accumulateSamples(
+        start: start,
+        end: end,
+        center: sourceX,
+        filterScale: filterScaleX,
+        kernel: kernel,
+        channels: channels,
+        sampleOffset: (sample) => ((y * raw.width) + sample) * channels,
+        maxSample: raw.width - 1,
+        read: (offset) => input[offset].toDouble(),
+        write: (channel, value) => horizontal[target + channel] = value,
+      );
+    }
+  }
+
+  final output = Uint8List(width * height * channels);
+  final scaleY = raw.height / height;
+  final filterScaleY = max(1.0, scaleY);
+  final radiusY = kernelRadius(kernel) * filterScaleY;
+  for (var y = 0; y < height; y += 1) {
+    final sourceY = ((y + 0.5) * scaleY) - 0.5;
+    final start = (sourceY - radiusY).floor();
+    final end = (sourceY + radiusY).ceil();
+    for (var x = 0; x < width; x += 1) {
+      final target = ((y * width) + x) * channels;
+      _accumulateSamples(
+        start: start,
+        end: end,
+        center: sourceY,
+        filterScale: filterScaleY,
+        kernel: kernel,
+        channels: channels,
+        sampleOffset: (sample) => ((sample * width) + x) * channels,
+        maxSample: raw.height - 1,
+        read: (offset) => horizontal[offset],
+        write: (channel, value) {
+          output[target + channel] = value.round().clamp(0, 255);
+        },
+      );
+    }
+  }
+  return RawPixels(
+    bytes: output,
+    width: width,
+    height: height,
+    channels: raw.channels,
+  );
+}
+
+void _accumulateSamples({
+  required int start,
+  required int end,
+  required double center,
+  required double filterScale,
+  required ResizeKernel kernel,
+  required int channels,
+  required int Function(int sample) sampleOffset,
+  required int maxSample,
+  required double Function(int offset) read,
+  required void Function(int channel, double value) write,
+}) {
+  final sums = Float64List(channels);
+  var weightSum = 0.0;
+  for (var sample = start; sample <= end; sample += 1) {
+    final distance = (sample - center) / filterScale;
+    final weight = kernelWeight(kernel, distance);
+    if (weight == 0) {
+      continue;
+    }
+    final offset = sampleOffset(sample.clamp(0, maxSample));
+    for (var c = 0; c < channels; c += 1) {
+      sums[c] += read(offset + c) * weight;
+    }
+    weightSum += weight;
+  }
+  if (weightSum == 0) {
+    final offset = sampleOffset(center.round().clamp(0, maxSample));
+    for (var c = 0; c < channels; c += 1) {
+      write(c, read(offset + c));
+    }
+    return;
+  }
+  for (var c = 0; c < channels; c += 1) {
+    write(c, sums[c] / weightSum);
+  }
+}
+
 RawPixels _crop(RawPixels raw, Region region) {
   final channels = raw.channels.value;
   final input = raw.bytes;
@@ -141,6 +361,41 @@ RawPixels _crop(RawPixels raw, Region region) {
     bytes: output,
     width: region.width,
     height: region.height,
+    channels: raw.channels,
+  );
+}
+
+RawPixels _embed(
+  RawPixels raw, {
+  required int width,
+  required int height,
+  required int left,
+  required int top,
+  required RgbaColor background,
+}) {
+  final channels = raw.channels.value;
+  final input = raw.bytes;
+  final output = Uint8List(width * height * channels);
+  for (var y = 0; y < height; y += 1) {
+    for (var x = 0; x < width; x += 1) {
+      _writeColor(output, ((y * width) + x) * channels, channels, background);
+    }
+  }
+  for (var y = 0; y < raw.height; y += 1) {
+    for (var x = 0; x < raw.width; x += 1) {
+      _copyPixel(
+        input,
+        output,
+        ((y * raw.width) + x) * channels,
+        (((top + y) * width) + left + x) * channels,
+        channels,
+      );
+    }
+  }
+  return RawPixels(
+    bytes: output,
+    width: width,
+    height: height,
     channels: raw.channels,
   );
 }

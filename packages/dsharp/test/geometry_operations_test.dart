@@ -50,7 +50,14 @@ void main() {
 
   test('resize operation changes dimensions', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2())
-        .resize(const ResizeOptions(width: 1, height: 1, fit: ResizeFit.fill))
+        .resize(
+          const ResizeOptions(
+            width: 1,
+            height: 1,
+            fit: ResizeFit.fill,
+            kernel: ResizeKernel.nearest,
+          ),
+        )
         .toPixelImage();
 
     expect(image.width, 1);
