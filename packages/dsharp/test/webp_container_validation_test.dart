@@ -154,6 +154,27 @@ void main() {
     );
   });
 
+  test('rejects ANIM chunks with invalid length', () async {
+    final ordered = animatedVp8Webp(width: 1, height: 1);
+    final bytes = Uint8List(ordered.length + 2)
+      ..setAll(0, ordered.sublist(0, 34))
+      ..setAll(38, ordered.sublist(38, 44))
+      ..setAll(44, <int>[0, 0])
+      ..setAll(46, ordered.sublist(44));
+    final words = ByteData.sublistView(bytes);
+    words.setUint32(4, ordered.length - 6, Endian.little);
+    words.setUint32(34, 8, Endian.little);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;

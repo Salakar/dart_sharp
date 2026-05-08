@@ -187,7 +187,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
           'WebP animation has multiple ANIM chunks.',
         );
       }
-      if (data.length < 6) {
+      if (data.length != 6) {
         throw const InvalidImageException('Invalid WebP animation header.');
       }
       hasAnimationHeader = true;
