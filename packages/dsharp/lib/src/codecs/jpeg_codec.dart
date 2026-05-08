@@ -9,7 +9,7 @@ import 'jpeg_decoder.dart';
 import 'jpeg_encoder.dart';
 import 'output.dart';
 
-/// First-party baseline JPEG codec.
+/// First-party JPEG codec.
 final class JpegImageCodec implements ImageCodec {
   /// Creates a JPEG codec.
   const JpegImageCodec();

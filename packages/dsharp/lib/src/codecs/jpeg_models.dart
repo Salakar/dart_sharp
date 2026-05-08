@@ -39,6 +39,15 @@ final class JpegComponent {
   /// Decoded component height.
   int height = 0;
 
+  /// Number of entropy-coded block columns.
+  int blockCols = 0;
+
+  /// Number of entropy-coded block rows.
+  int blockRows = 0;
+
+  /// Progressive quantized DCT coefficient blocks.
+  List<Int32List> coeffBlocks = const <Int32List>[];
+
   /// Decoded samples.
   Uint8List samples = Uint8List(0);
 }
@@ -46,13 +55,32 @@ final class JpegComponent {
 /// Parsed JPEG scan data.
 final class JpegScan {
   /// Creates scan data.
-  JpegScan({required this.components, required this.entropySegments});
+  JpegScan({
+    required this.components,
+    required this.entropySegments,
+    this.spectralStart = 0,
+    this.spectralEnd = 63,
+    this.successiveHigh = 0,
+    this.successiveLow = 0,
+  });
 
   /// Scan components in entropy order.
   final List<JpegComponent> components;
 
   /// De-stuffed entropy byte segments, split at restart markers.
   final List<Uint8List> entropySegments;
+
+  /// Progressive spectral selection start.
+  final int spectralStart;
+
+  /// Progressive spectral selection end.
+  final int spectralEnd;
+
+  /// Progressive successive approximation high bit.
+  final int successiveHigh;
+
+  /// Progressive successive approximation low bit.
+  final int successiveLow;
 }
 
 /// JPEG parser state.
@@ -68,6 +96,9 @@ final class JpegState {
 
   /// Whether this frame uses lossless predictive entropy coding.
   bool lossless = false;
+
+  /// Whether this frame uses progressive DCT scans.
+  bool progressive = false;
 
   /// Lossless JPEG predictor selection value.
   int losslessPredictor = 1;
@@ -95,4 +126,7 @@ final class JpegState {
 
   /// Scan payload.
   JpegScan? scan;
+
+  /// All scan payloads in stream order.
+  final List<JpegScan> scans = <JpegScan>[];
 }

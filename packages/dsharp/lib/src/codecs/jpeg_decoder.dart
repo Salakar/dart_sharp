@@ -9,12 +9,15 @@ import 'jpeg_tables.dart';
 import 'jpeg_transform.dart';
 
 part 'jpeg_lossless.dart';
+part 'jpeg_progressive.dart';
 
-/// Decodes baseline sequential JPEG bytes to RGBA pixels.
+/// Decodes supported JPEG bytes to RGBA pixels.
 RawPixels decodeJpegBytes(Uint8List bytes) {
   final state = _parse(bytes);
   if (state.lossless) {
     _decodeLosslessScan(state);
+  } else if (state.progressive) {
+    _decodeProgressiveScans(state);
   } else {
     _decodeScan(state);
   }
@@ -44,15 +47,39 @@ JpegState _parse(Uint8List bytes) {
       break;
     }
     if (marker == 0xda) {
+      if (offset + 2 > bytes.length) {
+        throw const InvalidImageException('Truncated JPEG marker.');
+      }
       final length = readUint16Be(bytes, offset);
-      _readSos(state, bytes.sublist(offset + 2, offset + length));
-      state.scan = JpegScan(
-        components: state.scan!.components,
-        entropySegments: _entropySegments(bytes, offset + length),
+      if (length < 2 || offset + length > bytes.length) {
+        throw const InvalidImageException('Invalid JPEG marker length.');
+      }
+      final scan = _readSos(state, bytes.sublist(offset + 2, offset + length));
+      final entropy = _entropySegments(bytes, offset + length);
+      final parsedScan = JpegScan(
+        components: scan.components,
+        entropySegments: entropy.segments,
+        spectralStart: scan.spectralStart,
+        spectralEnd: scan.spectralEnd,
+        successiveHigh: scan.successiveHigh,
+        successiveLow: scan.successiveLow,
       );
-      break;
+      state
+        ..scan = parsedScan
+        ..scans.add(parsedScan);
+      offset = entropy.endOffset;
+      if (!state.progressive) {
+        break;
+      }
+      continue;
+    }
+    if (offset + 2 > bytes.length) {
+      throw const InvalidImageException('Truncated JPEG marker.');
     }
     final length = readUint16Be(bytes, offset);
+    if (length < 2 || offset + length > bytes.length) {
+      throw const InvalidImageException('Invalid JPEG marker length.');
+    }
     final data = bytes.sublist(offset + 2, offset + length);
     if (marker == 0xdb) {
       _readDqt(state, data);
@@ -60,6 +87,11 @@ JpegState _parse(Uint8List bytes) {
       _readDht(state, data);
     } else if (marker == 0xc0) {
       state.lossless = false;
+      state.progressive = false;
+      _readSof0(state, data);
+    } else if (marker == 0xc2) {
+      state.lossless = false;
+      state.progressive = true;
       _readSof0(state, data);
     } else if (marker == 0xc3) {
       state.lossless = true;
@@ -69,9 +101,7 @@ JpegState _parse(Uint8List bytes) {
     } else if (marker == 0xee) {
       _readApp14(state, data);
     } else if (marker >= 0xc1 && marker <= 0xcf) {
-      throw const UnsupportedCodecException(
-        'Only baseline sequential JPEG is supported.',
-      );
+      throw const UnsupportedCodecException('Unsupported JPEG frame type.');
     }
     offset += length;
   }
@@ -153,7 +183,7 @@ void _readApp14(JpegState state, Uint8List data) {
   state.adobeTransform = data[11];
 }
 
-void _readSos(JpegState state, Uint8List data) {
+JpegScan _readSos(JpegState state, Uint8List data) {
   final components = <JpegComponent>[];
   var offset = 1;
   for (var i = 0; i < data[0]; i += 1) {
@@ -169,13 +199,17 @@ void _readSos(JpegState state, Uint8List data) {
     state.losslessPredictor = data[offset];
     state.pointTransform = data[offset + 2] & 0x0f;
   }
-  state.scan = JpegScan(
+  return JpegScan(
     components: components,
     entropySegments: const <Uint8List>[],
+    spectralStart: offset + 3 <= data.length ? data[offset] : 0,
+    spectralEnd: offset + 3 <= data.length ? data[offset + 1] : 63,
+    successiveHigh: offset + 3 <= data.length ? data[offset + 2] >> 4 : 0,
+    successiveLow: offset + 3 <= data.length ? data[offset + 2] & 0x0f : 0,
   );
 }
 
-List<Uint8List> _entropySegments(Uint8List bytes, int offset) {
+_EntropyScan _entropySegments(Uint8List bytes, int offset) {
   final segments = <Uint8List>[];
   var out = <int>[];
   var i = offset;
@@ -185,8 +219,10 @@ List<Uint8List> _entropySegments(Uint8List bytes, int offset) {
       if (i >= bytes.length) {
         break;
       }
+      var markerOffset = i - 1;
       var next = bytes[i++];
       while (next == 0xff && i < bytes.length) {
+        markerOffset = i - 1;
         next = bytes[i++];
       }
       if (next == 0x00) {
@@ -195,7 +231,10 @@ List<Uint8List> _entropySegments(Uint8List bytes, int offset) {
         segments.add(Uint8List.fromList(out));
         out = <int>[];
       } else {
-        break;
+        if (out.isNotEmpty || segments.isEmpty) {
+          segments.add(Uint8List.fromList(out));
+        }
+        return _EntropyScan(segments, markerOffset);
       }
     } else {
       out.add(value);
@@ -204,7 +243,14 @@ List<Uint8List> _entropySegments(Uint8List bytes, int offset) {
   if (out.isNotEmpty || segments.isEmpty) {
     segments.add(Uint8List.fromList(out));
   }
-  return segments;
+  return _EntropyScan(segments, i);
+}
+
+final class _EntropyScan {
+  const _EntropyScan(this.segments, this.endOffset);
+
+  final List<Uint8List> segments;
+  final int endOffset;
 }
 
 void _decodeScan(JpegState state) {
