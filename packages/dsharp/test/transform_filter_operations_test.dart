@@ -101,6 +101,42 @@ void main() {
     expect(orientedMetadata.orientation, isNull);
   });
 
+  test('autoOrient applies WebP EXIF orientation', () async {
+    final webp = await ImagePipeline.fromRawPixels(
+      rawRgb(3, 2, <int>[
+        255,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        255,
+        255,
+        0,
+        255,
+        0,
+        255,
+        0,
+        255,
+        255,
+      ]),
+    ).webp().toBytes();
+    final bytes = _withWebpExifOrientation(webp, width: 3, height: 2);
+
+    final sourceMetadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(
+      bytes,
+    ).autoOrient().toPixelImage();
+
+    expect(sourceMetadata.format, ImageFormat.webp);
+    expect(sourceMetadata.orientation, 6);
+    expect(image.width, 2);
+    expect(image.height, 3);
+  });
+
   test(
     'arbitrary rotate expands bounds and affine validates matrices',
     () async {
@@ -187,6 +223,63 @@ Uint8List _withExifOrientation(Uint8List jpeg, int orientation) {
   _jpegSegment(writer, 0xe1, _exifOrientation(orientation));
   writer.writeBytes(jpeg.sublist(2));
   return writer.toBytes();
+}
+
+Uint8List _withWebpExifOrientation(
+  Uint8List webp, {
+  required int width,
+  required int height,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x08)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _riffChunk(content, 'EXIF', _exifOrientation(6).sublist(6));
+  _riffChunk(content, 'VP8L', _webpChunk(webp, 'VP8L'));
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _webpChunk(Uint8List bytes, String target) {
+  var offset = 12;
+  while (offset + 8 <= bytes.length) {
+    final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
+    final length = readUint32Le(bytes, offset + 4);
+    final start = offset + 8;
+    final end = start + length;
+    if (type == target) {
+      return bytes.sublist(start, end);
+    }
+    offset = end + (length.isOdd ? 1 : 0);
+  }
+  throw StateError('Missing $target chunk.');
+}
+
+void _riffChunk(ByteWriter writer, String type, Iterable<int> data) {
+  final payload = Uint8List.fromList(List<int>.from(data));
+  writer
+    ..writeAscii(type)
+    ..writeUint32Le(payload.length)
+    ..writeBytes(payload);
+  if (payload.length.isOdd) {
+    writer.writeByte(0);
+  }
+}
+
+void _writeUint24Le(ByteWriter writer, int value) {
+  writer
+    ..writeByte(value)
+    ..writeByte(value >> 8)
+    ..writeByte(value >> 16);
 }
 
 void _jpegSegment(ByteWriter writer, int marker, List<int> data) {
