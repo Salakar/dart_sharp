@@ -47,6 +47,9 @@ List<List<_Vp8ChromaAc>> _lossyChromaAcBlocks(
     build(_lossyChromaHorizontalThirdVerticalAcBlock),
     build(_lossyChromaSecondHorizontalSecondVerticalAcBlock),
     build(_lossyChromaThirdHorizontalVerticalAcBlock),
+    build(_lossyChromaThirdHorizontalSecondVerticalAcBlock),
+    build(_lossyChromaSecondHorizontalThirdVerticalAcBlock),
+    build(_lossyChromaThirdHorizontalThirdVerticalAcBlock),
   ];
 }
 

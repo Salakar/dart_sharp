@@ -127,6 +127,80 @@ _Vp8ChromaAc _lossyChromaThirdHorizontalVerticalAcBlock(
   );
 }
 
+_Vp8ChromaAc _lossyChromaThirdHorizontalSecondVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyChromaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (sampleX, sampleY) {
+      final isOuterRow = sampleY == 0 || sampleY == 3;
+      return sampleX.isEven == isOuterRow;
+    },
+    scale: 2,
+  );
+}
+
+_Vp8ChromaAc _lossyChromaSecondHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyChromaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (sampleX, sampleY) {
+      final isOuterColumn = sampleX == 0 || sampleX == 3;
+      return isOuterColumn == sampleY.isEven;
+    },
+    scale: 2,
+  );
+}
+
+_Vp8ChromaAc _lossyChromaThirdHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyChromaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (sampleX, sampleY) {
+      return sampleX.isEven == sampleY.isEven;
+    },
+    scale: 2,
+  );
+}
+
 _Vp8ChromaAc _lossyChromaMixedAcBlock(
   Uint8List rgba, {
   required int width,
