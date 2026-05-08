@@ -28,6 +28,23 @@ Uint8List zlibEncodeStored(Uint8List data) {
   return writer.toBytes();
 }
 
+/// Encodes [data] as a zlib stream using fixed Huffman literal deflate blocks.
+Uint8List zlibEncodeFixed(Uint8List data) {
+  final bits = _DeflateBitWriter()
+    ..writeBits(1, 1)
+    ..writeBits(1, 2);
+  for (final byte in data) {
+    _writeFixedSymbol(bits, byte);
+  }
+  _writeFixedSymbol(bits, 256);
+  return (ByteWriter()
+        ..writeByte(0x78)
+        ..writeByte(0x9c)
+        ..writeBytes(bits.finish())
+        ..writeUint32Be(adler32(data)))
+      .toBytes();
+}
+
 /// Decodes a zlib-wrapped deflate stream.
 Uint8List zlibDecode(Uint8List bytes) {
   if (bytes.length < 6) {
@@ -217,6 +234,61 @@ int _reverseBits(int value, int length) {
   return reversed;
 }
 
+void _writeFixedSymbol(_DeflateBitWriter bits, int symbol) {
+  final code = _fixedLitLenCodes[symbol];
+  bits.writeBits(code.code, code.length);
+}
+
+List<({int code, int length})> _canonicalCodeTable(List<int> lengths) {
+  var code = 0;
+  final counts = List<int>.filled(16, 0);
+  for (final length in lengths) {
+    if (length > 0) {
+      counts[length] += 1;
+    }
+  }
+  final table = List<({int code, int length})>.filled(lengths.length, (
+    code: 0,
+    length: 0,
+  ));
+  for (var bits = 1; bits <= 15; bits += 1) {
+    code = (code + counts[bits - 1]) << 1;
+    var nextCode = code;
+    for (var symbol = 0; symbol < lengths.length; symbol += 1) {
+      if (lengths[symbol] == bits) {
+        table[symbol] = (code: _reverseBits(nextCode, bits), length: bits);
+        nextCode += 1;
+      }
+    }
+  }
+  return table;
+}
+
+final class _DeflateBitWriter {
+  final _bytes = <int>[];
+  var _current = 0;
+  var _bits = 0;
+
+  void writeBits(int value, int count) {
+    for (var i = 0; i < count; i += 1) {
+      _current |= ((value >> i) & 1) << _bits;
+      _bits += 1;
+      if (_bits == 8) {
+        _bytes.add(_current);
+        _current = 0;
+        _bits = 0;
+      }
+    }
+  }
+
+  Uint8List finish() {
+    if (_bits > 0) {
+      _bytes.add(_current);
+    }
+    return Uint8List.fromList(_bytes);
+  }
+}
+
 final _fixedLitLenTree = _HuffmanTree(<int>[
   ...List<int>.filled(144, 8),
   ...List<int>.filled(112, 9),
@@ -224,3 +296,9 @@ final _fixedLitLenTree = _HuffmanTree(<int>[
   ...List<int>.filled(8, 8),
 ]);
 final _fixedDistanceTree = _HuffmanTree(List<int>.filled(32, 5));
+final _fixedLitLenCodes = _canonicalCodeTable(<int>[
+  ...List<int>.filled(144, 8),
+  ...List<int>.filled(112, 9),
+  ...List<int>.filled(24, 7),
+  ...List<int>.filled(8, 8),
+]);

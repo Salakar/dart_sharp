@@ -99,6 +99,9 @@ final class PngImageCodec implements ImageCodec {
 
   @override
   EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
+    final pngOptions = options is PngEncoderOptions
+        ? options
+        : const PngEncoderOptions();
     final raw = image.firstFrame.pixels;
     final rgba = rawToRgba(raw);
     final scanlines = ByteWriter();
@@ -109,7 +112,14 @@ final class PngImageCodec implements ImageCodec {
     }
     final writer = ByteWriter()..writeBytes(_signature);
     _writeChunk(writer, 'IHDR', _ihdr(raw.width, raw.height));
-    _writeChunk(writer, 'IDAT', zlibEncodeStored(scanlines.toBytes()));
+    final data = scanlines.toBytes();
+    _writeChunk(
+      writer,
+      'IDAT',
+      pngOptions.compressionLevel == 0
+          ? zlibEncodeStored(data)
+          : zlibEncodeFixed(data),
+    );
     _writeChunk(writer, 'IEND', Uint8List(0));
     final bytes = writer.toBytes();
     return EncodedImage(

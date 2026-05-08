@@ -67,6 +67,34 @@ void main() {
     expect(decoded.firstFrameBytes().take(4), <int>[255, 0, 0, 255]);
   });
 
+  test('png encoder compressionLevel changes the zlib stream', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var i = 0; i < 16; i += 1) ...[i * 8, 255 - i * 8, i * 4, 255],
+      ]),
+      width: 4,
+      height: 4,
+      channels: ChannelCount.four,
+    );
+
+    final stored = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(compressionLevel: 0)).toBytes();
+    final fixed = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(compressionLevel: 6)).toBytes();
+
+    expect(stored, isNot(fixed));
+    expect(
+      (await ImagePipeline.fromBytes(stored).toPixelImage()).firstFrameBytes(),
+      raw.bytes,
+    );
+    expect(
+      (await ImagePipeline.fromBytes(fixed).toPixelImage()).firstFrameBytes(),
+      raw.bytes,
+    );
+  });
+
   test('jpeg codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
