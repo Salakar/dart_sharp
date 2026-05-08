@@ -113,6 +113,12 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaThirdHorizontalAcBlocks = _lossyLumaThirdHorizontalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
@@ -122,6 +128,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaSecondVerticalAcBlocks: lumaSecondVerticalAcBlocks,
     lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
     lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
+    lumaThirdHorizontalAcBlocks: lumaThirdHorizontalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -201,6 +208,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaSecondVerticalAcBlocks,
   required List<int> lumaDiagonalAcBlocks,
   required List<int> lumaSecondHorizontalAcBlocks,
+  required List<int> lumaThirdHorizontalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -251,6 +259,7 @@ Uint8List _encodeVp8SolidPayload({
           lumaSecondVerticalAcBlocks[blockOffset],
           lumaDiagonalAcBlocks[blockOffset],
           lumaSecondHorizontalAcBlocks[blockOffset],
+          lumaThirdHorizontalAcBlocks[blockOffset],
         );
       }
       final predictedU = _predictedChromaDc(
@@ -315,6 +324,7 @@ void _writeLumaDct(
   int secondVerticalAcCoefficient,
   int diagonalAcCoefficient,
   int secondHorizontalAcCoefficient,
+  int thirdHorizontalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
@@ -327,6 +337,7 @@ void _writeLumaDct(
       secondVerticalAcCoefficient,
       diagonalAcCoefficient,
       secondHorizontalAcCoefficient,
+      thirdHorizontalAcCoefficient,
     ],
     context,
     (coefficientIndex, context, node) {
@@ -341,7 +352,8 @@ void _writeLumaDct(
         verticalAcCoefficient != 0 ||
         secondVerticalAcCoefficient != 0 ||
         diagonalAcCoefficient != 0 ||
-        secondHorizontalAcCoefficient != 0,
+        secondHorizontalAcCoefficient != 0 ||
+        thirdHorizontalAcCoefficient != 0,
   );
 }
 
