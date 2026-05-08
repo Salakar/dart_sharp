@@ -9,9 +9,10 @@ import 'package:test/test.dart';
 void main() {
   test('decodes 16-bit grayscale PNG samples', () async {
     final image = await ImagePipeline.fromBytes(
-      _png16(
+      _png(
         width: 3,
         height: 1,
+        bitDepth: 16,
         colorType: 0,
         samples: const <int>[0, 0x8080, 0xffff],
       ),
@@ -35,9 +36,10 @@ void main() {
 
   test('decodes 16-bit grayscale alpha PNG samples', () async {
     final image = await ImagePipeline.fromBytes(
-      _png16(
+      _png(
         width: 1,
         height: 1,
+        bitDepth: 16,
         colorType: 4,
         samples: const <int>[0x4000, 0x8080],
       ),
@@ -48,9 +50,10 @@ void main() {
 
   test('decodes 16-bit truecolour alpha PNG samples', () async {
     final image = await ImagePipeline.fromBytes(
-      _png16(
+      _png(
         width: 1,
         height: 1,
+        bitDepth: 16,
         colorType: 6,
         samples: const <int>[0x1234, 0x8080, 0xffff, 0x4000],
       ),
@@ -58,13 +61,90 @@ void main() {
 
     expect(image.firstFrameBytes(), <int>[18, 128, 255, 64]);
   });
+
+  test('applies grayscale PNG transparency chunks', () async {
+    final image = await ImagePipeline.fromBytes(
+      _png(
+        width: 3,
+        height: 1,
+        bitDepth: 8,
+        colorType: 0,
+        samples: const <int>[0, 128, 255],
+        transparentSamples: const <int>[128],
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      0,
+      0,
+      0,
+      255,
+      128,
+      128,
+      128,
+      0,
+      255,
+      255,
+      255,
+      255,
+    ]);
+  });
+
+  test('applies low-bit grayscale PNG transparency chunks', () async {
+    final image = await ImagePipeline.fromBytes(
+      _png(
+        width: 4,
+        height: 1,
+        bitDepth: 2,
+        colorType: 0,
+        samples: const <int>[0, 1, 2, 3],
+        transparentSamples: const <int>[2],
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      0,
+      0,
+      0,
+      255,
+      85,
+      85,
+      85,
+      255,
+      170,
+      170,
+      170,
+      0,
+      255,
+      255,
+      255,
+      255,
+    ]);
+  });
+
+  test('applies truecolour PNG transparency chunks', () async {
+    final image = await ImagePipeline.fromBytes(
+      _png(
+        width: 2,
+        height: 1,
+        bitDepth: 16,
+        colorType: 2,
+        samples: const <int>[0xffff, 0, 0, 0x1234, 0x5678, 0x9abc],
+        transparentSamples: const <int>[0x1234, 0x5678, 0x9abc],
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[255, 0, 0, 255, 18, 86, 154, 0]);
+  });
 }
 
-Uint8List _png16({
+Uint8List _png({
   required int width,
   required int height,
+  required int bitDepth,
   required int colorType,
   required List<int> samples,
+  List<int>? transparentSamples,
 }) {
   final channels = switch (colorType) {
     0 => 1,
@@ -77,8 +157,30 @@ Uint8List _png16({
   var sample = 0;
   for (var y = 0; y < height; y += 1) {
     raw.writeByte(0);
-    for (var x = 0; x < width * channels; x += 1) {
-      raw.writeUint16Be(samples[sample++]);
+    if (bitDepth < 8) {
+      var current = 0;
+      var bits = 0;
+      final mask = (1 << bitDepth) - 1;
+      for (var x = 0; x < width * channels; x += 1) {
+        current = (current << bitDepth) | (samples[sample++] & mask);
+        bits += bitDepth;
+        if (bits == 8) {
+          raw.writeByte(current);
+          current = 0;
+          bits = 0;
+        }
+      }
+      if (bits > 0) {
+        raw.writeByte(current << (8 - bits));
+      }
+    } else {
+      for (var x = 0; x < width * channels; x += 1) {
+        if (bitDepth == 16) {
+          raw.writeUint16Be(samples[sample++]);
+        } else {
+          raw.writeByte(samples[sample++]);
+        }
+      }
     }
   }
   final writer = ByteWriter()
@@ -86,12 +188,19 @@ Uint8List _png16({
   final ihdr = ByteWriter()
     ..writeUint32Be(width)
     ..writeUint32Be(height)
-    ..writeByte(16)
+    ..writeByte(bitDepth)
     ..writeByte(colorType)
     ..writeByte(0)
     ..writeByte(0)
     ..writeByte(0);
   _writeChunk(writer, 'IHDR', ihdr.toBytes());
+  if (transparentSamples != null) {
+    final trns = ByteWriter();
+    for (final sample in transparentSamples) {
+      trns.writeUint16Be(sample);
+    }
+    _writeChunk(writer, 'tRNS', trns.toBytes());
+  }
   _writeChunk(writer, 'IDAT', zlibEncodeStored(raw.toBytes()));
   _writeChunk(writer, 'IEND', Uint8List(0));
   return writer.toBytes();
