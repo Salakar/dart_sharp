@@ -16,6 +16,12 @@ void main() {
         ImagePipeline.fromRawPixels(raw).greyscale(false),
       );
       final negated = await pixels(ImagePipeline.fromRawPixels(raw).negate());
+      final negatedAlpha = await pixels(
+        ImagePipeline.fromRawPixels(raw).negate(alpha: true),
+      );
+      final negatedDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw).negate(enabled: false),
+      );
       final threshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20),
       );
@@ -36,6 +42,12 @@ void main() {
         isEmpty,
       );
       expect(firstBytes(negated), <int>[245, 235, 225, 77]);
+      expect(firstBytes(negatedAlpha), <int>[245, 235, 225, 178]);
+      expect(firstBytes(negatedDisabled), <int>[10, 20, 30, 77]);
+      expect(
+        ImagePipeline.fromRawPixels(raw).negate(enabled: false).operations,
+        isEmpty,
+      );
       expect(firstBytes(threshold), <int>[0, 0, 0, 77]);
       expect(firstBytes(colorThreshold), <int>[0, 255, 255, 77]);
       expect(firstBytes(gamma), <int>[128, 128, 128, 77]);
