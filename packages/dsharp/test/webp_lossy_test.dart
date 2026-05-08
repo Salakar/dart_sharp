@@ -230,6 +230,31 @@ void main() {
     ]);
   });
 
+  test('accepts VP8 loop filtering for flat skipped macroblocks', () async {
+    final image = await ImagePipeline.fromBytes(
+      solidVp8Webp(width: 2, height: 2, loopFilterLevel: 16),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
   test('decodes VP8 streams with EOB residual partitions', () async {
     final bytes = eobResidualVp8Webp(width: 2, height: 2, qIndex: 1);
 
@@ -362,6 +387,42 @@ void main() {
       129,
       255,
     ]);
+  });
+
+  test('applies normal VP8 loop filtering across macroblock edges', () async {
+    final bytes = y2DcResidualVp8Webp(
+      width: 17,
+      height: 1,
+      coefficient: 16,
+      loopFilterLevel: 16,
+      yMode: 1,
+    );
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(
+      [for (var col = 0; col < 17; col += 1) rgba[col * 4]],
+      <int>[
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        135,
+        134,
+        133,
+        132,
+        130,
+      ],
+    );
   });
 
   test('tracks VP8 residual token contexts across macroblocks', () async {

@@ -255,7 +255,7 @@ const _catSixExtraProbs = <int>[
   129,
 ];
 
-void _readResidual(
+bool _readResidual(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
   _Vp8TokenContexts contexts,
@@ -270,6 +270,7 @@ void _readResidual(
     segmentId,
     contexts.contextFor(mbX, _y2BlockIndex),
   );
+  var hasAnyCoefficients = lumaDc != null;
   contexts.setHasCoefficients(mbX, _y2BlockIndex, lumaDc != null);
   for (var block = 0; block < 16; block += 1) {
     final hasCoefficients = _readLumaAcBlock(
@@ -284,6 +285,7 @@ void _readResidual(
       contexts.contextFor(mbX, block),
     );
     contexts.setHasCoefficients(mbX, block, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
   for (var block = 0; block < 4; block += 1) {
     final blockIndex = 16 + block;
@@ -299,6 +301,7 @@ void _readResidual(
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
   for (var block = 0; block < 4; block += 1) {
     final blockIndex = 20 + block;
@@ -314,10 +317,12 @@ void _readResidual(
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
+  return hasAnyCoefficients;
 }
 
-void _readBPredResidual(
+bool _readBPredResidual(
   Vp8BoolDecoder coeffs,
   _Vp8Planes planes,
   _Vp8TokenContexts contexts,
@@ -327,6 +332,7 @@ void _readBPredResidual(
   int segmentId,
   List<int> bModes,
 ) {
+  var hasAnyCoefficients = false;
   contexts.setHasCoefficients(mbX, _y2BlockIndex, false);
   for (var block = 0; block < 16; block += 1) {
     planes.predictLumaSubblock(mbX, mbY, block, bModes[block]);
@@ -341,6 +347,7 @@ void _readBPredResidual(
       contexts.contextFor(mbX, block),
     );
     contexts.setHasCoefficients(mbX, block, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
   for (var block = 0; block < 4; block += 1) {
     final blockIndex = 16 + block;
@@ -356,6 +363,7 @@ void _readBPredResidual(
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
   for (var block = 0; block < 4; block += 1) {
     final blockIndex = 20 + block;
@@ -371,7 +379,9 @@ void _readBPredResidual(
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
+    hasAnyCoefficients = hasAnyCoefficients || hasCoefficients;
   }
+  return hasAnyCoefficients;
 }
 
 List<int>? _readY2Block(

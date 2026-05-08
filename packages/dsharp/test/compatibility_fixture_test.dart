@@ -98,19 +98,19 @@ void main() {
     },
   );
 
-  test(
-    'optional upstream WebP fixture pixel decode remains explicit',
-    () async {
-      final fixture = File('../../sharp_clone/test/fixtures/4.webp');
-      if (!fixture.existsSync()) {
-        markTestSkipped('sharp_clone fixtures are not present.');
-        return;
-      }
+  test('optional upstream WebP fixture decodes pixels when present', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/4.webp');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
 
-      await expectLater(
-        ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
-        throwsA(isA<UnsupportedCodecException>()),
-      );
-    },
-  );
+    final image = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).toPixelImage();
+
+    expect(image.width, 1024);
+    expect(image.height, 772);
+    expect(image.firstFrameBytes().length, 1024 * 772 * 4);
+  });
 }

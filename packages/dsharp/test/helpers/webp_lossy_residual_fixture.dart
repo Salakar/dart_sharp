@@ -115,13 +115,17 @@ Uint8List y2DcResidualVp8Webp({
   required int height,
   int qIndex = 12,
   int coefficient = 1,
+  int loopFilterLevel = 0,
+  int yMode = 0,
 }) {
   final vp8 = _residualVp8Payload(
     width: width,
     height: height,
     y2: true,
+    yMode: yMode,
     qIndex: qIndex,
     coefficient: coefficient,
+    loopFilterLevel: loopFilterLevel,
   );
   return _simpleWebp(vp8);
 }
@@ -205,6 +209,7 @@ Uint8List chromaAcResidualVp8Webp({
 Uint8List _residualVp8Payload({
   required int width,
   required int height,
+  int yMode = 0,
   bool y2 = false,
   bool lumaAc = false,
   bool lumaDc = false,
@@ -225,6 +230,7 @@ Uint8List _residualVp8Payload({
   List<int?>? segmentQuantIndexes,
   bool segmentAbsolute = false,
   int tokenPartitionBits = 0,
+  int loopFilterLevel = 0,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -253,7 +259,7 @@ Uint8List _residualVp8Payload({
   );
   first
     ..bit(false)
-    ..literal(0, 6)
+    ..literal(loopFilterLevel, 6)
     ..literal(0, 3)
     ..bit(false)
     ..literal(tokenPartitionBits, 2)
@@ -288,7 +294,7 @@ Uint8List _residualVp8Payload({
     if (currentSegmentIds != null) {
       _writeSegmentId(first, currentSegmentIds[i]);
     }
-    _writeYMode(first, bPred ? 4 : 0);
+    _writeYMode(first, bPred ? 4 : yMode);
     if (bPred) {
       _writeBdcSubblockModes(first);
     }

@@ -9,9 +9,15 @@ Uint8List solidVp8Webp({
   required int width,
   required int height,
   int yMode = 0,
+  int loopFilterLevel = 0,
 }) {
   return _simpleWebp(
-    _solidVp8Payload(width: width, height: height, yMode: yMode),
+    _solidVp8Payload(
+      width: width,
+      height: height,
+      yMode: yMode,
+      loopFilterLevel: loopFilterLevel,
+    ),
   );
 }
 
@@ -299,6 +305,7 @@ Uint8List _solidVp8Payload({
   required int width,
   required int height,
   required int yMode,
+  int loopFilterLevel = 0,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -307,7 +314,7 @@ Uint8List _solidVp8Payload({
     ..bit(false)
     ..bit(false)
     ..bit(false)
-    ..literal(0, 6)
+    ..literal(loopFilterLevel, 6)
     ..literal(0, 3)
     ..bit(false)
     ..literal(0, 2)

@@ -8,6 +8,7 @@ import 'webp_vp8_bool.dart';
 part 'webp_vp8_prediction.dart';
 part 'webp_vp8_quant.dart';
 part 'webp_vp8_residual.dart';
+part 'webp_vp8_loop_filter.dart';
 
 const _kfYModeTree = <int>[-4, 2, 4, 6, 0, -1, -2, -3];
 const _kfYModeProb = <int>[145, 156, 163, 128];
@@ -212,6 +213,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   final planes = _Vp8Planes(header.width, header.height);
   final contexts = _Vp8TokenContexts(planes.mbCols);
   final bModeContexts = _Vp8BModeContexts(planes.mbCols);
+  final macroblocks = <_Vp8MacroblockInfo>[];
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
     contexts.resetLeft();
     bModeContexts.resetLeft();
@@ -225,9 +227,10 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
           : bModeContexts.setMacroblockMode(mbX, _bModeForYMode(yMode));
       final uvMode = bits.readTree(_kfUvModeTree, _kfUvModeProb);
       planes.predictChroma(mbX, mbY, uvMode);
+      var hasCoefficients = false;
       if (yMode == 4) {
         if (!skipCoeff) {
-          _readBPredResidual(
+          hasCoefficients = _readBPredResidual(
             coeffs,
             planes,
             contexts,
@@ -243,13 +246,34 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
         }
       } else if (!skipCoeff) {
         planes.predictLumaMacroblock(mbX, mbY, yMode);
-        _readResidual(coeffs, planes, contexts, mbX, mbY, frame, segmentId);
+        hasCoefficients = _readResidual(
+          coeffs,
+          planes,
+          contexts,
+          mbX,
+          mbY,
+          frame,
+          segmentId,
+        );
       } else {
         planes.predictLumaMacroblock(mbX, mbY, yMode);
         contexts.clearMacroblock(mbX);
       }
+      macroblocks.add(
+        _Vp8MacroblockInfo(
+          segmentId: segmentId,
+          yMode: yMode,
+          hasCoefficients: hasCoefficients,
+        ),
+      );
     }
   }
+  _applyVp8LoopFilter(
+    planes,
+    frame.loopFilter,
+    frame.segmentation,
+    macroblocks,
+  );
   return RawPixels(
     bytes: planes.composeRgba(),
     width: header.width,
@@ -293,24 +317,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     throw const UnsupportedCodecException('Unsupported VP8 color space.');
   }
   final segmentation = _Vp8Segmentation.read(bits);
-  bits.readBit();
-  final loopFilterLevel = bits.readLiteral(6);
-  bits.readLiteral(3);
-  if (bits.readBit() == 1) {
-    throw const UnsupportedCodecException(
-      'VP8 loop-filter adjustments are not implemented yet.',
-    );
-  }
-  if (loopFilterLevel != 0) {
-    throw const UnsupportedCodecException(
-      'VP8 loop filtering is not implemented yet.',
-    );
-  }
-  if (segmentation.hasLoopFilterUpdates) {
-    throw const UnsupportedCodecException(
-      'VP8 segmentation loop-filter updates are not implemented yet.',
-    );
-  }
+  final loopFilter = _Vp8LoopFilter.read(bits);
   final tokenPartitionCount = 1 << bits.readLiteral(2);
   final qIndex = bits.readLiteral(7);
   final yDcDelta = _readOptionalSigned(bits, 4);
@@ -357,6 +364,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     uvDcDelta: uvDcDelta,
     uvAcDelta: uvAcDelta,
     segmentation: segmentation,
+    loopFilter: loopFilter,
     tokenPartitionCount: tokenPartitionCount,
     yAcProbs: yAcProbs,
     yProbs: yProbs,
@@ -454,6 +462,7 @@ final class _Vp8FrameHeader {
     required this.uvDcDelta,
     required this.uvAcDelta,
     required this.segmentation,
+    required this.loopFilter,
     required this.tokenPartitionCount,
     required this.yAcProbs,
     required this.yProbs,
@@ -468,6 +477,7 @@ final class _Vp8FrameHeader {
   final int uvDcDelta;
   final int uvAcDelta;
   final _Vp8Segmentation segmentation;
+  final _Vp8LoopFilter loopFilter;
   final int tokenPartitionCount;
   final _Vp8LumaAcProbs yAcProbs;
   final _Vp8LumaProbs yProbs;
@@ -617,5 +627,13 @@ final class _Vp8Segmentation {
     }
     final value = quantizerValues[segmentId];
     return absolute ? value : baseQuantIndex + value;
+  }
+
+  int loopFilterLevel(int baseLevel, int segmentId) {
+    if (!enabled || !hasLoopFilterUpdates) {
+      return baseLevel;
+    }
+    final value = loopFilterValues[segmentId];
+    return _clampLoopFilterLevel(absolute ? value : baseLevel + value);
   }
 }
