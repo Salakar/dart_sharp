@@ -13,7 +13,8 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   pixels, decoded `PixelImage`, and generated solid images.
 - Codecs: raw plus first-party PNG, JPEG, GIF, TIFF, and WebP support without
   runtime package dependencies. PNG, baseline/progressive/lossless JPEG, GIF,
-  TIFF, WebP VP8L lossless static/animated, and raw output are implemented.
+  TIFF, WebP VP8L lossless/near-lossless static/animated, and raw output are
+  implemented.
   WebP metadata, VP8L, VP8 lossy, alpha, and animation decoding are implemented
   for supported bitstreams.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,

@@ -81,6 +81,23 @@ void main() {
     expect(decoded.frames[1].delay, const Duration(milliseconds: 70));
   });
 
+  test('WebP nearLossless preprocesses pixels before VP8L encoding', () async {
+    final raw = _rgba(<int>[1, 10, 23, 77, 250, 251, 252, 128]);
+
+    final decoded = await ImagePipeline.fromRawPixels(raw)
+        .webp(
+          const WebpEncoderOptions(
+            lossless: false,
+            nearLossless: true,
+            quality: 60,
+          ),
+        )
+        .toBytes()
+        .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+
+    expect(decoded.firstFrameBytes(), <int>[0, 11, 22, 77, 253, 253, 253, 128]);
+  });
+
   test(
     'WebP parity options validate and unsupported modes fail clearly',
     () async {
@@ -115,7 +132,7 @@ void main() {
         throwsA(isA<OperationValidationException>()),
       );
       expect(
-        pipeline.webp(const WebpEncoderOptions(nearLossless: true)).toBytes(),
+        pipeline.webp(const WebpEncoderOptions(lossless: false)).toBytes(),
         throwsA(isA<UnsupportedCodecException>()),
       );
     },

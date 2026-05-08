@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
+import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec.dart';
+import 'codec_pixels.dart';
 import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
@@ -51,17 +53,15 @@ final class WebpImageCodec implements ImageCodec {
     final webpOptions = options is WebpEncoderOptions
         ? options
         : const WebpEncoderOptions();
-    if (webpOptions.nearLossless) {
-      throw const UnsupportedCodecException(
-        'Near-lossless WebP encoding is not implemented in pure Dart yet.',
-      );
-    }
-    if (!webpOptions.lossless) {
+    if (!webpOptions.lossless && !webpOptions.nearLossless) {
       throw const UnsupportedCodecException(
         'Lossy WebP encoding is not implemented in pure Dart yet.',
       );
     }
-    final outputImage = _applyAnimationOptions(image, webpOptions);
+    var outputImage = _applyAnimationOptions(image, webpOptions);
+    if (webpOptions.nearLossless) {
+      outputImage = _applyNearLossless(outputImage, webpOptions.quality);
+    }
     final raw = outputImage.firstFrame.pixels;
     final bytes = encodeWebpLossless(outputImage);
     return EncodedImage(
@@ -111,6 +111,51 @@ PixelImage _applyAnimationOptions(
     ],
     loopCount: options.loopCount ?? image.loopCount,
   );
+}
+
+PixelImage _applyNearLossless(PixelImage image, int quality) {
+  if (quality == 100) {
+    return image;
+  }
+  return PixelImage(
+    frames: <ImageFrame>[
+      for (final frame in image.frames)
+        ImageFrame(
+          pixels: _nearLosslessPixels(frame.pixels, quality),
+          delay: frame.delay,
+        ),
+    ],
+    loopCount: image.loopCount,
+  );
+}
+
+RawPixels _nearLosslessPixels(RawPixels raw, int quality) {
+  final step = _nearLosslessStep(quality);
+  final rgba = rawToRgba(raw);
+  for (var offset = 0; offset < rgba.length; offset += 4) {
+    rgba[offset] = _quantizeNearLossless(rgba[offset], step);
+    rgba[offset + 1] = _quantizeNearLossless(rgba[offset + 1], step);
+    rgba[offset + 2] = _quantizeNearLossless(rgba[offset + 2], step);
+  }
+  return RawPixels(
+    bytes: rgba,
+    width: raw.width,
+    height: raw.height,
+    channels: ChannelCount.four,
+  );
+}
+
+int _nearLosslessStep(int quality) {
+  final halfStep = ((100 - quality) + 7) ~/ 8;
+  return halfStep * 2 + 1;
+}
+
+int _quantizeNearLossless(int value, int step) {
+  final quantized = ((value + (step >> 1)) ~/ step) * step;
+  if (quantized < 0) {
+    return 0;
+  }
+  return quantized > 255 ? 255 : quantized;
 }
 
 bool _containsWebpChunk(Uint8List bytes, String target) {
