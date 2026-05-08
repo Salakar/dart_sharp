@@ -5,23 +5,62 @@ final class _Vp8LoopFilter {
     required this.simple,
     required this.level,
     required this.sharpness,
+    required this.adjustmentEnabled,
+    required this.referenceDeltas,
+    required this.modeDeltas,
   });
 
   factory _Vp8LoopFilter.read(Vp8BoolDecoder bits) {
     final simple = bits.readBit() == 1;
     final level = bits.readLiteral(6);
     final sharpness = bits.readLiteral(3);
-    if (bits.readBit() == 1) {
-      throw const UnsupportedCodecException(
-        'VP8 loop-filter adjustments are not implemented yet.',
-      );
+    final adjustmentEnabled = bits.readBit() == 1;
+    final referenceDeltas = List<int>.filled(4, 0);
+    final modeDeltas = List<int>.filled(4, 0);
+    if (adjustmentEnabled && bits.readBit() == 1) {
+      for (var i = 0; i < referenceDeltas.length; i += 1) {
+        referenceDeltas[i] = _readLoopFilterDelta(bits);
+      }
+      for (var i = 0; i < modeDeltas.length; i += 1) {
+        modeDeltas[i] = _readLoopFilterDelta(bits);
+      }
     }
-    return _Vp8LoopFilter(simple: simple, level: level, sharpness: sharpness);
+    return _Vp8LoopFilter(
+      simple: simple,
+      level: level,
+      sharpness: sharpness,
+      adjustmentEnabled: adjustmentEnabled,
+      referenceDeltas: referenceDeltas,
+      modeDeltas: modeDeltas,
+    );
   }
 
   final bool simple;
   final int level;
   final int sharpness;
+  final bool adjustmentEnabled;
+  final List<int> referenceDeltas;
+  final List<int> modeDeltas;
+
+  int keyFrameLevel(int baseLevel, int yMode) {
+    if (!adjustmentEnabled) {
+      return baseLevel;
+    }
+    var adjusted = baseLevel + referenceDeltas[0];
+    // Key frames are intra-only; VP8 applies a mode delta only to B_PRED.
+    if (yMode == 4) {
+      adjusted += modeDeltas[0];
+    }
+    return _clampLoopFilterLevel(adjusted);
+  }
+}
+
+int _readLoopFilterDelta(Vp8BoolDecoder bits) {
+  if (bits.readBit() == 0) {
+    return 0;
+  }
+  final magnitude = bits.readLiteral(6);
+  return bits.readBit() == 1 ? -magnitude : magnitude;
 }
 
 final class _Vp8MacroblockInfo {
@@ -79,13 +118,16 @@ void _applyVp8LoopFilter(
   _Vp8Segmentation segmentation,
   List<_Vp8MacroblockInfo> macroblocks,
 ) {
-  if (filter.level == 0 && !segmentation.hasLoopFilterUpdates) {
+  if (filter.level == 0) {
     return;
   }
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
     for (var mbX = 0; mbX < planes.mbCols; mbX += 1) {
       final info = macroblocks[mbY * planes.mbCols + mbX];
-      final level = segmentation.loopFilterLevel(filter.level, info.segmentId);
+      final level = filter.keyFrameLevel(
+        segmentation.loopFilterLevel(filter.level, info.segmentId),
+        info.yMode,
+      );
       if (level == 0) {
         continue;
       }

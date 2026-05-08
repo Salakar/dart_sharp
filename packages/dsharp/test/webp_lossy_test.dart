@@ -255,6 +255,36 @@ void main() {
     ]);
   });
 
+  test('accepts VP8 loop-filter adjustments without delta updates', () async {
+    final image = await ImagePipeline.fromBytes(
+      solidVp8Webp(
+        width: 2,
+        height: 2,
+        loopFilterLevel: 16,
+        loopFilterAdjustmentEnabled: true,
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
   test('decodes VP8 streams with EOB residual partitions', () async {
     final bytes = eobResidualVp8Webp(width: 2, height: 2, qIndex: 1);
 
@@ -423,6 +453,71 @@ void main() {
         130,
       ],
     );
+  });
+
+  test('applies VP8 loop-filter reference deltas', () async {
+    final unfiltered = await ImagePipeline.fromBytes(
+      y2DcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 0,
+        yMode: 1,
+      ),
+    ).toPixelImage();
+    final filtered = await ImagePipeline.fromBytes(
+      y2DcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 16,
+        yMode: 1,
+      ),
+    ).toPixelImage();
+    final adjusted = await ImagePipeline.fromBytes(
+      y2DcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 16,
+        loopFilterRefDeltas: <int?>[-16, null, null, null],
+        yMode: 1,
+      ),
+    ).toPixelImage();
+
+    expect(unfiltered.firstFrameBytes(), isNot(filtered.firstFrameBytes()));
+    expect(adjusted.firstFrameBytes(), unfiltered.firstFrameBytes());
+  });
+
+  test('applies VP8 B_PRED loop-filter mode deltas', () async {
+    final unfiltered = await ImagePipeline.fromBytes(
+      bPredLumaDcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 0,
+      ),
+    ).toPixelImage();
+    final filtered = await ImagePipeline.fromBytes(
+      bPredLumaDcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 16,
+      ),
+    ).toPixelImage();
+    final adjusted = await ImagePipeline.fromBytes(
+      bPredLumaDcResidualVp8Webp(
+        width: 17,
+        height: 1,
+        coefficient: 16,
+        loopFilterLevel: 16,
+        loopFilterModeDeltas: <int?>[-16, null, null, null],
+      ),
+    ).toPixelImage();
+
+    expect(unfiltered.firstFrameBytes(), isNot(filtered.firstFrameBytes()));
+    expect(adjusted.firstFrameBytes(), unfiltered.firstFrameBytes());
   });
 
   test('tracks VP8 residual token contexts across macroblocks', () async {

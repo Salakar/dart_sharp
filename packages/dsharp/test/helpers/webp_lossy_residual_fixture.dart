@@ -117,6 +117,8 @@ Uint8List y2DcResidualVp8Webp({
   int coefficient = 1,
   int loopFilterLevel = 0,
   int yMode = 0,
+  List<int?>? loopFilterRefDeltas,
+  List<int?>? loopFilterModeDeltas,
 }) {
   final vp8 = _residualVp8Payload(
     width: width,
@@ -126,6 +128,8 @@ Uint8List y2DcResidualVp8Webp({
     qIndex: qIndex,
     coefficient: coefficient,
     loopFilterLevel: loopFilterLevel,
+    loopFilterRefDeltas: loopFilterRefDeltas,
+    loopFilterModeDeltas: loopFilterModeDeltas,
   );
   return _simpleWebp(vp8);
 }
@@ -231,6 +235,8 @@ Uint8List _residualVp8Payload({
   bool segmentAbsolute = false,
   int tokenPartitionBits = 0,
   int loopFilterLevel = 0,
+  List<int?>? loopFilterRefDeltas,
+  List<int?>? loopFilterModeDeltas,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -257,11 +263,13 @@ Uint8List _residualVp8Payload({
     segmentQuantIndexes: segmentQuantIndexes,
     segmentAbsolute: segmentAbsolute,
   );
+  _writeLoopFilterHeader(
+    first,
+    level: loopFilterLevel,
+    referenceDeltas: loopFilterRefDeltas,
+    modeDeltas: loopFilterModeDeltas,
+  );
   first
-    ..bit(false)
-    ..literal(loopFilterLevel, 6)
-    ..literal(0, 3)
-    ..bit(false)
     ..literal(tokenPartitionBits, 2)
     ..literal(qIndex, 7);
   for (var i = 0; i < 5; i += 1) {

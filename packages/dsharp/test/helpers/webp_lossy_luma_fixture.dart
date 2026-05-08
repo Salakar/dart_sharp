@@ -28,6 +28,8 @@ Uint8List bPredLumaDcResidualVp8Webp({
   required int height,
   int coefficient = 1,
   int coefficientIndex = 0,
+  int loopFilterLevel = 0,
+  List<int?>? loopFilterModeDeltas,
 }) => _simpleWebp(
   _residualVp8Payload(
     width: width,
@@ -36,6 +38,8 @@ Uint8List bPredLumaDcResidualVp8Webp({
     lumaDc: true,
     coefficient: coefficient,
     lumaCoefficientIndex: coefficientIndex,
+    loopFilterLevel: loopFilterLevel,
+    loopFilterModeDeltas: loopFilterModeDeltas,
   ),
 );
 

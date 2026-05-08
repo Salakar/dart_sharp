@@ -10,6 +10,9 @@ Uint8List solidVp8Webp({
   required int height,
   int yMode = 0,
   int loopFilterLevel = 0,
+  bool loopFilterAdjustmentEnabled = false,
+  List<int?>? loopFilterRefDeltas,
+  List<int?>? loopFilterModeDeltas,
 }) {
   return _simpleWebp(
     _solidVp8Payload(
@@ -17,6 +20,9 @@ Uint8List solidVp8Webp({
       height: height,
       yMode: yMode,
       loopFilterLevel: loopFilterLevel,
+      loopFilterAdjustmentEnabled: loopFilterAdjustmentEnabled,
+      loopFilterRefDeltas: loopFilterRefDeltas,
+      loopFilterModeDeltas: loopFilterModeDeltas,
     ),
   );
 }
@@ -306,17 +312,24 @@ Uint8List _solidVp8Payload({
   required int height,
   required int yMode,
   int loopFilterLevel = 0,
+  bool loopFilterAdjustmentEnabled = false,
+  List<int?>? loopFilterRefDeltas,
+  List<int?>? loopFilterModeDeltas,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
   final first = _BoolWriter()
     ..bit(false)
     ..bit(false)
-    ..bit(false)
-    ..bit(false)
-    ..literal(loopFilterLevel, 6)
-    ..literal(0, 3)
-    ..bit(false)
+    ..bit(false);
+  _writeLoopFilterHeader(
+    first,
+    level: loopFilterLevel,
+    adjustmentEnabled: loopFilterAdjustmentEnabled,
+    referenceDeltas: loopFilterRefDeltas,
+    modeDeltas: loopFilterModeDeltas,
+  );
+  first
     ..literal(0, 2)
     ..literal(0, 7);
   for (var i = 0; i < 5; i += 1) {
@@ -349,6 +362,57 @@ Uint8List _solidVp8Payload({
     ..byte(0)
     ..byte(0);
   return vp8.finish();
+}
+
+void _writeLoopFilterHeader(
+  _BoolWriter out, {
+  required int level,
+  bool adjustmentEnabled = false,
+  List<int?>? referenceDeltas,
+  List<int?>? modeDeltas,
+}) {
+  final refs = referenceDeltas;
+  final modes = modeDeltas;
+  if (level < 0 || level > 63) {
+    throw ArgumentError.value(level, 'level');
+  }
+  if (refs != null && refs.length != 4) {
+    throw ArgumentError.value(refs.length, 'referenceDeltas');
+  }
+  if (modes != null && modes.length != 4) {
+    throw ArgumentError.value(modes.length, 'modeDeltas');
+  }
+  final hasUpdates = refs != null || modes != null;
+  out
+    ..bit(false)
+    ..literal(level, 6)
+    ..literal(0, 3)
+    ..bit(adjustmentEnabled || hasUpdates);
+  if (adjustmentEnabled || hasUpdates) {
+    out.bit(hasUpdates);
+    if (hasUpdates) {
+      for (var i = 0; i < 4; i += 1) {
+        _writeLoopFilterDelta(out, refs == null ? null : refs[i]);
+      }
+      for (var i = 0; i < 4; i += 1) {
+        _writeLoopFilterDelta(out, modes == null ? null : modes[i]);
+      }
+    }
+  }
+}
+
+void _writeLoopFilterDelta(_BoolWriter out, int? value) {
+  out.bit(value != null);
+  if (value == null) {
+    return;
+  }
+  final magnitude = value.abs();
+  if (magnitude > 63) {
+    throw ArgumentError.value(value, 'value');
+  }
+  out
+    ..literal(magnitude, 6)
+    ..bit(value < 0);
 }
 
 Uint8List _simpleWebp(Uint8List vp8) {
