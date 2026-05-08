@@ -119,6 +119,12 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaThirdVerticalAcBlocks = _lossyLumaThirdVerticalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
@@ -129,6 +135,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
     lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
     lumaThirdHorizontalAcBlocks: lumaThirdHorizontalAcBlocks,
+    lumaThirdVerticalAcBlocks: lumaThirdVerticalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -209,6 +216,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaDiagonalAcBlocks,
   required List<int> lumaSecondHorizontalAcBlocks,
   required List<int> lumaThirdHorizontalAcBlocks,
+  required List<int> lumaThirdVerticalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -260,6 +268,7 @@ Uint8List _encodeVp8SolidPayload({
           lumaDiagonalAcBlocks[blockOffset],
           lumaSecondHorizontalAcBlocks[blockOffset],
           lumaThirdHorizontalAcBlocks[blockOffset],
+          lumaThirdVerticalAcBlocks[blockOffset],
         );
       }
       final predictedU = _predictedChromaDc(
@@ -325,6 +334,7 @@ void _writeLumaDct(
   int diagonalAcCoefficient,
   int secondHorizontalAcCoefficient,
   int thirdHorizontalAcCoefficient,
+  int thirdVerticalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
@@ -338,6 +348,9 @@ void _writeLumaDct(
       diagonalAcCoefficient,
       secondHorizontalAcCoefficient,
       thirdHorizontalAcCoefficient,
+      0,
+      0,
+      thirdVerticalAcCoefficient,
     ],
     context,
     (coefficientIndex, context, node) {
@@ -353,7 +366,8 @@ void _writeLumaDct(
         secondVerticalAcCoefficient != 0 ||
         diagonalAcCoefficient != 0 ||
         secondHorizontalAcCoefficient != 0 ||
-        thirdHorizontalAcCoefficient != 0,
+        thirdHorizontalAcCoefficient != 0 ||
+        thirdVerticalAcCoefficient != 0,
   );
 }
 

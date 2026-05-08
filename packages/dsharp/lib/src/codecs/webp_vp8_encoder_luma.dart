@@ -174,6 +174,35 @@ List<int> _lossyLumaThirdHorizontalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaThirdVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaThirdVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaHorizontalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -389,6 +418,73 @@ int _lossyLumaThirdHorizontalAcBlock(
       col1Pixels == 0 ||
       col2Pixels == 0 ||
       col3Pixels == 0) {
+    return 0;
+  }
+  final evenAverage = (even + evenPixels ~/ 2) ~/ evenPixels;
+  final oddAverage = (odd + oddPixels ~/ 2) ~/ oddPixels;
+  return _clampDctCoefficient(evenAverage - oddAverage);
+}
+
+int _lossyLumaThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final xStart = mbX * 16 + blockX * 4;
+  final yStart = mbY * 16 + blockY * 4;
+  if (xStart >= width || yStart >= height) {
+    return 0;
+  }
+  var even = 0;
+  var odd = 0;
+  var evenPixels = 0;
+  var oddPixels = 0;
+  var row0Pixels = 0;
+  var row1Pixels = 0;
+  var row2Pixels = 0;
+  var row3Pixels = 0;
+  final xEnd = xStart + 4 < width ? xStart + 4 : width;
+  final yEnd = yStart + 4 < height ? yStart + 4 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      final luma = _rgbToVp8Yuv(
+        _quantizeLossyColor(
+          _Rgb(rgba[offset], rgba[offset + 1], rgba[offset + 2]),
+          quality,
+        ),
+      ).y;
+      final localY = y - yStart;
+      if (localY == 0) {
+        even += luma;
+        evenPixels += 1;
+        row0Pixels += 1;
+      } else if (localY == 1) {
+        odd += luma;
+        oddPixels += 1;
+        row1Pixels += 1;
+      } else if (localY == 2) {
+        even += luma;
+        evenPixels += 1;
+        row2Pixels += 1;
+      } else if (localY == 3) {
+        odd += luma;
+        oddPixels += 1;
+        row3Pixels += 1;
+      }
+      offset += 4;
+    }
+  }
+  if (row0Pixels == 0 ||
+      row1Pixels == 0 ||
+      row2Pixels == 0 ||
+      row3Pixels == 0) {
     return 0;
   }
   final evenAverage = (even + evenPixels ~/ 2) ~/ evenPixels;
