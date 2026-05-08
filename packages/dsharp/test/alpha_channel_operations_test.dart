@@ -47,10 +47,34 @@ void main() {
         rawRgba(1, 1, <int>[100, 0, 0, 128]),
       ).flatten(const RgbaColor(red: 0, green: 0, blue: 100)),
     );
+    final flattenedDefault = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgba(1, 1, <int>[100, 0, 0, 128]),
+      ).flatten(true),
+    );
+    final flattenDisabled = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgba(1, 1, <int>[100, 0, 0, 128]),
+      ).flatten(false),
+    );
 
     expect(removed.channels, ChannelCount.three);
     expect(firstBytes(removed), <int>[1, 2, 3]);
     expect(firstBytes(flattened), <int>[50, 0, 50]);
+    expect(firstBytes(flattenedDefault), <int>[50, 0, 0]);
+    expect(firstBytes(flattenDisabled), <int>[100, 0, 0, 128]);
+    expect(
+      ImagePipeline.fromRawPixels(
+        rawRgba(1, 1, <int>[100, 0, 0, 128]),
+      ).flatten(false).operations,
+      isEmpty,
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawRgba(1, 1, <int>[100, 0, 0, 128]),
+      ).flatten('black'),
+      throwsA(isA<OperationValidationException>()),
+    );
   });
 
   test(

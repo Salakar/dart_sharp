@@ -17,9 +17,17 @@ extension ImagePipelineAlpha on ImagePipeline {
     return _append(const RemoveAlphaOperation());
   }
 
-  /// Flattens alpha against [background].
-  ImagePipeline flatten([RgbaColor background = RgbaColor.black]) {
-    return _append(FlattenOperation(background));
+  /// Flattens alpha when enabled, optionally against a background color.
+  ImagePipeline flatten([Object flatten = RgbaColor.black]) {
+    if (flatten is bool) {
+      return flatten ? _append(const FlattenOperation()) : this;
+    }
+    if (flatten is RgbaColor) {
+      return _append(FlattenOperation(flatten));
+    }
+    throw const OperationValidationException(
+      'Flatten expects a boolean or background color.',
+    );
   }
 
   /// Extracts [channel] as grayscale.
