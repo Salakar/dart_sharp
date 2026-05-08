@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import 'binary_io.dart';
 import 'codec.dart';
@@ -10,6 +9,7 @@ import 'webp_alpha.dart';
 import 'webp_animation.dart';
 import 'webp_info.dart';
 import 'webp_lossless.dart';
+import 'webp_lossless_encoder.dart';
 import 'webp_vp8.dart';
 
 /// First-party WebP container decoder.
@@ -45,8 +45,17 @@ final class WebpImageCodec implements ImageCodec {
 
   @override
   EncodedImage encode(PixelImage image) {
-    throw const UnsupportedCodecException(
-      'WebP encode is unsupported until a first-party encoder exists.',
+    final raw = image.firstFrame.pixels;
+    final bytes = encodeWebpLossless(image);
+    return EncodedImage(
+      bytes: bytes,
+      info: OutputInfo(
+        format: format,
+        size: bytes.length,
+        width: raw.width,
+        height: raw.height,
+        channels: 4,
+      ),
     );
   }
 }

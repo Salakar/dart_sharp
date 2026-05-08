@@ -120,6 +120,25 @@ void main() {
     expect(decoded.height, 1);
   });
 
+  test('webp codec encodes decodable VP8L bytes', () async {
+    final encoded = await ImagePipeline.create(
+      const CreateImage(
+        width: 2,
+        height: 1,
+        channels: 4,
+        background: RgbaColor(red: 10, green: 20, blue: 30, alpha: 40),
+      ),
+    ).toBytesWithInfo(format: ImageFormat.webp);
+
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+
+    expect(encoded.info.format, ImageFormat.webp);
+    expect(sniffImageFormat(encoded.bytes), ImageFormat.webp);
+    expect(decoded.width, 2);
+    expect(decoded.height, 1);
+    expect(decoded.firstFrameBytes(), <int>[10, 20, 30, 40, 10, 20, 30, 40]);
+  });
+
   test('unsupported codecs fail with typed exceptions', () async {
     final registry = CodecRegistry.defaultRegistry();
     for (final format in <ImageFormat>[

@@ -9,6 +9,8 @@ void main() {
 
     expect(capabilities.supportFor(ImageFormat.raw).canDecode, isTrue);
     expect(capabilities.supportFor(ImageFormat.raw).canEncode, isTrue);
+    expect(capabilities.supportFor(ImageFormat.webp).canDecode, isTrue);
+    expect(capabilities.supportFor(ImageFormat.webp).canEncode, isTrue);
     expect(capabilities.supportFor(ImageFormat.avif).canDecode, isFalse);
     expect(
       capabilities.supportFor(ImageFormat.webp).metadata,
