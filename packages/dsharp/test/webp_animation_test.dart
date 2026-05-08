@@ -205,6 +205,19 @@ void main() {
     );
   });
 
+  test('rejects animation frames with mismatched payload dimensions', () async {
+    final bytes = animatedVp8lWebpWithMismatchedFramePayload();
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects animated WebP missing ANIM header', () async {
     final bytes = animatedVp8lWebpWithoutAnimHeader();
 

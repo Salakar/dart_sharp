@@ -336,25 +336,30 @@ WebpFrameInfo _frameInfo(Uint8List data) {
   if (payload.hasVp8l && payload.hasAlpha) {
     throw const InvalidImageException('WebP VP8L animation frame has ALPH.');
   }
+  final width = _uint24Le(data, 6) + 1;
+  final height = _uint24Le(data, 9) + 1;
+  if (payload.width != width || payload.height != height) {
+    throw const InvalidImageException('Invalid WebP animation frame size.');
+  }
   return WebpFrameInfo(
     x: _uint24Le(data, 0) * 2,
     y: _uint24Le(data, 3) * 2,
-    width: _uint24Le(data, 6) + 1,
-    height: _uint24Le(data, 9) + 1,
+    width: width,
+    height: height,
     duration: Duration(milliseconds: _uint24Le(data, 12)),
     hasAlpha: payload.hasAlpha,
     blend: (flags & 0x02) == 0,
   );
 }
 
-({bool hasAlpha, bool hasVp8l, bool hasVp8}) _framePayloadInfo(
-  Uint8List bytes, {
-  required int start,
-}) {
+({bool hasAlpha, bool hasVp8l, bool hasVp8, int? width, int? height})
+_framePayloadInfo(Uint8List bytes, {required int start}) {
   var offset = start;
   var hasAlpha = false;
   var hasVp8l = false;
   var hasVp8 = false;
+  int? width;
+  int? height;
   var imageChunkCount = 0;
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
@@ -378,6 +383,9 @@ WebpFrameInfo _frameInfo(Uint8List data) {
           'WebP animation frame has multiple image chunks.',
         );
       }
+      final info = _vp8lInfo(bytes.sublist(dataStart, dataEnd));
+      width = info.width;
+      height = info.height;
       hasVp8l = true;
     } else if (type == 'VP8 ') {
       imageChunkCount += 1;
@@ -386,6 +394,9 @@ WebpFrameInfo _frameInfo(Uint8List data) {
           'WebP animation frame has multiple image chunks.',
         );
       }
+      final info = _vp8Info(bytes.sublist(dataStart, dataEnd));
+      width = info.width;
+      height = info.height;
       hasVp8 = true;
     }
     offset = dataEnd + (length.isOdd ? 1 : 0);
@@ -393,7 +404,13 @@ WebpFrameInfo _frameInfo(Uint8List data) {
   if (offset != bytes.length) {
     throw const InvalidImageException('Truncated WebP animation frame.');
   }
-  return (hasAlpha: hasAlpha, hasVp8l: hasVp8l, hasVp8: hasVp8);
+  return (
+    hasAlpha: hasAlpha,
+    hasVp8l: hasVp8l,
+    hasVp8: hasVp8,
+    width: width,
+    height: height,
+  );
 }
 
 int _uint24Le(Uint8List bytes, int offset) {
