@@ -113,6 +113,13 @@ void main() {
       throwsA(isA<InvalidImageException>()),
     );
   });
+
+  test('rejects WebP frame metadata outside canvas', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_outOfBoundsWebpFrameBytes()).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
 }
 
 Uint8List _pngMetadataBytes() {
@@ -275,6 +282,37 @@ Uint8List _truncatedWebpAnmfBytes() {
     ..writeAscii('VP8L')
     ..writeUint32Le(5)
     ..writeByte(0x2f);
+  _riffChunk(content, 'ANMF', frame.toBytes());
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _outOfBoundsWebpFrameBytes() {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x02)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, 0);
+  _writeUint24Le(content, 0);
+  _riffChunk(content, 'ANIM', <int>[0, 0, 0, 0, 1, 0]);
+  final frame = ByteWriter();
+  _writeUint24Le(frame, 1);
+  _writeUint24Le(frame, 0);
+  _writeUint24Le(frame, 0);
+  _writeUint24Le(frame, 0);
+  _writeUint24Le(frame, 1);
+  frame.writeByte(0);
+  final vp8l = ByteWriter()
+    ..writeByte(0x2f)
+    ..writeUint32Le(0);
+  _riffChunk(frame, 'VP8L', vp8l.toBytes());
   _riffChunk(content, 'ANMF', frame.toBytes());
   final writer = ByteWriter()
     ..writeAscii('RIFF')

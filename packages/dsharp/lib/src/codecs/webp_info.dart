@@ -153,6 +153,12 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   if (parsed == null) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
   }
+  for (final frame in frames) {
+    if (frame.x + frame.width > parsed.width ||
+        frame.y + frame.height > parsed.height) {
+      throw const InvalidImageException('WebP animation frame exceeds canvas.');
+    }
+  }
   return WebpImageInfo(
     width: parsed.width,
     height: parsed.height,
