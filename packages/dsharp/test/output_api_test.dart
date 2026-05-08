@@ -253,15 +253,64 @@ void main() {
     expect(_pngIccProfile(keptPng), profile);
   });
 
+  test(
+    'withMetadata keeps supported metadata across encoded outputs',
+    () async {
+      final xmp = XmpMetadata.parse('<xmp><title>All</title></xmp>');
+      final profile = Uint8List.fromList(<int>[2, 4, 6, 8]);
+      final jpegSource = _withJpegIcc(
+        _withJpegExif(
+          await ImagePipeline.fromRawPixels(
+            raw(),
+          ).withXmpMetadata(xmp).jpeg().toBytes(),
+        ),
+        profile,
+      );
+      final pngSource = _withPngIcc(
+        _withPngExif(
+          await ImagePipeline.fromRawPixels(
+            raw(),
+          ).withXmpMetadata(xmp).png().toBytes(),
+        ),
+        profile,
+      );
+      final webpSource = _withWebpMetadata(
+        await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+        profile: profile,
+        exif: _exifTiffOrientation(6),
+        xmp: xmp.xmlText,
+        width: 1,
+        height: 1,
+      );
+
+      final keptWebp = await ImagePipeline.fromBytes(
+        jpegSource,
+      ).withMetadata().webp().toBytes();
+      final keptJpeg = await ImagePipeline.fromBytes(
+        pngSource,
+      ).withMetadata().jpeg().toBytes();
+      final keptPng = await ImagePipeline.fromBytes(
+        webpSource,
+      ).withMetadata().png().toBytes();
+
+      for (final bytes in <Uint8List>[keptWebp, keptJpeg, keptPng]) {
+        final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+        expect(metadata.hasProfile, isTrue);
+        expect(metadata.hasExif, isTrue);
+        expect(metadata.hasXmp, isTrue);
+        expect(metadata.orientation, 6);
+      }
+      expect(_webpChunk(keptWebp, 'ICCP'), profile);
+      expect(_jpegIccProfile(keptJpeg), profile);
+      expect(_pngIccProfile(keptPng), profile);
+    },
+  );
+
   test('unsupported output format and metadata writes fail clearly', () async {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
       ).webp(const WebpEncoderOptions(lossless: false)).toBytes(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
-    expect(
-      ImagePipeline.fromRawPixels(raw()).withMetadata().png().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
     expect(
@@ -290,6 +339,18 @@ void main() {
     );
     await expectLater(
       ImagePipeline.fromBytes(jpegWithIcc).keepIccProfile().gif().toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    final jpegWithMetadata = _withJpegIcc(
+      _withJpegExif(
+        await ImagePipeline.fromRawPixels(
+          raw(),
+        ).withXmpMetadata(XmpMetadata.parse('<xmp />')).jpeg().toBytes(),
+      ),
+      Uint8List.fromList(<int>[1, 2, 3]),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(jpegWithMetadata).withMetadata().gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
   });
@@ -421,6 +482,35 @@ Uint8List _withWebpIcc(
   _writeUint24Le(content, width - 1);
   _writeUint24Le(content, height - 1);
   _riffChunk(content, 'ICCP', profile);
+  _riffChunk(content, 'VP8L', _webpChunk(webp, 'VP8L'));
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _withWebpMetadata(
+  Uint8List webp, {
+  required Uint8List profile,
+  required Uint8List exif,
+  required String xmp,
+  required int width,
+  required int height,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x2c)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _riffChunk(content, 'ICCP', profile);
+  _riffChunk(content, 'EXIF', exif);
+  _riffChunk(content, 'XMP ', xmp.codeUnits);
   _riffChunk(content, 'VP8L', _webpChunk(webp, 'VP8L'));
   final writer = ByteWriter()
     ..writeAscii('RIFF')
