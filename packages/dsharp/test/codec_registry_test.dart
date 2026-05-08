@@ -485,6 +485,25 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
+  test('tiff encoder lzw compression round trips pixels', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var i = 0; i < 6; i += 1) ...[i * 20, 180 - i * 10, 40, 255],
+      ]),
+      width: 3,
+      height: 2,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(const TiffEncoderOptions(compression: TiffCompression.lzw))
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 259), 5);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('webp codec encodes decodable VP8L bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(

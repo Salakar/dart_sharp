@@ -38,6 +38,7 @@ final class TiffImageCodec implements ImageCodec {
     final stripOffset = tags.value(273);
     final samples = tags.value(277, fallback: 1);
     final byteCount = tags.value(279);
+    final predictor = tags.value(317, fallback: 1);
     if (photometric == 3) {
       throw const UnsupportedCodecException(
         'Paletted TIFF decoding is not implemented yet.',
@@ -46,11 +47,19 @@ final class TiffImageCodec implements ImageCodec {
     final strip = bytes.sublist(stripOffset, stripOffset + byteCount);
     final source = switch (compression) {
       1 => strip,
+      5 => _tiffLzwDecode(strip),
       8 || 32946 => zlibDecode(Uint8List.fromList(strip)),
       _ => throw const UnsupportedCodecException(
-        'Only uncompressed and deflate TIFF are supported.',
+        'Only uncompressed, LZW, and deflate TIFF are supported.',
       ),
     };
+    if (predictor == 2) {
+      _undoHorizontalPredictor(source, width, height, samples);
+    } else if (predictor != 1) {
+      throw const UnsupportedCodecException(
+        'Only TIFF predictors 1 and 2 are supported.',
+      );
+    }
     final rgba = _toRgba(source, width, height, samples, photometric);
     return PixelImage.fromRawPixels(
       RawPixels(
@@ -67,10 +76,9 @@ final class TiffImageCodec implements ImageCodec {
     final tiffOptions = options is TiffEncoderOptions
         ? options
         : const TiffEncoderOptions();
-    if (tiffOptions.compression != TiffCompression.none &&
-        tiffOptions.compression != TiffCompression.deflate) {
+    if (tiffOptions.compression == TiffCompression.jpeg) {
       throw const UnsupportedCodecException(
-        'TIFF encoding currently supports uncompressed and deflate output only.',
+        'TIFF JPEG compression is not implemented yet.',
       );
     }
     if (tiffOptions.bitDepth != 8) {
@@ -96,12 +104,18 @@ final class TiffImageCodec implements ImageCodec {
     final raw = image.firstFrame.pixels;
     final channels = raw.channels == ChannelCount.three ? 3 : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);
-    final encodedPixels = tiffOptions.compression == TiffCompression.deflate
-        ? zlibEncodeFixed(pixels)
-        : pixels;
-    final compressionTag = tiffOptions.compression == TiffCompression.deflate
-        ? 8
-        : 1;
+    final encodedPixels = switch (tiffOptions.compression) {
+      TiffCompression.none => pixels,
+      TiffCompression.lzw => _tiffLzwEncode(pixels),
+      TiffCompression.deflate => zlibEncodeFixed(pixels),
+      TiffCompression.jpeg => throw StateError('unreachable'),
+    };
+    final compressionTag = switch (tiffOptions.compression) {
+      TiffCompression.none => 1,
+      TiffCompression.lzw => 5,
+      TiffCompression.deflate => 8,
+      TiffCompression.jpeg => throw StateError('unreachable'),
+    };
     const entryCount = 10;
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
@@ -239,6 +253,100 @@ List<int> _toRgba(
   return output;
 }
 
+Uint8List _tiffLzwDecode(Uint8List bytes) {
+  final reader = _MsbBitReader(bytes);
+  final out = <int>[];
+  final table = _lzwInitialTable();
+  var nextCode = 258;
+  var codeWidth = 9;
+  List<int>? previous;
+  while (true) {
+    final code = reader.read(codeWidth);
+    if (code == null) {
+      break;
+    }
+    if (code == 256) {
+      table.setAll(0, _lzwInitialTable());
+      nextCode = 258;
+      codeWidth = 9;
+      previous = null;
+      continue;
+    }
+    if (code == 257) {
+      break;
+    }
+    final entry = code < nextCode && table[code] != null
+        ? table[code]!
+        : code == nextCode && previous != null
+        ? <int>[...previous, previous.first]
+        : throw const InvalidImageException('Invalid TIFF LZW code.');
+    out.addAll(entry);
+    if (previous != null && nextCode < 4096) {
+      table[nextCode++] = <int>[...previous, entry.first];
+      if (nextCode == (1 << codeWidth) && codeWidth < 12) {
+        codeWidth += 1;
+      }
+    }
+    previous = entry;
+  }
+  return Uint8List.fromList(out);
+}
+
+Uint8List _tiffLzwEncode(List<int> bytes) {
+  final writer = _MsbBitWriter()..write(256, 9);
+  final dictionary = <String, int>{
+    for (var i = 0; i < 256; i += 1) String.fromCharCode(i): i,
+  };
+  var nextCode = 258;
+  var codeWidth = 9;
+  var current = '';
+  for (final byte in bytes) {
+    final char = String.fromCharCode(byte);
+    final candidate = current + char;
+    if (dictionary.containsKey(candidate)) {
+      current = candidate;
+      continue;
+    }
+    writer.write(dictionary[current]!, codeWidth);
+    if (nextCode < 4096) {
+      dictionary[candidate] = nextCode++;
+      if (nextCode == (1 << codeWidth) && codeWidth < 12) {
+        codeWidth += 1;
+      }
+    }
+    current = char;
+  }
+  if (current.isNotEmpty) {
+    writer.write(dictionary[current]!, codeWidth);
+  }
+  writer.write(257, codeWidth);
+  return writer.finish();
+}
+
+List<List<int>?> _lzwInitialTable() {
+  return <List<int>?>[
+    for (var i = 0; i < 256; i += 1) <int>[i],
+    null,
+    null,
+    for (var i = 258; i < 4096; i += 1) null,
+  ];
+}
+
+void _undoHorizontalPredictor(
+  Uint8List bytes,
+  int width,
+  int height,
+  int samples,
+) {
+  final rowBytes = width * samples;
+  for (var y = 0; y < height; y += 1) {
+    final row = y * rowBytes;
+    for (var x = samples; x < rowBytes; x += 1) {
+      bytes[row + x] = (bytes[row + x] + bytes[row + x - samples]) & 0xff;
+    }
+  }
+}
+
 void _entry(ByteWriter writer, int tag, int type, int count, int value) {
   writer
     ..writeUint16Le(tag)
@@ -250,5 +358,53 @@ void _entry(ByteWriter writer, int tag, int type, int count, int value) {
       ..writeUint16Le(0);
   } else {
     writer.writeUint32Le(value);
+  }
+}
+
+final class _MsbBitReader {
+  _MsbBitReader(this.bytes);
+
+  final Uint8List bytes;
+  var _offset = 0;
+  var _buffer = 0;
+  var _bits = 0;
+
+  int? read(int count) {
+    while (_bits < count) {
+      if (_offset >= bytes.length) {
+        return null;
+      }
+      _buffer = (_buffer << 8) | bytes[_offset++];
+      _bits += 8;
+    }
+    _bits -= count;
+    final value = (_buffer >> _bits) & ((1 << count) - 1);
+    _buffer &= _bits == 0 ? 0 : (1 << _bits) - 1;
+    return value;
+  }
+}
+
+final class _MsbBitWriter {
+  final _bytes = <int>[];
+  var _buffer = 0;
+  var _bits = 0;
+
+  void write(int value, int count) {
+    for (var bit = count - 1; bit >= 0; bit -= 1) {
+      _buffer = (_buffer << 1) | ((value >> bit) & 1);
+      _bits += 1;
+      if (_bits == 8) {
+        _bytes.add(_buffer);
+        _buffer = 0;
+        _bits = 0;
+      }
+    }
+  }
+
+  Uint8List finish() {
+    if (_bits > 0) {
+      _bytes.add(_buffer << (8 - _bits));
+    }
+    return Uint8List.fromList(_bytes);
   }
 }

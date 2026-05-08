@@ -93,12 +93,6 @@ void main() {
       throwsA(isA<UnsupportedCodecException>()),
     );
     expect(
-      ImagePipeline.fromRawPixels(raw())
-          .tiff(const TiffEncoderOptions(compression: TiffCompression.lzw))
-          .toBytes(),
-      throwsA(isA<UnsupportedCodecException>()),
-    );
-    expect(
       ImagePipeline.fromRawPixels(
         raw(),
       ).tiff(const TiffEncoderOptions(tile: true)).toBytes(),
