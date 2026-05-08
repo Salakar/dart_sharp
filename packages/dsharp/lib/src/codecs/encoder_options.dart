@@ -94,8 +94,16 @@ final class GifEncoderOptions extends EncoderOptions {
     this.progressive = false,
     this.colors = 256,
     this.keepDuplicateFrames = false,
+    int? loopCount,
+    int? loop,
+    Duration? frameDelay,
+    Duration? delay,
+    List<Duration>? frameDelays,
+    List<Duration>? delays,
     super.force,
-  });
+  }) : loopCount = loopCount ?? loop,
+       frameDelay = frameDelay ?? delay,
+       frameDelays = frameDelays ?? delays ?? const <Duration>[];
 
   /// Whether to reuse an existing palette where possible.
   final bool reuse;
@@ -109,6 +117,15 @@ final class GifEncoderOptions extends EncoderOptions {
   /// Whether duplicate frames should be kept.
   final bool keepDuplicateFrames;
 
+  /// Optional animation loop count, where 0 means infinite looping.
+  final int? loopCount;
+
+  /// Optional display delay to apply to every encoded animation frame.
+  final Duration? frameDelay;
+
+  /// Optional per-frame display delays for encoded animation frames.
+  final List<Duration> frameDelays;
+
   @override
   ImageFormat get format => ImageFormat.gif;
 
@@ -116,6 +133,25 @@ final class GifEncoderOptions extends EncoderOptions {
   void validate() {
     if (colors < 2 || colors > 256) {
       throw const OperationValidationException('GIF colors must be 2..256.');
+    }
+    final loop = loopCount;
+    if (loop != null && (loop < 0 || loop > 0xffff)) {
+      throw const OperationValidationException(
+        'GIF loop count must be 0..65535.',
+      );
+    }
+    final delay = frameDelay;
+    if (delay != null && (delay.isNegative || delay.inMilliseconds > 0xffff)) {
+      throw const OperationValidationException(
+        'GIF frame delay must be 0..65535 ms.',
+      );
+    }
+    for (final frameDelay in frameDelays) {
+      if (frameDelay.isNegative || frameDelay.inMilliseconds > 0xffff) {
+        throw const OperationValidationException(
+          'GIF frame delay must be 0..65535 ms.',
+        );
+      }
     }
   }
 }

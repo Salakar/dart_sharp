@@ -95,8 +95,12 @@ final class GifImageCodec implements ImageCodec {
     final gifOptions = options is GifEncoderOptions
         ? options
         : const GifEncoderOptions();
-    final raw = image.firstFrame.pixels;
-    final frames = _framesForEncoding(image, gifOptions.keepDuplicateFrames);
+    final outputImage = _applyGifAnimationOptions(image, gifOptions);
+    final raw = outputImage.firstFrame.pixels;
+    final frames = _framesForEncoding(
+      outputImage,
+      gifOptions.keepDuplicateFrames,
+    );
     final palette = GifPalette.fromRgba(
       Uint8List.fromList(<int>[for (final frame in frames) ...frame.rgba]),
       maxColors: gifOptions.colors,
@@ -110,8 +114,8 @@ final class GifImageCodec implements ImageCodec {
       ..writeByte(0)
       ..writeByte(0)
       ..writeBytes(palette.bytes);
-    if (image.loopCount != null) {
-      _writeLoopExtension(writer, image.loopCount!);
+    if (outputImage.loopCount != null) {
+      _writeLoopExtension(writer, outputImage.loopCount!);
     }
     var indexOffset = 0;
     for (final frame in frames) {
@@ -142,7 +146,7 @@ final class GifImageCodec implements ImageCodec {
         height: raw.height,
         channels: 4,
         frames: frames.length,
-        loopCount: image.loopCount,
+        loopCount: outputImage.loopCount,
         frameDelays: <Duration>[
           for (final frame in frames)
             if (frame.image.delay != null) frame.image.delay!,
@@ -150,6 +154,36 @@ final class GifImageCodec implements ImageCodec {
       ),
     );
   }
+}
+
+PixelImage _applyGifAnimationOptions(
+  PixelImage image,
+  GifEncoderOptions options,
+) {
+  final frameDelays = options.frameDelays;
+  if (options.loopCount == null &&
+      options.frameDelay == null &&
+      frameDelays.isEmpty) {
+    return image;
+  }
+  if (frameDelays.isNotEmpty && frameDelays.length != image.frames.length) {
+    throw const OperationValidationException(
+      'GIF frameDelays length must match frame count.',
+    );
+  }
+  final frames = image.frames;
+  return PixelImage(
+    frames: <ImageFrame>[
+      for (var index = 0; index < frames.length; index += 1)
+        ImageFrame(
+          pixels: frames[index].pixels,
+          delay: frameDelays.isNotEmpty
+              ? frameDelays[index]
+              : options.frameDelay ?? frames[index].delay,
+        ),
+    ],
+    loopCount: options.loopCount ?? image.loopCount,
+  );
 }
 
 final class _GifFrameData {

@@ -71,6 +71,107 @@ void main() {
 
     expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 2]));
   });
+
+  test('GIF animation options override loop count and frame delays', () async {
+    final encoded = await ImagePipeline.fromPixelImage(_animation(loopCount: 2))
+        .gif(
+          const GifEncoderOptions(
+            loopCount: 3,
+            frameDelays: <Duration>[
+              Duration(milliseconds: 40),
+              Duration(milliseconds: 60),
+            ],
+          ),
+        )
+        .toBytesWithInfo();
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+
+    expect(encoded.info.loopCount, 3);
+    expect(encoded.info.frameDelays, <Duration>[
+      const Duration(milliseconds: 40),
+      const Duration(milliseconds: 60),
+    ]);
+    expect(decoded.loopCount, 3);
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 40));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 60));
+  });
+
+  test('GIF frameDelay repeats one delay across animation frames', () async {
+    final bytes = await ImagePipeline.fromPixelImage(_animation())
+        .gif(const GifEncoderOptions(frameDelay: Duration(milliseconds: 50)))
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 50));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 50));
+  });
+
+  test('GIF loop and delay aliases map to animation metadata', () async {
+    final bytes = await ImagePipeline.fromPixelImage(_animation())
+        .gif(
+          const GifEncoderOptions(loop: 4, delay: Duration(milliseconds: 70)),
+        )
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(decoded.loopCount, 4);
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 70));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 70));
+  });
+
+  test('GIF animation option ranges are validated', () {
+    expect(
+      ImagePipeline.fromPixelImage(
+        _animation(),
+      ).gif(const GifEncoderOptions(loopCount: -1)).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromPixelImage(_animation())
+          .gif(
+            const GifEncoderOptions(
+              frameDelay: Duration(milliseconds: 0x10000),
+            ),
+          )
+          .toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromPixelImage(_animation())
+          .gif(
+            const GifEncoderOptions(
+              frameDelays: <Duration>[Duration(milliseconds: 10)],
+            ),
+          )
+          .toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+}
+
+PixelImage _animation({int? loopCount}) {
+  return PixelImage(
+    frames: <ImageFrame>[
+      ImageFrame(
+        pixels: _solid(255, 0, 0),
+        delay: const Duration(milliseconds: 10),
+      ),
+      ImageFrame(
+        pixels: _solid(0, 255, 0),
+        delay: const Duration(milliseconds: 20),
+      ),
+    ],
+    loopCount: loopCount,
+  );
+}
+
+RawPixels _solid(int red, int green, int blue) {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[red, green, blue, 255]),
+    width: 1,
+    height: 1,
+    channels: ChannelCount.four,
+  );
 }
 
 final class _GifFrame {
