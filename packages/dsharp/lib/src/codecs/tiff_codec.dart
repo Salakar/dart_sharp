@@ -10,10 +10,12 @@ import 'codec_pixels.dart';
 import 'deflate_codec.dart';
 import 'encoder_options.dart';
 import 'image_format.dart';
+import 'jpeg_decoder.dart';
 import 'output.dart';
 
 part 'tiff_samples.dart';
 part 'tiff_color.dart';
+part 'tiff_jpeg.dart';
 
 /// First-party baseline TIFF codec for chunky, grayscale, and palette images.
 final class TiffImageCodec implements ImageCodec {
@@ -42,6 +44,11 @@ final class TiffImageCodec implements ImageCodec {
     final samples = tags.value(277, fallback: 1);
     final bitsPerSample = tags.values(258, fallback: const <int>[8]);
     final predictor = tags.value(317, fallback: 1);
+    if (compression == 7) {
+      return PixelImage.fromRawPixels(
+        _decodeJpegCompressedTiff(bytes, tags, width, height),
+      );
+    }
     final source = _decodeTiffStrips(
       bytes,
       tags.values(273),
@@ -251,6 +258,17 @@ final class _Ifd {
     }
     return entry.values(bytes, endian, tag);
   }
+
+  Uint8List byteValues(int tag, {Uint8List? fallback}) {
+    final entry = tags[tag];
+    if (entry == null) {
+      if (fallback != null) {
+        return fallback;
+      }
+      throw InvalidImageException('Missing TIFF tag $tag.');
+    }
+    return entry.byteValues(bytes, tag);
+  }
 }
 
 _Ifd _readIfd(Uint8List bytes, int offset, _TiffEndian endian) {
@@ -307,6 +325,16 @@ final class _IfdEntry {
         _readTiffValue(bytes, endian, type, start + i * typeSize),
     ];
   }
+
+  Uint8List byteValues(Uint8List bytes, int tag) {
+    final typeSize = _tiffTypeSize(type);
+    final byteCount = count * typeSize;
+    final start = byteCount <= 4 ? inlineOffset : rawValue;
+    if (start + byteCount > bytes.length) {
+      throw InvalidImageException('Truncated TIFF tag $tag values.');
+    }
+    return Uint8List.sublistView(bytes, start, start + byteCount);
+  }
 }
 
 int _readTiffValue(Uint8List bytes, _TiffEndian endian, int type, int offset) {
@@ -323,6 +351,7 @@ int _tiffTypeSize(int type) {
     1 => 1,
     3 => 2,
     4 => 4,
+    7 => 1,
     _ => throw InvalidImageException('Unsupported TIFF tag type $type.'),
   };
 }

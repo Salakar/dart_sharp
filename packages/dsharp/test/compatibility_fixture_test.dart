@@ -108,6 +108,25 @@ void main() {
     expect(image.firstFrameBytes().length, 400 * 266 * 4);
   });
 
+  test('optional upstream JPEG-compressed CMYK TIFF fixture decodes', () async {
+    final fixture = File(
+      '../../sharp_clone/test/fixtures/fogra-0-100-100-0.tif',
+    );
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final image = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).toPixelImage();
+
+    expect(image.width, 1000);
+    expect(image.height, 1000);
+    expect(image.firstFrameBytes().length, 1000 * 1000 * 4);
+    expect(image.firstFrameBytes().sublist(0, 4), <int>[255, 0, 0, 255]);
+  });
+
   test('optional upstream WebP fixture exposes metadata', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {

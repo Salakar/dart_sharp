@@ -328,6 +328,9 @@ void _writeSamples(
 
 Uint8List _composeRgba(JpegState state) {
   if (state.components.length == 4) {
+    if (state.adobeTransform != 2) {
+      return _composeCmykRgba(state);
+    }
     return _composeYcckRgba(state);
   }
   final rgba = Uint8List(state.width * state.height * 4);
@@ -355,11 +358,6 @@ Uint8List _composeRgba(JpegState state) {
 }
 
 Uint8List _composeYcckRgba(JpegState state) {
-  if (state.adobeTransform != 2) {
-    throw const UnsupportedCodecException(
-      'Only Adobe YCCK JPEG color transform is supported for four-channel JPEG.',
-    );
-  }
   final rgba = Uint8List(state.width * state.height * 4);
   final y = state.components[0];
   final cb = state.components[1];
@@ -383,8 +381,40 @@ Uint8List _composeYcckRgba(JpegState state) {
   return rgba;
 }
 
+Uint8List _composeCmykRgba(JpegState state) {
+  final rgba = Uint8List(state.width * state.height * 4);
+  final c = state.components[0];
+  final m = state.components[1];
+  final y = state.components[2];
+  final k = state.components[3];
+  for (var py = 0; py < state.height; py += 1) {
+    for (var px = 0; px < state.width; px += 1) {
+      final black = _sample(k, px, py, state.width, state.height);
+      final out = (py * state.width + px) * 4;
+      rgba[out] = _cmykToRgbChannel(
+        _sample(c, px, py, state.width, state.height),
+        black,
+      );
+      rgba[out + 1] = _cmykToRgbChannel(
+        _sample(m, px, py, state.width, state.height),
+        black,
+      );
+      rgba[out + 2] = _cmykToRgbChannel(
+        _sample(y, px, py, state.width, state.height),
+        black,
+      );
+      rgba[out + 3] = 255;
+    }
+  }
+  return rgba;
+}
+
 int _cmykChannel(int cmy, int black) {
   return ((255 - cmy) * black + 127) ~/ 255;
+}
+
+int _cmykToRgbChannel(int cmy, int black) {
+  return ((255 - cmy) * (255 - black) + 127) ~/ 255;
 }
 
 int _sample(JpegComponent component, int x, int y, int width, int height) {
