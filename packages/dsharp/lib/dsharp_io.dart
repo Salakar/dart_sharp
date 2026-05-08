@@ -43,6 +43,26 @@ extension ImagePipelineFileIo on ImagePipeline {
     await file.writeAsBytes(encoded.bytes, flush: true);
     return encoded.info;
   }
+
+  /// Writes encoded output to a file path or [File].
+  Future<OutputInfo> toFile(
+    Object file, {
+    ImageFormat? format,
+    CodecRegistry? registry,
+    CancellationToken? cancellationToken,
+  }) {
+    final resolved = switch (file) {
+      final File value => value,
+      final String value => File(value),
+      _ => throw ArgumentError.value(file, 'file', 'Expected a File or path.'),
+    };
+    return writeToFile(
+      resolved,
+      format: format,
+      registry: registry,
+      cancellationToken: cancellationToken,
+    );
+  }
 }
 
 ImageFormat? _formatFromPath(String path) {
