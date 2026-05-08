@@ -5,6 +5,24 @@ import 'helpers/webp_lossless_fixture.dart';
 import 'helpers/webp_lossy_fixture.dart';
 
 void main() {
+  test('rejects VP8 WebP with zero frame dimensions', () async {
+    for (final zeroWidth in <bool>[true, false]) {
+      final bytes = solidVp8Webp(width: 1, height: 1);
+      final offset = zeroWidth ? 26 : 28;
+      bytes[offset] = 0;
+      bytes[offset + 1] = 0;
+
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;

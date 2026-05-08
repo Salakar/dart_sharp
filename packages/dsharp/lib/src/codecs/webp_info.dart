@@ -267,9 +267,14 @@ WebpImageInfo _vp8Info(Uint8List data) {
       data[5] != 0x2a) {
     throw const InvalidImageException('Invalid VP8 key-frame header.');
   }
+  final width = readUint16Le(data, 6) & 0x3fff;
+  final height = readUint16Le(data, 8) & 0x3fff;
+  if (width == 0 || height == 0) {
+    throw const InvalidImageException('Invalid VP8 dimensions.');
+  }
   return WebpImageInfo(
-    width: readUint16Le(data, 6) & 0x3fff,
-    height: readUint16Le(data, 8) & 0x3fff,
+    width: width,
+    height: height,
     compression: WebpCompression.vp8,
     hasAlpha: false,
     hasProfile: false,
