@@ -25,6 +25,12 @@ void main() {
       final threshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20),
       );
+      final thresholdTrue = await pixels(
+        ImagePipeline.fromRawPixels(raw).threshold(true),
+      );
+      final thresholdDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw).threshold(false),
+      );
       final colorThreshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20, false),
       );
@@ -49,8 +55,26 @@ void main() {
         isEmpty,
       );
       expect(firstBytes(threshold), <int>[0, 0, 0, 77]);
+      expect(firstBytes(thresholdTrue), <int>[0, 0, 0, 77]);
+      expect(firstBytes(thresholdDisabled), <int>[10, 20, 30, 77]);
+      expect(
+        ImagePipeline.fromRawPixels(raw).threshold(false).operations,
+        isEmpty,
+      );
       expect(firstBytes(colorThreshold), <int>[0, 255, 255, 77]);
       expect(firstBytes(gamma), <int>[128, 128, 128, 77]);
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).threshold(-1),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).threshold(256),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw).threshold(20, 'false'),
+        throwsA(isA<OperationValidationException>()),
+      );
     },
   );
 

@@ -37,13 +37,10 @@ extension ImagePipelineColor on ImagePipeline {
     return enabled ? _append(NegateOperation(negateAlpha: alpha)) : this;
   }
 
-  /// Applies a threshold.
-  ImagePipeline threshold([int threshold = 128, bool grayscale = true]) {
-    return _append(
-      ThresholdOperation(
-        ThresholdOptions(threshold: threshold, grayscale: grayscale),
-      ),
-    );
+  /// Applies a threshold when enabled.
+  ImagePipeline threshold([Object threshold = 128, Object grayscale = true]) {
+    final options = _thresholdOptions(threshold, grayscale);
+    return options == null ? this : _append(ThresholdOperation(options));
   }
 
   /// Applies linear channel adjustment.
@@ -183,5 +180,24 @@ extension ImagePipelineColor on ImagePipeline {
     throw const OperationValidationException(
       'Recombination matrix must be a numeric 3x3 or 4x4 matrix.',
     );
+  }
+
+  ThresholdOptions? _thresholdOptions(Object threshold, Object grayscale) {
+    if (threshold is bool && !threshold) {
+      return null;
+    }
+    final thresholdValue = switch (threshold) {
+      true => 128,
+      final int value when value >= 0 && value <= 255 => value,
+      _ => throw const OperationValidationException(
+        'Threshold must be an integer between 0 and 255.',
+      ),
+    };
+    if (grayscale is! bool) {
+      throw const OperationValidationException(
+        'Threshold grayscale option must be a boolean.',
+      );
+    }
+    return ThresholdOptions(threshold: thresholdValue, grayscale: grayscale);
   }
 }
