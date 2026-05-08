@@ -124,27 +124,21 @@ void main() {
     expect(image.firstFrameBytes(), <int>[1, 2, 3, 255]);
   });
 
-  test('ignores ALPH chunks appended outside declared RIFF payload', () async {
+  test('rejects ALPH chunks appended outside declared RIFF payload', () async {
     final bytes = alphaOutsideRiffVp8Webp(
       width: 2,
       height: 1,
       alpha: <int>[0, 255],
     );
 
-    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
-    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
-
-    expect(metadata.hasAlpha, isTrue);
-    expect(image.firstFrameBytes(), <int>[
-      128,
-      128,
-      128,
-      255,
-      128,
-      128,
-      128,
-      255,
-    ]);
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
   });
 
   test('decodes extended lossy WebP with uncompressed alpha', () async {

@@ -254,6 +254,14 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       'WebP ALPH chunk requires an extended VP8 image.',
     );
   }
+  if (parsed.compression == WebpCompression.extended &&
+      !parsed.isAnimated &&
+      imageCompression == WebpCompression.vp8 &&
+      parsed.hasAlpha != hasAlphaChunk) {
+    throw const InvalidImageException(
+      'WebP VP8 alpha flag does not match ALPH chunk.',
+    );
+  }
   for (final frame in frames) {
     if (frame.x + frame.width > parsed.width ||
         frame.y + frame.height > parsed.height) {

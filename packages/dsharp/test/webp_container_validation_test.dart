@@ -71,6 +71,31 @@ void main() {
     );
   });
 
+  test('rejects static VP8 alpha flag and chunk mismatches', () async {
+    final alphaFlagWithoutChunk = extendedSolidVp8Webp(width: 1, height: 1);
+    alphaFlagWithoutChunk[20] |= 0x10;
+    final alphaChunkWithoutFlag = alphaSolidVp8Webp(
+      width: 1,
+      height: 1,
+      alpha: <int>[127],
+    );
+    alphaChunkWithoutFlag[20] &= 0xef;
+
+    for (final bytes in <Uint8List>[
+      alphaFlagWithoutChunk,
+      alphaChunkWithoutFlag,
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects animation frame ALPH chunks after VP8 image data', () async {
     final ordered = animatedVp8Webp(width: 1, height: 1, alpha: <int>[127]);
     final reordered = Uint8List.fromList(<int>[
