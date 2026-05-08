@@ -10,6 +10,8 @@ void main() {
   test('rejects VP8 WebP with invalid frame tag fields', () async {
     final nonKeyFrame = solidVp8Webp(width: 1, height: 1);
     nonKeyFrame[20] |= 1;
+    final unsupportedVersion = solidVp8Webp(width: 1, height: 1);
+    unsupportedVersion[20] |= 0x08;
     final hiddenKeyFrame = solidVp8Webp(width: 1, height: 1);
     hiddenKeyFrame[20] &= 0xef;
     final oversizedFirstPartition = solidVp8Webp(width: 1, height: 1);
@@ -19,6 +21,7 @@ void main() {
 
     final cases = <(Uint8List, Matcher)>[
       (nonKeyFrame, isA<UnsupportedCodecException>()),
+      (unsupportedVersion, isA<UnsupportedCodecException>()),
       (hiddenKeyFrame, isA<InvalidImageException>()),
       (oversizedFirstPartition, isA<InvalidImageException>()),
     ];

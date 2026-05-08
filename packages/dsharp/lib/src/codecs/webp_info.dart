@@ -308,6 +308,9 @@ WebpImageInfo _vp8Info(Uint8List data) {
       'Only VP8 key frames are supported for WebP still images.',
     );
   }
+  if (((tag >> 1) & 0x07) > 3) {
+    throw const UnsupportedCodecException('Unsupported VP8 bitstream version.');
+  }
   if (((tag >> 4) & 1) == 0) {
     throw const InvalidImageException('VP8 key frame is not displayable.');
   }
