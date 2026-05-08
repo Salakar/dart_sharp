@@ -40,14 +40,33 @@ void main() {
       expect(image.height, 5);
     },
   );
+
+  test('applies VP8 display scale bits in animation frames', () async {
+    final bytes = animatedVp8Webp(width: 4, height: 3);
+    final frameOffset = _chunkPayloadOffset(bytes, 'ANMF');
+    _setVp8Scale(bytes, horizontal: 1, vertical: 2, start: frameOffset + 16);
+    _setVp8xCanvas(bytes, width: 5, height: 5);
+    _setAnimationFrameSize(bytes, width: 5, height: 5);
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.width, 5);
+    expect(metadata.height, 5);
+    expect(metadata.frames, 1);
+    expect(image.width, 5);
+    expect(image.height, 5);
+    expect(image.firstFrameBytes(), hasLength(5 * 5 * 4));
+  });
 }
 
 void _setVp8Scale(
   Uint8List webp, {
   required int horizontal,
   required int vertical,
+  int start = 12,
 }) {
-  final offset = _chunkPayloadOffset(webp, 'VP8 ');
+  final offset = _chunkPayloadOffset(webp, 'VP8 ', start: start);
   webp[offset + 7] = (webp[offset + 7] & 0x3f) | (horizontal << 6);
   webp[offset + 9] = (webp[offset + 9] & 0x3f) | (vertical << 6);
 }
@@ -58,8 +77,18 @@ void _setVp8xCanvas(Uint8List webp, {required int width, required int height}) {
   _writeUint24Le(webp, offset + 7, height - 1);
 }
 
-int _chunkPayloadOffset(Uint8List webp, String type) {
-  var offset = 12;
+void _setAnimationFrameSize(
+  Uint8List webp, {
+  required int width,
+  required int height,
+}) {
+  final offset = _chunkPayloadOffset(webp, 'ANMF');
+  _writeUint24Le(webp, offset + 6, width - 1);
+  _writeUint24Le(webp, offset + 9, height - 1);
+}
+
+int _chunkPayloadOffset(Uint8List webp, String type, {int start = 12}) {
+  var offset = start;
   while (offset + 8 <= webp.length) {
     final chunkType = String.fromCharCodes(webp.sublist(offset, offset + 4));
     final length =
