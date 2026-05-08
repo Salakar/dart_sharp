@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'codec.dart';
@@ -17,7 +18,9 @@ final class RawImageCodec implements ImageCodec {
 
   @override
   PixelImage decode(Uint8List bytes) {
-    throw UnsupportedError('Raw decoding requires a RawPixels descriptor.');
+    throw const UnsupportedCodecException(
+      'Raw decoding requires a RawPixels descriptor.',
+    );
   }
 
   /// Decodes a raw descriptor.

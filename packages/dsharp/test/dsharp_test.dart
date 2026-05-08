@@ -61,4 +61,14 @@ void main() {
       throwsA(isA<InvalidImageException>()),
     );
   });
+
+  test('raw byte decoding requires a descriptor with typed exception', () {
+    expect(
+      () => CodecRegistry.defaultRegistry().decode(
+        Uint8List(4),
+        format: ImageFormat.raw,
+      ),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
 }
