@@ -99,6 +99,13 @@ void main() {
     expect(metadata.hasProfile, isTrue);
     expect(metadata.orientation, 6);
   });
+
+  test('rejects malformed WebP animation metadata chunks', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_truncatedWebpAnimBytes()).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
 }
 
 Uint8List _pngMetadataBytes() {
@@ -208,6 +215,28 @@ Uint8List _webpMetadataBytes() {
   final vp8l = ByteWriter()..writeByte(0x2f);
   final bits = 2 | (1 << 14);
   vp8l.writeUint32Le(bits);
+  _riffChunk(content, 'VP8L', vp8l.toBytes());
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _truncatedWebpAnimBytes() {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x02)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, 0);
+  _writeUint24Le(content, 0);
+  _riffChunk(content, 'ANIM', <int>[0, 0, 0, 0, 1]);
+  final vp8l = ByteWriter()..writeByte(0x2f);
+  vp8l.writeUint32Le(0);
   _riffChunk(content, 'VP8L', vp8l.toBytes());
   final writer = ByteWriter()
     ..writeAscii('RIFF')

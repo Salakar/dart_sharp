@@ -140,6 +140,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     } else if (type == 'XMP ') {
       hasXmp = true;
     } else if (type == 'ANIM') {
+      if (data.length < 6) {
+        throw const InvalidImageException('Invalid WebP animation header.');
+      }
       loopCount = readUint16Le(data, 4);
     } else if (type == 'ANMF') {
       frames.add(_frameInfo(data));
