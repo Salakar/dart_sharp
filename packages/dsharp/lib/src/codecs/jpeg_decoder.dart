@@ -56,6 +56,8 @@ JpegState _parse(Uint8List bytes) {
       _readSof0(state, data);
     } else if (marker == 0xdd) {
       state.restartInterval = readUint16Be(data, 0);
+    } else if (marker == 0xee) {
+      _readApp14(state, data);
     } else if (marker >= 0xc1 && marker <= 0xcf) {
       throw const UnsupportedCodecException(
         'Only baseline sequential JPEG is supported.',
@@ -126,6 +128,18 @@ void _readSof0(JpegState state, Uint8List data) {
       ),
     );
   }
+}
+
+void _readApp14(JpegState state, Uint8List data) {
+  if (data.length < 12 ||
+      data[0] != 0x41 ||
+      data[1] != 0x64 ||
+      data[2] != 0x6f ||
+      data[3] != 0x62 ||
+      data[4] != 0x65) {
+    return;
+  }
+  state.adobeTransform = data[11];
 }
 
 void _readSos(JpegState state, Uint8List data) {
@@ -313,6 +327,9 @@ void _writeSamples(
 }
 
 Uint8List _composeRgba(JpegState state) {
+  if (state.components.length == 4) {
+    return _composeYcckRgba(state);
+  }
   final rgba = Uint8List(state.width * state.height * 4);
   final y = state.components[0];
   final cb = state.components.length > 1 ? state.components[1] : null;
@@ -335,6 +352,39 @@ Uint8List _composeRgba(JpegState state) {
     }
   }
   return rgba;
+}
+
+Uint8List _composeYcckRgba(JpegState state) {
+  if (state.adobeTransform != 2) {
+    throw const UnsupportedCodecException(
+      'Only Adobe YCCK JPEG color transform is supported for four-channel JPEG.',
+    );
+  }
+  final rgba = Uint8List(state.width * state.height * 4);
+  final y = state.components[0];
+  final cb = state.components[1];
+  final cr = state.components[2];
+  final k = state.components[3];
+  for (var py = 0; py < state.height; py += 1) {
+    for (var px = 0; px < state.width; px += 1) {
+      final cmy = jpegYcbcrToRgb(
+        _sample(y, px, py, state.width, state.height),
+        _sample(cb, px, py, state.width, state.height),
+        _sample(cr, px, py, state.width, state.height),
+      );
+      final black = _sample(k, px, py, state.width, state.height);
+      final out = (py * state.width + px) * 4;
+      rgba[out] = _cmykChannel(cmy.r, black);
+      rgba[out + 1] = _cmykChannel(cmy.g, black);
+      rgba[out + 2] = _cmykChannel(cmy.b, black);
+      rgba[out + 3] = 255;
+    }
+  }
+  return rgba;
+}
+
+int _cmykChannel(int cmy, int black) {
+  return ((255 - cmy) * black + 127) ~/ 255;
 }
 
 int _sample(JpegComponent component, int x, int y, int width, int height) {

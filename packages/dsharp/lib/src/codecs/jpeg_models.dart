@@ -78,6 +78,9 @@ final class JpegState {
   /// Number of MCUs between restart markers, or zero when disabled.
   int restartInterval = 0;
 
+  /// Adobe APP14 color transform value, when present.
+  int? adobeTransform;
+
   /// Scan payload.
   JpegScan? scan;
 }

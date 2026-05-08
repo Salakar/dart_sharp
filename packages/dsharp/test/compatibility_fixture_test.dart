@@ -66,6 +66,29 @@ void main() {
     expect(rgba.sublist(177119 * 4, 177120 * 4), <int>[40, 91, 108, 255]);
   });
 
+  test('optional upstream Adobe YCCK JPEG fixture decodes pixels', () async {
+    final fixture = File(
+      '../../sharp_clone/test/fixtures/'
+      'Channel_digital_image_CMYK_color_no_profile.jpg',
+    );
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final bytes = await fixture.readAsBytes();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(_jpegAdobeTransform(bytes), 2);
+    expect(image.width, 500);
+    expect(image.height, 333);
+    expect(rgba.length, 500 * 333 * 4);
+    expect(rgba.sublist(0, 4), <int>[200, 228, 255, 255]);
+    expect(rgba.sublist(499 * 4, 500 * 4), <int>[53, 77, 77, 255]);
+    expect(rgba.sublist(166499 * 4, 166500 * 4), <int>[35, 55, 15, 255]);
+  });
+
   test('optional upstream WebP fixture exposes metadata', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {
@@ -253,4 +276,17 @@ int _jpegRestartMarkerCount(List<int> bytes) {
     count += _jpegMarkerCount(bytes, marker);
   }
   return count;
+}
+
+int? _jpegAdobeTransform(List<int> bytes) {
+  for (var i = 0; i + 11 < bytes.length; i += 1) {
+    if (bytes[i] == 0x41 &&
+        bytes[i + 1] == 0x64 &&
+        bytes[i + 2] == 0x6f &&
+        bytes[i + 3] == 0x62 &&
+        bytes[i + 4] == 0x65) {
+      return bytes[i + 11];
+    }
+  }
+  return null;
 }
