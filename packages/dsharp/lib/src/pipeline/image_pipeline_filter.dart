@@ -8,8 +8,40 @@ extension ImagePipelineFilter on ImagePipeline {
   }
 
   /// Applies a sharpen filter.
-  ImagePipeline sharpen() {
-    return _append(const SharpenOperation());
+  ImagePipeline sharpen([Object? options, num? flat, num? jagged]) {
+    if (options == null) {
+      return _append(const SharpenOperation());
+    }
+    if (options is bool) {
+      return options ? _append(const SharpenOperation()) : this;
+    }
+    if (options is SharpenOptions) {
+      if (flat != null || jagged != null) {
+        throw const OperationValidationException(
+          'Sharpen options cannot be combined with flat or jagged arguments.',
+        );
+      }
+      options.validate();
+      return _append(SharpenOperation(options));
+    }
+    if (options is num) {
+      _validateRange('Sharpen sigma', options, 0.01, 10000);
+      if (flat != null) {
+        _validateRange('Sharpen flat', flat, 0, 10000);
+      }
+      if (jagged != null) {
+        _validateRange('Sharpen jagged', jagged, 0, 10000);
+      }
+      return _append(
+        SharpenOperation(
+          SharpenOptions(sigma: options, m1: flat ?? 1, m2: jagged ?? 2),
+          true,
+        ),
+      );
+    }
+    throw const OperationValidationException(
+      'Sharpen expects a boolean, number, or SharpenOptions.',
+    );
   }
 
   /// Applies a median filter with a square mask [size].
@@ -41,6 +73,14 @@ extension ImagePipelineFilter on ImagePipeline {
         max == null
             ? '$label must be a positive integer.'
             : '$label must be an integer between 1 and $max.',
+      );
+    }
+  }
+
+  void _validateRange(String label, num value, num min, num max) {
+    if (value < min || value > max) {
+      throw OperationValidationException(
+        '$label must be between $min and $max.',
       );
     }
   }

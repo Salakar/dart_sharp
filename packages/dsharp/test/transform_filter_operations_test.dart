@@ -198,13 +198,25 @@ void main() {
     expect(firstBytes(extractThenRotate), <int>[1, 0, 0, 255]);
   });
 
-  test('blur, median, dilate, and erode handle tiny edge pixels', () async {
+  test('blur, sharpen, median, dilate, and erode handle tiny pixels', () async {
     final raw = rawGray(3, 3, <int>[0, 0, 0, 0, 255, 0, 0, 0, 0]);
     final wide = rawGray(5, 1, <int>[0, 0, 255, 0, 0]);
     final erodeWide = rawGray(5, 1, <int>[255, 255, 0, 255, 255]);
+    final edge = rawGray(5, 1, <int>[20, 20, 80, 20, 20]);
     final blurred = await pixels(ImagePipeline.fromRawPixels(raw).blur());
     final blurDisabled = await pixels(
       ImagePipeline.fromRawPixels(raw).blur(false),
+    );
+    final sharpenDisabled = await pixels(
+      ImagePipeline.fromRawPixels(edge).sharpen(false),
+    );
+    final sharpenedOptions = await pixels(
+      ImagePipeline.fromRawPixels(
+        edge,
+      ).sharpen(const SharpenOptions(sigma: 1, m2: 2, x1: 0, y2: 100, y3: 100)),
+    );
+    final sharpenedLegacy = await pixels(
+      ImagePipeline.fromRawPixels(edge).sharpen(1.5, 0.5, 2.5),
     );
     final median = await pixels(ImagePipeline.fromRawPixels(raw).median());
     final medianUnit = await pixels(
@@ -222,6 +234,14 @@ void main() {
     expect(firstBytes(blurred)[4], 28);
     expect(firstBytes(blurDisabled), raw.bytes);
     expect(ImagePipeline.fromRawPixels(raw).blur(false).operations, isEmpty);
+    expect(firstBytes(sharpenDisabled), edge.bytes);
+    expect(
+      ImagePipeline.fromRawPixels(edge).sharpen(false).operations,
+      isEmpty,
+    );
+    expect(firstBytes(sharpenedOptions)[2], greaterThan(80));
+    expect(firstBytes(sharpenedOptions)[1], lessThan(20));
+    expect(firstBytes(sharpenedLegacy)[2], greaterThan(80));
     expect(firstBytes(median)[4], 0);
     expect(firstBytes(medianUnit), wide.bytes);
     expect(firstBytes(dilated)[0], 255);
@@ -244,6 +264,34 @@ void main() {
       () => ImagePipeline.fromRawPixels(raw).erode(0),
       throwsA(isA<OperationValidationException>()),
     );
+    for (final build in <ImagePipeline Function()>[
+      () => ImagePipeline.fromRawPixels(raw).sharpen(-1.5),
+      () => ImagePipeline.fromRawPixels(raw).sharpen(1, -1),
+      () => ImagePipeline.fromRawPixels(raw).sharpen(1, 1, -1),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: -1)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 11)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 1, m1: -1)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 1, m2: -1)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 1, x1: -1)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 1, y2: -1)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).sharpen(const SharpenOptions(sigma: 1, y3: -1)),
+    ]) {
+      expect(build, throwsA(isA<OperationValidationException>()));
+    }
   });
 
   test('convolve supports scale and rejects invalid kernels', () async {

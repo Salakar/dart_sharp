@@ -99,6 +99,53 @@ final class ConvolutionKernel {
   }
 }
 
+/// Options for sigma-based sharpening.
+final class SharpenOptions {
+  /// Creates sharpen options.
+  const SharpenOptions({
+    required this.sigma,
+    this.m1 = 1,
+    this.m2 = 2,
+    this.x1 = 2,
+    this.y2 = 10,
+    this.y3 = 20,
+  });
+
+  /// Gaussian mask sigma.
+  final num sigma;
+
+  /// Sharpening amount for flat areas.
+  final num m1;
+
+  /// Sharpening amount for jagged areas.
+  final num m2;
+
+  /// Threshold between flat and jagged areas.
+  final num x1;
+
+  /// Maximum brightening amount.
+  final num y2;
+
+  /// Maximum darkening amount.
+  final num y3;
+
+  /// Validates sharpen options.
+  void validate({bool legacySigmaRange = false}) {
+    final minSigma = legacySigmaRange ? 0.01 : 0.000001;
+    final maxSigma = legacySigmaRange ? 10000 : 10;
+    if (sigma < minSigma || sigma > maxSigma) {
+      throw OperationValidationException(
+        'Sharpen sigma must be between $minSigma and $maxSigma.',
+      );
+    }
+    _validateRange('Sharpen m1', m1, 0, 1000000);
+    _validateRange('Sharpen m2', m2, 0, 1000000);
+    _validateRange('Sharpen x1', x1, 0, 1000000);
+    _validateRange('Sharpen y2', y2, 0, 1000000);
+    _validateRange('Sharpen y3', y3, 0, 1000000);
+  }
+}
+
 /// Options for affine transforms.
 final class AffineOptions {
   /// Creates affine options.
@@ -140,6 +187,12 @@ final class AffineOptions {
 
   /// Output vertical offset.
   final double ody;
+}
+
+void _validateRange(String label, num value, num min, num max) {
+  if (value < min || value > max) {
+    throw OperationValidationException('$label must be between $min and $max.');
+  }
 }
 
 /// Options for linear channel adjustment.

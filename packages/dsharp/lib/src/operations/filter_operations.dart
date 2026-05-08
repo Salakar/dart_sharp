@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import '../api/exceptions.dart';
@@ -58,13 +59,24 @@ final class ConvolveOperation implements PipelineOperation {
 /// Applies a mild sharpen kernel.
 final class SharpenOperation implements PipelineOperation {
   /// Creates a sharpen operation.
-  const SharpenOperation();
+  const SharpenOperation([this.options, this.legacySigmaRange = false]);
+
+  /// Sigma-based options, or null for mild sharpen.
+  final SharpenOptions? options;
+
+  /// Whether to validate legacy positional sigma ranges.
+  final bool legacySigmaRange;
 
   @override
   String get name => 'sharpen';
 
   @override
   PixelImage apply(PixelImage image) {
+    final options = this.options;
+    if (options != null) {
+      options.validate(legacySigmaRange: legacySigmaRange);
+      return mapFrames(image, (raw) => _unsharp(raw, options));
+    }
     return const ConvolveOperation(
       ConvolutionKernel(
         width: 3,
@@ -144,6 +156,76 @@ RawPixels _median(RawPixels raw, int size) {
     }
   }
   return sameSizeRaw(raw, output, raw.channels);
+}
+
+RawPixels _unsharp(RawPixels raw, SharpenOptions options) {
+  final sigma = min(10.0, options.sigma.toDouble());
+  final blurred = _gaussianBlur(raw, _gaussianKernel(sigma));
+  final channels = raw.channels.value;
+  final input = raw.bytes;
+  final output = Uint8List(input.length);
+  final colorChannels = min(3, channels);
+  for (var i = 0; i < input.length; i += channels) {
+    for (var c = 0; c < colorChannels; c += 1) {
+      final delta = input[i + c] - blurred[i + c];
+      final magnitude = delta.abs();
+      final amount = magnitude <= options.x1 ? options.m1 : options.m2;
+      final limit = delta >= 0 ? options.y2 : options.y3;
+      final adjustment = min(magnitude * amount, limit).toDouble();
+      output[i + c] = byteClamp(
+        input[i + c] + (delta >= 0 ? adjustment : -adjustment),
+      );
+    }
+    for (var c = colorChannels; c < channels; c += 1) {
+      output[i + c] = input[i + c];
+    }
+  }
+  return sameSizeRaw(raw, output, raw.channels);
+}
+
+Uint8List _gaussianBlur(RawPixels raw, List<double> kernel) {
+  final channels = raw.channels.value;
+  final input = raw.bytes;
+  final radius = kernel.length ~/ 2;
+  final temp = List<double>.filled(input.length, 0);
+  final output = Uint8List(input.length);
+  for (var y = 0; y < raw.height; y += 1) {
+    for (var x = 0; x < raw.width; x += 1) {
+      final target = clampedOffset(raw, x, y);
+      for (var c = 0; c < channels; c += 1) {
+        var sum = 0.0;
+        for (var k = -radius; k <= radius; k += 1) {
+          sum += input[clampedOffset(raw, x + k, y) + c] * kernel[k + radius];
+        }
+        temp[target + c] = sum;
+      }
+    }
+  }
+  for (var y = 0; y < raw.height; y += 1) {
+    for (var x = 0; x < raw.width; x += 1) {
+      final target = clampedOffset(raw, x, y);
+      for (var c = 0; c < channels; c += 1) {
+        var sum = 0.0;
+        for (var k = -radius; k <= radius; k += 1) {
+          sum += temp[clampedOffset(raw, x, y + k) + c] * kernel[k + radius];
+        }
+        output[target + c] = byteClamp(sum);
+      }
+    }
+  }
+  return output;
+}
+
+List<double> _gaussianKernel(double sigma) {
+  final radius = max(1, (sigma * 3).ceil());
+  final values = <double>[];
+  var total = 0.0;
+  for (var i = -radius; i <= radius; i += 1) {
+    final value = exp(-(i * i) / (2 * sigma * sigma));
+    values.add(value);
+    total += value;
+  }
+  return <double>[for (final value in values) value / total];
 }
 
 RawPixels _convolve(RawPixels raw, ConvolutionKernel kernel) {
