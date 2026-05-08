@@ -170,7 +170,7 @@ void main() {
         0,
         0,
         255,
-        5,
+        20,
         0,
         0,
         255,
@@ -200,7 +200,46 @@ void main() {
 
     expect(image.width, 1);
     expect(image.height, 1);
-    expect(image.firstFrameBytes(), <int>[5, 0, 0, 255]);
+    expect(image.firstFrameBytes(), <int>[20, 0, 0, 255]);
+  });
+
+  test('trim honors threshold options and validates ranges', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        0,
+        0,
+        0,
+        255,
+        5,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+      ]),
+      width: 3,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    final lenient = await ImagePipeline.fromRawPixels(
+      raw,
+    ).trim().toPixelImage();
+    final exact = await ImagePipeline.fromRawPixels(
+      raw,
+    ).trim(const TrimOptions(threshold: 0)).toPixelImage();
+
+    expect(lenient.width, 3);
+    expect(exact.width, 1);
+    expect(exact.firstFrameBytes(), <int>[5, 0, 0, 255]);
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw,
+      ).trim(const TrimOptions(threshold: -1)).toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
   });
 
   test('kernel helpers provide deterministic weights', () {

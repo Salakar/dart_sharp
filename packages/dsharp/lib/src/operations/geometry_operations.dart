@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../geometry/geometry.dart';
 import '../geometry/resize_geometry.dart';
 import '../pipeline/pipeline_operation.dart';
@@ -82,6 +83,11 @@ final class TrimOperation implements PipelineOperation {
 
   @override
   PixelImage apply(PixelImage image) {
+    if (options.threshold < 0) {
+      throw OperationValidationException(
+        'Trim threshold must be non-negative.',
+      );
+    }
     return _mapFrames(image, (raw) => _trim(raw, options));
   }
 }

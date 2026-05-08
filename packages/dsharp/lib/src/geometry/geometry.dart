@@ -180,13 +180,20 @@ final class ExtendOptions {
 /// Trim options.
 final class TrimOptions {
   /// Creates trim options.
-  const TrimOptions({this.background, this.threshold = 0});
+  const TrimOptions({
+    this.background,
+    this.threshold = 10,
+    this.lineArt = false,
+  });
 
   /// Optional explicit background color. Defaults to the top-left pixel.
   final RgbaColor? background;
 
   /// Per-channel threshold.
   final int threshold;
+
+  /// Whether the input is line art rather than photographic.
+  final bool lineArt;
 }
 
 /// Resize options.
