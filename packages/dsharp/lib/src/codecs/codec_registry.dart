@@ -5,6 +5,7 @@ import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'codec.dart';
+import 'encoder_options.dart';
 import 'format_sniffer.dart';
 import 'gif_codec.dart';
 import 'image_format.dart';
@@ -114,8 +115,20 @@ final class CodecRegistry {
   }
 
   /// Encodes [image] as [format].
-  EncodedImage encode(PixelImage image, {required ImageFormat format}) {
-    return codecFor(format).encode(image);
+  EncodedImage encode(
+    PixelImage image, {
+    required ImageFormat format,
+    EncoderOptions? options,
+  }) {
+    if (options != null) {
+      if (options.format != format) {
+        throw const OperationValidationException(
+          'Encoder options must match the requested output format.',
+        );
+      }
+      options.validate();
+    }
+    return codecFor(format).encode(image, options: options);
   }
 
   /// Capability table aligned with this registry.

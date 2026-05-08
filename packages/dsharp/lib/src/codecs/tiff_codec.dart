@@ -6,6 +6,7 @@ import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec.dart';
 import 'codec_pixels.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -53,7 +54,7 @@ final class TiffImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     final raw = image.firstFrame.pixels;
     final channels = raw.channels == ChannelCount.three ? 3 : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);

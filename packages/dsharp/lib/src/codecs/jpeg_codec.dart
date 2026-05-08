@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../pixels/pixel_image.dart';
 import 'codec.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'jpeg_decoder.dart';
 import 'jpeg_encoder.dart';
@@ -21,9 +22,12 @@ final class JpegImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
+    final jpegOptions = options is JpegEncoderOptions
+        ? options
+        : const JpegEncoderOptions();
     final raw = image.firstFrame.pixels;
-    final bytes = encodeJpegBytes(raw);
+    final bytes = encodeJpegBytes(raw, quality: jpegOptions.quality);
     return EncodedImage(
       bytes: bytes,
       info: OutputInfo(

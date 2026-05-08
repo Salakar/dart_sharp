@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../pixels/pixel_image.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -13,5 +14,5 @@ abstract interface class ImageCodec {
   PixelImage decode(Uint8List bytes);
 
   /// Encodes pixels into this codec's format.
-  EncodedImage encode(PixelImage image);
+  EncodedImage encode(PixelImage image, {EncoderOptions? options});
 }

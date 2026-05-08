@@ -6,6 +6,7 @@ import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec.dart';
 import 'codec_pixels.dart';
+import 'encoder_options.dart';
 import 'gif_lzw.dart';
 import 'gif_palette.dart';
 import 'image_format.dart';
@@ -75,7 +76,7 @@ final class GifImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     final raw = image.firstFrame.pixels;
     final rgba = rawToRgba(raw);
     final palette = GifPalette.fromRgba(rgba);

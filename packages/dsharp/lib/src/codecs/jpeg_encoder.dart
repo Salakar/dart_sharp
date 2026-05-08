@@ -9,26 +9,36 @@ import 'jpeg_tables.dart';
 import 'jpeg_transform.dart';
 
 /// Encodes pixels as baseline sequential JPEG bytes.
-Uint8List encodeJpegBytes(RawPixels raw) {
+Uint8List encodeJpegBytes(RawPixels raw, {int quality = 80}) {
   final rgb = rawToRgb(raw);
+  final lumaQuant = jpegScaledQuantTable(jpegStandardLumaQuant, quality);
+  final chromaQuant = jpegScaledQuantTable(jpegStandardChromaQuant, quality);
   final writer = ByteWriter()
     ..writeByte(0xff)
     ..writeByte(0xd8);
   _segment(writer, 0xe0, _jfif());
-  _segment(writer, 0xdb, _dqt(0, jpegLumaQuant));
-  _segment(writer, 0xdb, _dqt(1, jpegChromaQuant));
+  _segment(writer, 0xdb, _dqt(0, lumaQuant));
+  _segment(writer, 0xdb, _dqt(1, chromaQuant));
   _segment(writer, 0xc0, _sof(raw.width, raw.height));
   _segment(writer, 0xc4, _dht(0, 0));
   _segment(writer, 0xc4, _dht(1, 0));
   _segment(writer, 0xda, _sos());
-  writer.writeBytes(_entropy(rgb, raw.width, raw.height));
+  writer.writeBytes(
+    _entropy(rgb, raw.width, raw.height, lumaQuant, chromaQuant),
+  );
   writer
     ..writeByte(0xff)
     ..writeByte(0xd9);
   return writer.toBytes();
 }
 
-Uint8List _entropy(Uint8List rgb, int width, int height) {
+Uint8List _entropy(
+  Uint8List rgb,
+  int width,
+  int height,
+  List<int> lumaQuant,
+  List<int> chromaQuant,
+) {
   final bits = JpegBitWriter();
   final predictors = List<int>.filled(3, 0);
   final blocksX = (width + 7) ~/ 8;
@@ -38,17 +48,17 @@ Uint8List _entropy(Uint8List rgb, int width, int height) {
       final planes = _blockPlanes(rgb, width, height, bx, by);
       predictors[0] = _writeBlock(
         bits,
-        jpegFdct(planes[0], jpegLumaQuant),
+        jpegFdct(planes[0], lumaQuant),
         predictors[0],
       );
       predictors[1] = _writeBlock(
         bits,
-        jpegFdct(planes[1], jpegChromaQuant),
+        jpegFdct(planes[1], chromaQuant),
         predictors[1],
       );
       predictors[2] = _writeBlock(
         bits,
-        jpegFdct(planes[2], jpegChromaQuant),
+        jpegFdct(planes[2], chromaQuant),
         predictors[2],
       );
     }

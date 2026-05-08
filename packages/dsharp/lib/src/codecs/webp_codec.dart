@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import 'binary_io.dart';
 import 'codec.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 import 'webp_alpha.dart';
@@ -44,7 +46,15 @@ final class WebpImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
+    final webpOptions = options is WebpEncoderOptions
+        ? options
+        : const WebpEncoderOptions();
+    if (!webpOptions.lossless) {
+      throw const UnsupportedCodecException(
+        'Lossy WebP encoding is not implemented in pure Dart yet.',
+      );
+    }
     final raw = image.firstFrame.pixels;
     final bytes = encodeWebpLossless(image);
     return EncodedImage(

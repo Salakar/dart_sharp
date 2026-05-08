@@ -8,6 +8,7 @@ import 'binary_io.dart';
 import 'codec.dart';
 import 'codec_pixels.dart';
 import 'deflate_codec.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -97,7 +98,7 @@ final class PngImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     final raw = image.firstFrame.pixels;
     final rgba = rawToRgba(raw);
     final scanlines = ByteWriter();

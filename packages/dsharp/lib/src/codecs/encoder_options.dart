@@ -170,7 +170,7 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Creates WebP options.
   const WebpEncoderOptions({
     this.quality = 80,
-    this.lossless = false,
+    this.lossless = true,
     this.effort = 4,
     super.force,
   });

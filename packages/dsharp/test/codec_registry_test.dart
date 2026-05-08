@@ -86,6 +86,30 @@ void main() {
     expect(decoded.firstFrameBytes().take(3), everyElement(greaterThan(230)));
   });
 
+  test('jpeg encoder quality option changes encoded bytes', () async {
+    final pixels = <int>[
+      for (var y = 0; y < 8; y += 1)
+        for (var x = 0; x < 8; x += 1) ...[x * 31, y * 31, (x + y) * 15],
+    ];
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(pixels),
+      width: 8,
+      height: 8,
+      channels: ChannelCount.three,
+    );
+
+    final low = await ImagePipeline.fromRawPixels(
+      raw,
+    ).jpeg(const JpegEncoderOptions(quality: 20)).toBytes();
+    final high = await ImagePipeline.fromRawPixels(
+      raw,
+    ).jpeg(const JpegEncoderOptions(quality: 90)).toBytes();
+
+    expect(low, isNot(high));
+    expect(sniffImageFormat(low), ImageFormat.jpeg);
+    expect(sniffImageFormat(high), ImageFormat.jpeg);
+  });
+
   test('gif codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(

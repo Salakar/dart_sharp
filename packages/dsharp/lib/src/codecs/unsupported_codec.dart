@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import 'codec.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -25,7 +26,7 @@ final class UnsupportedImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     throw UnsupportedCodecException(
       '${format.id} encode is unsupported. $reason',
     );

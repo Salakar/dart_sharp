@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'codec.dart';
+import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -25,7 +26,7 @@ final class RawImageCodec implements ImageCodec {
   }
 
   @override
-  EncodedImage encode(PixelImage image) {
+  EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
     final bytes = image.firstFrameBytes();
     return EncodedImage(
       bytes: bytes,

@@ -151,7 +151,11 @@ final class ImagePipeline {
       token?.throwIfCancelled();
       _validateMetadataWrites(this);
       final resolved = _resolveOutputFormat(this, format);
-      final encoded = codecs.encode(image, format: resolved);
+      final encoded = codecs.encode(
+        image,
+        format: resolved,
+        options: _encoderOptions?.format == resolved ? _encoderOptions : null,
+      );
       return EncodedImage(
         bytes: encoded.bytes,
         info: _outputInfo(encoded.info, image),

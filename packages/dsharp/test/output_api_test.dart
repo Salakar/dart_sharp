@@ -84,6 +84,12 @@ void main() {
 
   test('unsupported output format and metadata writes fail clearly', () {
     expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).webp(const WebpEncoderOptions(lossless: false)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
       ImagePipeline.fromRawPixels(raw()).withMetadata().png().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
