@@ -6,16 +6,34 @@ import 'pipeline_test_helpers.dart';
 void main() {
   test('ensureAlpha handles grayscale and RGB inputs', () async {
     final gray = await pixels(
-      ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[9])).ensureAlpha(7),
+      ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[9])).ensureAlpha(),
     );
     final rgb = await pixels(
       ImagePipeline.fromRawPixels(
         rawRgb(1, 1, <int>[1, 2, 3]),
-      ).ensureAlpha(128),
+      ).ensureAlpha(0.5),
     );
 
-    expect(firstBytes(gray), <int>[9, 9, 9, 7]);
+    expect(firstBytes(gray), <int>[9, 9, 9, 255]);
     expect(firstBytes(rgb), <int>[1, 2, 3, 128]);
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).ensureAlpha(1.1),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).ensureAlpha(-0.1),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).ensureAlpha(double.nan),
+      throwsA(isA<OperationValidationException>()),
+    );
   });
 
   test('removeAlpha and flatten handle RGBA alpha', () async {

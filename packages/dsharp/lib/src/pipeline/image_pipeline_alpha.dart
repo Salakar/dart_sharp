@@ -2,9 +2,14 @@ part of 'image_pipeline.dart';
 
 /// Alpha and channel pipeline operations.
 extension ImagePipelineAlpha on ImagePipeline {
-  /// Ensures an alpha channel.
-  ImagePipeline ensureAlpha([int alpha = 255]) {
-    return _append(EnsureAlphaOperation(alpha));
+  /// Ensures an alpha channel with [alpha] in the range 0..1.
+  ImagePipeline ensureAlpha([num alpha = 1]) {
+    if (alpha.isNaN || alpha < 0 || alpha > 1) {
+      throw const OperationValidationException(
+        'Alpha must be between 0 and 1.',
+      );
+    }
+    return _append(EnsureAlphaOperation((alpha * 255).round()));
   }
 
   /// Removes alpha.
