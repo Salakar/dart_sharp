@@ -2,12 +2,20 @@ import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
+import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec_pixels.dart';
 
-/// Encodes the first frame as a lossless VP8L WebP image.
+/// Encodes frames as lossless VP8L WebP images.
 Uint8List encodeWebpLossless(PixelImage image) {
-  final raw = image.firstFrame.pixels;
+  _validateDimensions(image.firstFrame.pixels);
+  if (image.isAnimated) {
+    return _animatedWebpContainer(image);
+  }
+  return _webpContainer(_encodeVp8lPayload(image.firstFrame.pixels));
+}
+
+Uint8List _encodeVp8lPayload(RawPixels raw) {
   if (raw.width > 16384 || raw.height > 16384) {
     throw const OperationValidationException(
       'WebP dimensions must be at most 16384x16384.',
@@ -41,7 +49,117 @@ Uint8List encodeWebpLossless(PixelImage image) {
       ..write(_reverseBits(rgba[i], 8), 8)
       ..write(_reverseBits(rgba[i + 2], 8), 8);
   }
-  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+  return Uint8List.fromList(<int>[0x2f, ...bits.finish()]);
+}
+
+Uint8List _animatedWebpContainer(PixelImage image) {
+  final width = image.width;
+  final height = image.height;
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(_hasAnyAlpha(image) ? 0x12 : 0x02)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _writeChunk(content, 'ANIM', _animationPayload(image.loopCount ?? 0));
+  for (final frame in image.frames) {
+    _writeChunk(content, 'ANMF', _framePayload(frame));
+  }
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _animationPayload(int loopCount) {
+  if (loopCount < 0 || loopCount > 0xffff) {
+    throw const OperationValidationException(
+      'WebP loop count must be 0..65535.',
+    );
+  }
+  final writer = ByteWriter()
+    ..writeUint32Le(0)
+    ..writeUint16Le(loopCount);
+  return writer.toBytes();
+}
+
+Uint8List _framePayload(ImageFrame frame) {
+  _validateDimensions(frame.pixels);
+  final writer = ByteWriter();
+  _writeUint24Le(writer, 0);
+  _writeUint24Le(writer, 0);
+  _writeUint24Le(writer, frame.width - 1);
+  _writeUint24Le(writer, frame.height - 1);
+  _writeUint24Le(writer, frame.delay?.inMilliseconds ?? 0);
+  writer.writeByte(0x02);
+  _writeChunk(writer, 'VP8L', _encodeVp8lPayload(frame.pixels));
+  return writer.toBytes();
+}
+
+void _validateDimensions(RawPixels raw) {
+  if (raw.width > 16384 || raw.height > 16384) {
+    throw const OperationValidationException(
+      'WebP dimensions must be at most 16384x16384.',
+    );
+  }
+}
+
+bool _hasAnyAlpha(PixelImage image) {
+  for (final frame in image.frames) {
+    if (_hasAlpha(frame.pixels)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _hasAlpha(RawPixels raw) {
+  if (raw.channels == ChannelCount.two) {
+    final bytes = raw.bytes;
+    for (var i = 1; i < bytes.length; i += 2) {
+      if (bytes[i] != 255) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (raw.channels != ChannelCount.four) {
+    return false;
+  }
+  final bytes = raw.bytes;
+  for (var i = 3; i < bytes.length; i += 4) {
+    if (bytes[i] != 255) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void _writeChunk(ByteWriter writer, String type, Uint8List payload) {
+  writer
+    ..writeAscii(type)
+    ..writeUint32Le(payload.length)
+    ..writeBytes(payload);
+  if (payload.length.isOdd) {
+    writer.writeByte(0);
+  }
+}
+
+void _writeUint24Le(ByteWriter writer, int value) {
+  if (value < 0 || value > 0xffffff) {
+    throw const OperationValidationException(
+      'WebP 24-bit fields must be 0..16777215.',
+    );
+  }
+  writer
+    ..writeByte(value)
+    ..writeByte(value >> 8)
+    ..writeByte(value >> 16);
 }
 
 void _writeBytePrefixCode(_Vp8lBitWriter bits, int alphabetSize) {

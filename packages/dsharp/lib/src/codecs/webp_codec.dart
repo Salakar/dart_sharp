@@ -65,6 +65,12 @@ final class WebpImageCodec implements ImageCodec {
         width: raw.width,
         height: raw.height,
         channels: 4,
+        frames: image.frames.length,
+        loopCount: image.loopCount,
+        frameDelays: <Duration>[
+          for (final frame in image.frames)
+            if (frame.delay != null) frame.delay!,
+        ],
       ),
     );
   }
