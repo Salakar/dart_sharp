@@ -121,9 +121,9 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
-    if (!pngOptions.palette && pngOptions.bitDepth != 8) {
+    if (!pngOptions.palette && !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
       throw const UnsupportedCodecException(
-        'PNG non-palette encoding currently supports 8-bit output only.',
+        'PNG grayscale encoding supports bit depths 1, 2, 4, and 8.',
       );
     }
     if (pngOptions.palette && !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
@@ -135,6 +135,9 @@ final class PngImageCodec implements ImageCodec {
     final rgba = rawToRgba(raw);
     if (pngOptions.palette) {
       return _encodePalettePng(raw.width, raw.height, rgba, pngOptions);
+    }
+    if (pngOptions.bitDepth < 8) {
+      return _encodeGrayscalePng(raw.width, raw.height, rgba, pngOptions);
     }
     final writer = ByteWriter()..writeBytes(_signature);
     _writeChunk(
@@ -227,6 +230,52 @@ EncodedImage _encodePalettePng(
       width: width,
       height: height,
       channels: 4,
+    ),
+  );
+}
+
+EncodedImage _encodeGrayscalePng(
+  int width,
+  int height,
+  Uint8List rgba,
+  PngEncoderOptions options,
+) {
+  final writer = ByteWriter()..writeBytes(PngImageCodec._signature);
+  _writeChunk(
+    writer,
+    'IHDR',
+    _ihdr(
+      width,
+      height,
+      bitDepth: options.bitDepth,
+      colorType: 0,
+      interlace: options.progressive ? 1 : 0,
+    ),
+  );
+  final data = _grayscaleScanlines(
+    width,
+    height,
+    rgba,
+    bitDepth: options.bitDepth,
+    interlaced: options.progressive,
+  );
+  _writeChunk(
+    writer,
+    'IDAT',
+    options.compressionLevel == 0
+        ? zlibEncodeStored(data)
+        : zlibEncodeFixed(data),
+  );
+  _writeChunk(writer, 'IEND', Uint8List(0));
+  final bytes = writer.toBytes();
+  return EncodedImage(
+    bytes: bytes,
+    info: OutputInfo(
+      format: ImageFormat.png,
+      size: bytes.length,
+      width: width,
+      height: height,
+      channels: 1,
     ),
   );
 }
@@ -438,9 +487,8 @@ bool _supportsPngBitDepth(int colorType, int bitDepth) {
   };
 }
 
-bool _supportsPaletteBitDepth(int bitDepth) {
-  return bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8;
-}
+bool _supportsPaletteBitDepth(int bitDepth) =>
+    bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8;
 
 int _scanlineBytes(int width, int channels, int bitDepth) {
   return ((width * channels * bitDepth) + 7) >> 3;
@@ -548,6 +596,56 @@ Uint8List _indexedScanlines(
     }
   }
   return scanlines.toBytes();
+}
+
+Uint8List _grayscaleScanlines(
+  int width,
+  int height,
+  Uint8List rgba, {
+  required int bitDepth,
+  required bool interlaced,
+}) {
+  final scanlines = ByteWriter();
+  if (!interlaced) {
+    for (var y = 0; y < height; y += 1) {
+      scanlines.writeByte(0);
+      final samples = <int>[
+        for (var x = 0; x < width; x += 1)
+          _grayscaleSample(rgba, y * width + x, bitDepth),
+      ];
+      _writeIndexedRow(scanlines, samples, 0, width, bitDepth);
+    }
+    return scanlines.toBytes();
+  }
+  for (final pass in _adam7Passes) {
+    final passWidth = _passSize(width, pass.start, pass.step);
+    final passHeight = _passSize(height, pass.yStart, pass.yStep);
+    if (passWidth == 0 || passHeight == 0) {
+      continue;
+    }
+    for (var row = 0; row < passHeight; row += 1) {
+      final y = pass.yStart + row * pass.yStep;
+      final rowBase = y * width + pass.start;
+      scanlines.writeByte(0);
+      final samples = <int>[
+        for (var col = 0; col < passWidth; col += 1)
+          _grayscaleSample(rgba, rowBase + col * pass.step, bitDepth),
+      ];
+      _writeIndexedRow(scanlines, samples, 0, passWidth, bitDepth);
+    }
+  }
+  return scanlines.toBytes();
+}
+
+int _grayscaleSample(Uint8List rgba, int pixel, int bitDepth) {
+  final offset = pixel * 4;
+  if (rgba[offset + 3] != 255) {
+    throw const UnsupportedCodecException('Opaque pixels required.');
+  }
+  final gray =
+      (rgba[offset] * 299 + rgba[offset + 1] * 587 + rgba[offset + 2] * 114) ~/
+      1000;
+  return (gray * ((1 << bitDepth) - 1) + 127) ~/ 255;
 }
 
 void _writeIndexedRow(

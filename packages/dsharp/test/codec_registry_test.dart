@@ -115,6 +115,41 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
+  test('png encoder bitDepth writes low-bit grayscale', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        0,
+        0,
+        0,
+        255,
+        85,
+        85,
+        85,
+        255,
+        170,
+        170,
+        170,
+        255,
+        255,
+        255,
+        255,
+        255,
+      ]),
+      width: 4,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(bitDepth: 2)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_pngColorType(encoded), 0);
+    expect(_pngBitDepth(encoded), 2);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('jpeg codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
