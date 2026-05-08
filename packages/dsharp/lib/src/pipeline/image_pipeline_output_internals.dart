@@ -83,7 +83,8 @@ bool _isSupportedMetadataWrite(MetadataWriteOptions writes) {
       writes.keepXmp ||
       writes.keepExif ||
       writes.keepIcc ||
-      writes.withMetadata;
+      writes.withMetadata ||
+      writes.density != null;
 }
 
 EncodedImage _applyMetadataWrites(
@@ -103,11 +104,15 @@ EncodedImage _applyMetadataWrites(
   final icc =
       writes.iccProfile ??
       (writes.keepIcc || keepAll ? _sourceIcc(pipeline) : null);
-  if (xmp == null && exif == null && icc == null) {
+  final density = writes.density;
+  if (xmp == null && exif == null && icc == null && density == null) {
     return encoded;
   }
   var bytes = encoded.bytes;
   if (encoded.info.format == ImageFormat.png) {
+    if (density != null) {
+      bytes = _writePngDensity(bytes, density);
+    }
     if (icc != null) {
       bytes = _writePngIcc(bytes, icc);
     }
@@ -123,6 +128,11 @@ EncodedImage _applyMetadataWrites(
     );
   }
   if (encoded.info.format == ImageFormat.webp) {
+    if (density != null) {
+      throw const UnsupportedCodecException(
+        'Metadata density writing is only implemented for JPEG and PNG output.',
+      );
+    }
     if (icc != null) {
       bytes = _writeWebpIcc(bytes, icc);
     }
@@ -138,6 +148,9 @@ EncodedImage _applyMetadataWrites(
     );
   }
   if (encoded.info.format == ImageFormat.jpeg) {
+    if (density != null) {
+      bytes = _writeJpegDensity(bytes, density);
+    }
     if (icc != null) {
       bytes = _writeJpegIcc(bytes, icc);
     }

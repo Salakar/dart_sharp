@@ -13,6 +13,7 @@ final class MetadataWriteOptions {
     this.iccProfile,
     this.xmp,
     this.withMetadata = false,
+    this.density,
   });
 
   /// Keep existing EXIF metadata.
@@ -36,6 +37,9 @@ final class MetadataWriteOptions {
   /// Request broad metadata preservation.
   final bool withMetadata;
 
+  /// Optional output density in pixels per inch.
+  final double? density;
+
   /// Whether this request needs metadata writing support.
   bool get isRequested =>
       keepExif ||
@@ -44,7 +48,8 @@ final class MetadataWriteOptions {
       exif != null ||
       iccProfile != null ||
       xmp != null ||
-      withMetadata;
+      withMetadata ||
+      density != null;
 
   /// Returns a copy with fields replaced.
   MetadataWriteOptions copyWith({
@@ -58,6 +63,8 @@ final class MetadataWriteOptions {
     XmpMetadata? xmp,
     bool clearXmp = false,
     bool? withMetadata,
+    double? density,
+    bool clearDensity = false,
   }) {
     return MetadataWriteOptions(
       keepExif: keepExif ?? this.keepExif,
@@ -67,6 +74,7 @@ final class MetadataWriteOptions {
       iccProfile: clearIccProfile ? null : iccProfile ?? this.iccProfile,
       xmp: clearXmp ? null : xmp ?? this.xmp,
       withMetadata: withMetadata ?? this.withMetadata,
+      density: clearDensity ? null : density ?? this.density,
     );
   }
 }

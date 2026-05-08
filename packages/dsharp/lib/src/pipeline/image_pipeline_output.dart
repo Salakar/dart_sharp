@@ -113,10 +113,15 @@ extension ImagePipelineOutput on ImagePipeline {
   }
 
   /// Requests broad metadata preservation.
-  ImagePipeline withMetadata() {
+  ImagePipeline withMetadata({num? density}) {
+    final resolvedDensity = _resolveMetadataDensity(density);
     return _copyPipelineWith(
       this,
-      metadataWrites: _metadataWrites.copyWith(withMetadata: true),
+      metadataWrites: _metadataWrites.copyWith(
+        withMetadata: true,
+        density: resolvedDensity,
+        clearDensity: density == null,
+      ),
     );
   }
 
@@ -233,4 +238,16 @@ Duration? _resolveTimeoutArgument(Object options) {
   throw const OperationValidationException(
     'Timeout options must be a Duration or map with seconds.',
   );
+}
+
+double? _resolveMetadataDensity(num? density) {
+  if (density == null) {
+    return null;
+  }
+  if (density.isNaN || density <= 0 || !density.isFinite) {
+    throw const OperationValidationException(
+      'Metadata density must be a positive finite number.',
+    );
+  }
+  return density.toDouble();
 }
