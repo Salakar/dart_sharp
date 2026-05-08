@@ -21,16 +21,22 @@ final class JpegEncoderOptions extends EncoderOptions {
   /// Creates JPEG options.
   const JpegEncoderOptions({
     this.quality = 80,
-    this.progressive = false,
+    bool progressive = false,
+    bool? optimizeScans,
+    bool? optimiseScans,
     this.chromaSubsampling = '4:2:0',
     super.force,
-  });
+  }) : optimizeScans = optimizeScans ?? optimiseScans ?? false,
+       progressive = progressive || (optimizeScans ?? optimiseScans ?? false);
 
   /// Quality from 1 to 100.
   final int quality;
 
   /// Whether to emit progressive JPEG.
   final bool progressive;
+
+  /// Whether to optimize progressive scan output.
+  final bool optimizeScans;
 
   /// Chroma subsampling mode.
   final String chromaSubsampling;
