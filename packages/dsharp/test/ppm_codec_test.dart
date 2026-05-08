@@ -8,7 +8,8 @@ void main() {
     expect(sniffImageFormat(_ascii('P6\n1 1\n255\n')), ImageFormat.ppm);
     expect(sniffImageFormat(_ascii('P5\t1 1\n255\n')), ImageFormat.ppm);
     expect(sniffImageFormat(_ascii('P3 1 1 255 0 0 0')), ImageFormat.ppm);
-    expect(sniffImageFormat(_ascii('P4\n1 1\n')), ImageFormat.unknown);
+    expect(sniffImageFormat(_ascii('P4\n1 1\n')), ImageFormat.ppm);
+    expect(sniffImageFormat(_ascii('P1 1 1 0')), ImageFormat.ppm);
   });
 
   test('decodes binary PPM with comments', () async {
@@ -65,6 +66,39 @@ void main() {
     expect(pgm.firstFrameBytes(), <int>[0, 0, 0, 255, 255, 255, 255, 255]);
   });
 
+  test('decodes ASCII and binary PBM variants', () async {
+    final ascii = await ImagePipeline.fromBytes(
+      _ascii('P1\n3 1\n0 1 0\n'),
+    ).toPixelImage();
+    final binary = await ImagePipeline.fromBytes(
+      Uint8List.fromList(<int>[..._ascii('P4\n3 1\n'), 0x40]),
+    ).toPixelImage();
+    final padded = await ImagePipeline.fromBytes(
+      Uint8List.fromList(<int>[..._ascii('P4\n9 2\n'), 0x80, 0x80, 0, 0x80]),
+    ).toPixelImage();
+
+    expect(ascii.firstFrameBytes(), <int>[
+      255,
+      255,
+      255,
+      255,
+      0,
+      0,
+      0,
+      255,
+      255,
+      255,
+      255,
+      255,
+    ]);
+    expect(binary.firstFrameBytes(), ascii.firstFrameBytes());
+    final paddedBytes = padded.firstFrameBytes();
+    expect(
+      <int>[paddedBytes[0], paddedBytes[32], paddedBytes[36], paddedBytes[68]],
+      <int>[0, 0, 255, 0],
+    );
+  });
+
   test('encodes PPM through format selection and round trips', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[10, 20, 30, 40, 200, 210, 220, 230]),
@@ -98,6 +132,7 @@ void main() {
 
     expect(ImageFormat.fromId('pnm'), ImageFormat.ppm);
     expect(ImageFormat.fromId('pgm'), ImageFormat.ppm);
+    expect(ImageFormat.fromId('pbm'), ImageFormat.ppm);
     expect(support.canDecode, isTrue);
     expect(support.canEncode, isTrue);
     expect(support.metadata, CodecAvailability.unsupported);
@@ -110,6 +145,16 @@ void main() {
     );
     await expectLater(
       ImagePipeline.fromBytes(_ascii('P2\n1 1\n3\n4\n')).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(_ascii('P1\n1 1\n2\n')).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(
+        Uint8List.fromList(<int>[..._ascii('P4\n9 1\n'), 0]),
+      ).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
     );
   });

@@ -54,8 +54,10 @@ ImageFormat sniffImageFormat(Uint8List bytes) {
   }
   if (bytes.length >= 3 &&
       bytes[0] == 0x50 &&
-      (bytes[1] == 0x32 ||
+      (bytes[1] == 0x31 ||
+          bytes[1] == 0x32 ||
           bytes[1] == 0x33 ||
+          bytes[1] == 0x34 ||
           bytes[1] == 0x35 ||
           bytes[1] == 0x36) &&
       _isWhitespace(bytes[2])) {

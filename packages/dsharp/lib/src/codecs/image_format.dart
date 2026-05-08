@@ -18,8 +18,8 @@ enum ImageFormat {
   /// Raw pixel bytes with caller-supplied dimensions.
   raw('raw'),
 
-  /// Netpbm portable pixmap/graymap image data.
-  ppm('ppm', aliases: ['pnm', 'pgm']),
+  /// Netpbm portable pixmap/graymap/bitmap image data.
+  ppm('ppm', aliases: ['pnm', 'pgm', 'pbm']),
 
   /// AV1 Image File Format.
   avif('avif'),

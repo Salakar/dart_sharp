@@ -12,7 +12,7 @@ import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
-/// First-party Netpbm PPM/PGM codec.
+/// First-party Netpbm PPM/PGM/PBM codec.
 final class PpmImageCodec implements ImageCodec {
   /// Creates a PPM codec.
   const PpmImageCodec();
@@ -24,14 +24,15 @@ final class PpmImageCodec implements ImageCodec {
   PixelImage decode(Uint8List bytes) {
     final scanner = _PnmScanner(bytes);
     final magic = scanner.nextToken();
-    final isAscii = magic == 'P2' || magic == 'P3';
-    final isGray = magic == 'P2' || magic == 'P5';
+    final isBitmap = magic == 'P1' || magic == 'P4';
+    final isAscii = magic == 'P1' || magic == 'P2' || magic == 'P3';
+    final isGray = isBitmap || magic == 'P2' || magic == 'P5';
     if (!isAscii && !isGray && magic != 'P6') {
       throw const InvalidImageException('Invalid PPM signature.');
     }
     final width = scanner.nextInt('width');
     final height = scanner.nextInt('height');
-    final maxValue = scanner.nextInt('max value');
+    final maxValue = isBitmap ? 1 : scanner.nextInt('max value');
     if (width <= 0 || height <= 0) {
       throw const InvalidImageException('Invalid PPM dimensions.');
     }
@@ -44,8 +45,22 @@ final class PpmImageCodec implements ImageCodec {
       frames: 1,
     );
     final rgba = isAscii
-        ? _decodeAsciiPnm(scanner, width, height, maxValue, isGray: isGray)
-        : _decodeBinaryPnm(scanner, width, height, maxValue, isGray: isGray);
+        ? _decodeAsciiPnm(
+            scanner,
+            width,
+            height,
+            maxValue,
+            isGray: isGray,
+            isBitmap: isBitmap,
+          )
+        : _decodeBinaryPnm(
+            scanner,
+            width,
+            height,
+            maxValue,
+            isGray: isGray,
+            isBitmap: isBitmap,
+          );
     return PixelImage.fromRawPixels(
       RawPixels(
         bytes: rgba,
@@ -88,12 +103,18 @@ Uint8List _decodeAsciiPnm(
   int height,
   int maxValue, {
   required bool isGray,
+  required bool isBitmap,
 }) {
   final rgba = Uint8List(width * height * 4);
   final samplesPerPixel = isGray ? 1 : 3;
   for (var pixel = 0; pixel < width * height; pixel += 1) {
     final out = pixel * 4;
-    if (isGray) {
+    if (isBitmap) {
+      final gray = _pbmGray(scanner.nextInt('sample'));
+      rgba[out] = gray;
+      rgba[out + 1] = gray;
+      rgba[out + 2] = gray;
+    } else if (isGray) {
       final gray = _scalePnmSample(scanner.nextInt('sample'), maxValue);
       rgba[out] = gray;
       rgba[out + 1] = gray;
@@ -117,7 +138,11 @@ Uint8List _decodeBinaryPnm(
   int height,
   int maxValue, {
   required bool isGray,
+  required bool isBitmap,
 }) {
+  if (isBitmap) {
+    return _decodeBinaryPbm(scanner, width, height);
+  }
   scanner.consumeRasterSeparator();
   final samplesPerPixel = isGray ? 1 : 3;
   final bytesPerSample = maxValue < 256 ? 1 : 2;
@@ -153,11 +178,42 @@ Uint8List _decodeBinaryPnm(
   return rgba;
 }
 
+Uint8List _decodeBinaryPbm(_PnmScanner scanner, int width, int height) {
+  scanner.consumeRasterSeparator();
+  final rowBytes = (width + 7) >> 3;
+  final expectedBytes = rowBytes * height;
+  if (scanner.offset + expectedBytes > scanner.bytes.length) {
+    throw const InvalidImageException('Truncated PPM raster data.');
+  }
+  final rgba = Uint8List(width * height * 4);
+  for (var y = 0; y < height; y += 1) {
+    final row = scanner.offset + y * rowBytes;
+    for (var x = 0; x < width; x += 1) {
+      final byte = scanner.bytes[row + (x >> 3)];
+      final bit = (byte >> (7 - (x & 7))) & 1;
+      final gray = _pbmGray(bit);
+      final out = ((y * width) + x) * 4;
+      rgba[out] = gray;
+      rgba[out + 1] = gray;
+      rgba[out + 2] = gray;
+      rgba[out + 3] = 255;
+    }
+  }
+  return rgba;
+}
+
 int _readPnmSample(Uint8List bytes, int offset, int bytesPerSample) {
   if (bytesPerSample == 1) {
     return bytes[offset];
   }
   return readUint16Be(bytes, offset);
+}
+
+int _pbmGray(int value) {
+  if (value != 0 && value != 1) {
+    throw const InvalidImageException('Invalid PPM sample value.');
+  }
+  return value == 0 ? 255 : 0;
 }
 
 int _scalePnmSample(int value, int maxValue) {
