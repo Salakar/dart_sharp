@@ -63,6 +63,18 @@ final class JpegState {
   /// Image height.
   int height = 0;
 
+  /// Sample precision in bits.
+  int precision = 8;
+
+  /// Whether this frame uses lossless predictive entropy coding.
+  bool lossless = false;
+
+  /// Lossless JPEG predictor selection value.
+  int losslessPredictor = 1;
+
+  /// Lossless JPEG point transform.
+  int pointTransform = 0;
+
   /// Frame components.
   final List<JpegComponent> components = <JpegComponent>[];
 

@@ -8,10 +8,16 @@ import 'jpeg_models.dart';
 import 'jpeg_tables.dart';
 import 'jpeg_transform.dart';
 
+part 'jpeg_lossless.dart';
+
 /// Decodes baseline sequential JPEG bytes to RGBA pixels.
 RawPixels decodeJpegBytes(Uint8List bytes) {
   final state = _parse(bytes);
-  _decodeScan(state);
+  if (state.lossless) {
+    _decodeLosslessScan(state);
+  } else {
+    _decodeScan(state);
+  }
   return RawPixels(
     bytes: _composeRgba(state),
     width: state.width,
@@ -53,6 +59,10 @@ JpegState _parse(Uint8List bytes) {
     } else if (marker == 0xc4) {
       _readDht(state, data);
     } else if (marker == 0xc0) {
+      state.lossless = false;
+      _readSof0(state, data);
+    } else if (marker == 0xc3) {
+      state.lossless = true;
       _readSof0(state, data);
     } else if (marker == 0xdd) {
       state.restartInterval = readUint16Be(data, 0);
@@ -112,6 +122,7 @@ void _readSof0(JpegState state, Uint8List data) {
   if (data[0] != 8) {
     throw const UnsupportedCodecException('Only 8-bit JPEG is supported.');
   }
+  state.precision = data[0];
   state.height = readUint16Be(data, 1);
   state.width = readUint16Be(data, 3);
   final count = data[5];
@@ -153,6 +164,10 @@ void _readSos(JpegState state, Uint8List data) {
       ..dcTable = tables >> 4
       ..acTable = tables & 0x0f;
     components.add(component);
+  }
+  if (offset + 3 <= data.length) {
+    state.losslessPredictor = data[offset];
+    state.pointTransform = data[offset + 2] & 0x0f;
   }
   state.scan = JpegScan(
     components: components,
@@ -327,6 +342,9 @@ void _writeSamples(
 }
 
 Uint8List _composeRgba(JpegState state) {
+  if (state.lossless && state.components.length == 3) {
+    return _composeRgbRgba(state);
+  }
   if (state.components.length == 4) {
     if (state.adobeTransform != 2) {
       return _composeCmykRgba(state);
@@ -353,6 +371,21 @@ Uint8List _composeRgba(JpegState state) {
       rgba[out + 2] = rgb.b;
       rgba[out + 3] = 255;
     }
+  }
+  return rgba;
+}
+
+Uint8List _composeRgbRgba(JpegState state) {
+  final rgba = Uint8List(state.width * state.height * 4);
+  final r = state.components[0].samples;
+  final g = state.components[1].samples;
+  final b = state.components[2].samples;
+  for (var pixel = 0; pixel < state.width * state.height; pixel += 1) {
+    final out = pixel * 4;
+    rgba[out] = r[pixel];
+    rgba[out + 1] = g[pixel];
+    rgba[out + 2] = b[pixel];
+    rgba[out + 3] = 255;
   }
   return rgba;
 }

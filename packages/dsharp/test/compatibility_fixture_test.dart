@@ -78,6 +78,34 @@ void main() {
     );
   });
 
+  test('optional upstream lossless JPEG fixture decodes pixels', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/testimgl.jpg');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final image = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).toPixelImage();
+
+    expect(image.width, 227);
+    expect(image.height, 149);
+    expect(image.firstFrameBytes().sublist(0, 4), <int>[48, 46, 44, 255]);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 100, 60, <int>[
+      242,
+      50,
+      52,
+      255,
+    ], tolerance: 0);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 226, 148, <int>[
+      38,
+      46,
+      38,
+      255,
+    ], tolerance: 0);
+  });
+
   test('optional upstream restart JPEG fixture decodes pixels', () async {
     final fixture = File('../../sharp_clone/test/fixtures/Landscape_9.jpg');
     if (!fixture.existsSync()) {
