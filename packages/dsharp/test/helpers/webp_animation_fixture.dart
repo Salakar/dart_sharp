@@ -163,6 +163,15 @@ Uint8List animatedVp8lWebpWithoutFrames() {
   );
 }
 
+/// Builds an invalid animation that also carries a top-level image chunk.
+Uint8List animatedVp8lWebpWithTopLevelImageChunk() {
+  return _invalidAnimatedVp8lWebp(
+    vp8xFlags: 0x02,
+    includeAnim: true,
+    includeTopLevelImage: true,
+  );
+}
+
 /// Builds an invalid VP8L animation frame that also carries an ALPH chunk.
 Uint8List animatedVp8lWebpWithAlphaChunk() {
   final frame = _vp8lPayload(
@@ -308,6 +317,7 @@ Uint8List _invalidAnimatedVp8lWebp({
   required int vp8xFlags,
   required bool includeAnim,
   bool includeFrame = true,
+  bool includeTopLevelImage = false,
 }) {
   final frame = _vp8lPayload(
     width: 1,
@@ -351,6 +361,9 @@ Uint8List _invalidAnimatedVp8lWebp({
         vp8l: frame,
       ),
     );
+  }
+  if (includeTopLevelImage) {
+    _writeChunk(chunks, 'VP8L', frame);
   }
   final payload = chunks.finish();
   return (_ByteWriter()

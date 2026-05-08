@@ -175,6 +175,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
   }
   if (parsed.isAnimated) {
+    if (imageChunkCount != 0) {
+      throw const InvalidImageException(
+        'WebP animation has top-level image chunks.',
+      );
+    }
     if (!hasAnimationHeader) {
       throw const InvalidImageException('WebP animation is missing ANIM.');
     }
