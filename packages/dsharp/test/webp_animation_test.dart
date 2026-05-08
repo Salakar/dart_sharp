@@ -2,6 +2,7 @@ import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
 import 'helpers/webp_lossless_fixture.dart';
+import 'helpers/webp_lossy_fixture.dart';
 
 void main() {
   test('decodes extended static WebP with VP8L payload', () async {
@@ -90,6 +91,47 @@ void main() {
       255,
       0,
       0,
+      255,
+    ]);
+  });
+
+  test('decodes animated WebP with VP8 frame payloads', () async {
+    final bytes = animatedVp8Webp(width: 2, height: 1);
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.frames, 1);
+    expect(image.loopCount, 1);
+    expect(image.frames.first.delay, const Duration(milliseconds: 15));
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
+  test('applies ALPH chunks to animated VP8 frame payloads', () async {
+    final bytes = animatedVp8Webp(width: 2, height: 1, alpha: <int>[0, 255]);
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.hasAlpha, isTrue);
+    expect(image.firstFrameBytes(), <int>[
+      128,
+      128,
+      128,
+      0,
+      128,
+      128,
+      128,
       255,
     ]);
   });

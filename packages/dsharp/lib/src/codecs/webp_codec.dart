@@ -28,7 +28,7 @@ final class WebpImageCodec implements ImageCodec {
   PixelImage decode(Uint8List bytes) {
     final info = readWebpInfo(bytes);
     if (info.isAnimated) {
-      return decodeAnimatedWebpLossless(bytes);
+      return decodeAnimatedWebp(bytes);
     }
     if (info.compression == WebpCompression.vp8) {
       return PixelImage.fromRawPixels(decodeWebpVp8(bytes));

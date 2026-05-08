@@ -4,10 +4,12 @@ import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
+import 'webp_alpha.dart';
 import 'webp_lossless.dart';
+import 'webp_vp8.dart';
 
-/// Decodes animated WebP frames whose frame payloads are VP8L.
-PixelImage decodeAnimatedWebpLossless(Uint8List bytes) {
+/// Decodes animated WebP frames whose frame payloads are VP8L or VP8.
+PixelImage decodeAnimatedWebp(Uint8List bytes) {
   final animation = _readAnimation(bytes);
   final canvas = Uint8List(animation.width * animation.height * 4);
   _fillRect(
@@ -34,7 +36,7 @@ PixelImage decodeAnimatedWebpLossless(Uint8List bytes) {
         animation.background,
       );
     }
-    final pixels = decodeWebpLosslessChunk(frame.vp8l);
+    final pixels = _decodeFramePixels(frame);
     if (pixels.width != frame.width || pixels.height != frame.height) {
       throw const InvalidImageException('Invalid WebP animation frame size.');
     }
@@ -124,6 +126,8 @@ _AnimationFrame _readFrame(Uint8List data) {
     throw const InvalidImageException('Invalid WebP animation frame header.');
   }
   Uint8List? vp8l;
+  Uint8List? vp8;
+  Uint8List? alpha;
   var offset = 16;
   while (offset + 8 <= data.length) {
     final type = String.fromCharCodes(data.sublist(offset, offset + 4));
@@ -135,16 +139,20 @@ _AnimationFrame _readFrame(Uint8List data) {
     }
     if (type == 'VP8L') {
       vp8l = data.sublist(start, end);
-    } else if (type == 'VP8 ' || type == 'ALPH') {
-      throw const UnsupportedCodecException(
-        'Animated WebP currently supports VP8L frame payloads only.',
-      );
+    } else if (type == 'VP8 ') {
+      vp8 = data.sublist(start, end);
+    } else if (type == 'ALPH') {
+      alpha = data.sublist(start, end);
     }
     offset = end + (length.isOdd ? 1 : 0);
   }
-  final payload = vp8l;
-  if (payload == null) {
-    throw const InvalidImageException('WebP animation frame has no VP8L data.');
+  if ((vp8l == null) == (vp8 == null)) {
+    throw const InvalidImageException(
+      'WebP animation frame has no image data.',
+    );
+  }
+  if (vp8l != null && alpha != null) {
+    throw const InvalidImageException('WebP VP8L animation frame has ALPH.');
   }
   final flags = data[15];
   return _AnimationFrame(
@@ -155,8 +163,38 @@ _AnimationFrame _readFrame(Uint8List data) {
     duration: Duration(milliseconds: _uint24Le(data, 12)),
     blend: (flags & 0x02) == 0,
     dispose: (flags & 0x01) != 0,
-    vp8l: payload,
+    vp8l: vp8l,
+    vp8: vp8,
+    alpha: alpha,
   );
+}
+
+RawPixels _decodeFramePixels(_AnimationFrame frame) {
+  final vp8l = frame.vp8l;
+  if (vp8l != null) {
+    return decodeWebpLosslessChunk(vp8l);
+  }
+  var pixels = decodeWebpVp8Chunk(frame.vp8!);
+  final alpha = frame.alpha;
+  if (alpha == null) {
+    return pixels;
+  }
+  final values = decodeWebpAlphaChunk(
+    alpha,
+    width: pixels.width,
+    height: pixels.height,
+  );
+  final rgba = pixels.bytes;
+  for (var i = 0; i < values.length; i += 1) {
+    rgba[i * 4 + 3] = values[i];
+  }
+  pixels = RawPixels(
+    bytes: rgba,
+    width: pixels.width,
+    height: pixels.height,
+    channels: ChannelCount.four,
+  );
+  return pixels;
 }
 
 void _drawFrame(
@@ -273,6 +311,8 @@ final class _AnimationFrame {
     required this.blend,
     required this.dispose,
     required this.vp8l,
+    required this.vp8,
+    required this.alpha,
   });
 
   final int x;
@@ -282,7 +322,9 @@ final class _AnimationFrame {
   final Duration duration;
   final bool blend;
   final bool dispose;
-  final Uint8List vp8l;
+  final Uint8List? vp8l;
+  final Uint8List? vp8;
+  final Uint8List? alpha;
 }
 
 final class _FrameRect {

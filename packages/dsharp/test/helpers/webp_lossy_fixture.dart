@@ -117,6 +117,69 @@ Uint8List truncatedCompressedAlphaVp8Webp({
   return _riffWebp(chunks.finish());
 }
 
+/// Builds an animated WebP with one lossy VP8 frame and optional ALPH data.
+Uint8List animatedVp8Webp({
+  required int width,
+  required int height,
+  List<int>? alpha,
+}) {
+  if (alpha != null && alpha.length != width * height) {
+    throw ArgumentError.value(alpha.length, 'alpha.length');
+  }
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(alpha == null ? 0x02 : 0x12)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(
+    chunks,
+    'ANIM',
+    (_ByteWriter()
+          ..u32(0)
+          ..u16(1))
+        .finish(),
+  );
+  _writeChunk(
+    chunks,
+    'ANMF',
+    _lossyAnimationFramePayload(
+      width: width,
+      height: height,
+      durationMs: 15,
+      vp8: vp8,
+      alpha: alpha,
+    ),
+  );
+  return _riffWebp(chunks.finish());
+}
+
+Uint8List _lossyAnimationFramePayload({
+  required int width,
+  required int height,
+  required int durationMs,
+  required Uint8List vp8,
+  required List<int>? alpha,
+}) {
+  final out = _ByteWriter()
+    ..u24(0)
+    ..u24(0)
+    ..u24(width - 1)
+    ..u24(height - 1)
+    ..u24(durationMs)
+    ..byte(2);
+  final alphaValues = alpha;
+  if (alphaValues != null) {
+    _writeChunk(out, 'ALPH', Uint8List.fromList(<int>[0, ...alphaValues]));
+  }
+  _writeChunk(out, 'VP8 ', vp8);
+  return out.finish();
+}
+
 Uint8List _compressedAlphaPayload(List<int> values) {
   final symbols = <int>[];
   for (final value in values) {
