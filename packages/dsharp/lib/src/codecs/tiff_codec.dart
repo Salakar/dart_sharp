@@ -49,8 +49,9 @@ final class TiffImageCodec implements ImageCodec {
       1 => strip,
       5 => _tiffLzwDecode(strip),
       8 || 32946 => zlibDecode(Uint8List.fromList(strip)),
+      32773 => _tiffPackBitsDecode(strip),
       _ => throw const UnsupportedCodecException(
-        'Only uncompressed, LZW, and deflate TIFF are supported.',
+        'Only uncompressed, LZW, PackBits, and deflate TIFF are supported.',
       ),
     };
     if (predictor == 2) {
@@ -107,12 +108,14 @@ final class TiffImageCodec implements ImageCodec {
     final encodedPixels = switch (tiffOptions.compression) {
       TiffCompression.none => pixels,
       TiffCompression.lzw => _tiffLzwEncode(pixels),
+      TiffCompression.packBits => _tiffPackBitsEncode(pixels),
       TiffCompression.deflate => zlibEncodeFixed(pixels),
       TiffCompression.jpeg => throw StateError('unreachable'),
     };
     final compressionTag = switch (tiffOptions.compression) {
       TiffCompression.none => 1,
       TiffCompression.lzw => 5,
+      TiffCompression.packBits => 32773,
       TiffCompression.deflate => 8,
       TiffCompression.jpeg => throw StateError('unreachable'),
     };
@@ -321,6 +324,68 @@ Uint8List _tiffLzwEncode(List<int> bytes) {
   }
   writer.write(257, codeWidth);
   return writer.finish();
+}
+
+Uint8List _tiffPackBitsDecode(Uint8List bytes) {
+  final out = <int>[];
+  var offset = 0;
+  while (offset < bytes.length) {
+    final header = bytes[offset++];
+    if (header <= 127) {
+      final count = header + 1;
+      if (offset + count > bytes.length) {
+        throw const InvalidImageException('Truncated TIFF PackBits literal.');
+      }
+      out.addAll(bytes.sublist(offset, offset + count));
+      offset += count;
+    } else if (header >= 129) {
+      if (offset >= bytes.length) {
+        throw const InvalidImageException('Truncated TIFF PackBits run.');
+      }
+      out.addAll(List<int>.filled(257 - header, bytes[offset++]));
+    }
+  }
+  return Uint8List.fromList(out);
+}
+
+Uint8List _tiffPackBitsEncode(List<int> bytes) {
+  final out = <int>[];
+  var offset = 0;
+  while (offset < bytes.length) {
+    final run = _packBitsRunLength(bytes, offset);
+    if (run >= 3) {
+      out
+        ..add(257 - run)
+        ..add(bytes[offset]);
+      offset += run;
+      continue;
+    }
+    final literalStart = offset;
+    offset += run;
+    while (offset < bytes.length && offset - literalStart < 128) {
+      final nextRun = _packBitsRunLength(bytes, offset);
+      if (nextRun >= 3) {
+        break;
+      }
+      final remaining = 128 - (offset - literalStart);
+      offset += nextRun > remaining ? remaining : nextRun;
+    }
+    final count = offset - literalStart;
+    out
+      ..add(count - 1)
+      ..addAll(bytes.sublist(literalStart, offset));
+  }
+  return Uint8List.fromList(out);
+}
+
+int _packBitsRunLength(List<int> bytes, int offset) {
+  var count = 1;
+  while (offset + count < bytes.length &&
+      count < 128 &&
+      bytes[offset + count] == bytes[offset]) {
+    count += 1;
+  }
+  return count;
 }
 
 List<List<int>?> _lzwInitialTable() {

@@ -128,6 +128,9 @@ enum TiffCompression {
   /// LZW compression.
   lzw,
 
+  /// PackBits run-length compression.
+  packBits,
+
   /// Deflate compression.
   deflate,
 
