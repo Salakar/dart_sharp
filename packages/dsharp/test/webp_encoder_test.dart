@@ -121,6 +121,37 @@ void main() {
     expect(pixels[7], 128);
   });
 
+  test('WebP lossy encoder writes animated VP8 frames', () async {
+    final encoded = await ImagePipeline.fromPixelImage(_animation(loopCount: 2))
+        .webp(
+          const WebpEncoderOptions(
+            lossless: false,
+            loop: 6,
+            frameDelays: <Duration>[
+              Duration(milliseconds: 30),
+              Duration(milliseconds: 40),
+            ],
+          ),
+        )
+        .toBytesWithInfo();
+    final metadata = await ImagePipeline.fromBytes(encoded.bytes).metadata();
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+
+    expect(encoded.info.frames, 2);
+    expect(encoded.info.loopCount, 6);
+    expect(encoded.info.frameDelays, <Duration>[
+      const Duration(milliseconds: 30),
+      const Duration(milliseconds: 40),
+    ]);
+    expect(metadata.frames, 2);
+    expect(metadata.loopCount, 6);
+    expect(metadata.hasAlpha, isTrue);
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 30));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 40));
+    expect(decoded.frames[1].pixels.bytes[3], 0);
+    expect(decoded.frames[1].pixels.bytes[7], 128);
+  });
+
   test('WebP encoder normalizes non-RGBA raw channel layouts', () async {
     final cases = <(RawPixels, List<int>)>[
       (
@@ -179,10 +210,6 @@ void main() {
       expect(
         pipeline.webp(const WebpEncoderOptions(preset: 'fail')).toBytes(),
         throwsA(isA<OperationValidationException>()),
-      );
-      expect(
-        pipeline.webp(const WebpEncoderOptions(lossless: false)).toBytes(),
-        throwsA(isA<UnsupportedCodecException>()),
       );
     },
   );

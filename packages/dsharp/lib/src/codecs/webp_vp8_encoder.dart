@@ -6,18 +6,13 @@ Uint8List encodeWebpVp8(
   required int quality,
   required int alphaQuality,
 }) {
-  if (raw.width > 16383 || raw.height > 16383) {
-    throw const OperationValidationException(
-      'Lossy WebP dimensions must be at most 16383x16383.',
-    );
-  }
+  _validateLossyDimensions(raw);
   final rgba = rawToRgba(raw);
-  final average = _averageLossyColor(rgba);
-  final quantized = _quantizeLossyColor(average, quality);
-  final vp8 = _encodeVp8SolidPayload(
+  final vp8 = _encodeVp8SolidFromRgba(
+    rgba,
     width: raw.width,
     height: raw.height,
-    color: _rgbToVp8Yuv(quantized),
+    quality: quality,
   );
   final alpha = _lossyAlphaPayload(rgba, alphaQuality);
   if (alpha == null) {
@@ -29,6 +24,118 @@ Uint8List encodeWebpVp8(
     height: raw.height,
     alpha: alpha,
   );
+}
+
+/// Encodes animation frames as simple lossy VP8 WebP keyframes.
+Uint8List encodeAnimatedWebpVp8(
+  PixelImage image, {
+  required int quality,
+  required int alphaQuality,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(_hasLossyAnimationAlpha(image) ? 0x12 : 0x02)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, image.width - 1);
+  _writeUint24Le(content, image.height - 1);
+  _writeWebpChunk(
+    content,
+    'ANIM',
+    _lossyAnimationPayload(image.loopCount ?? 0),
+  );
+  for (final frame in image.frames) {
+    _writeWebpChunk(
+      content,
+      'ANMF',
+      _lossyFramePayload(frame, quality: quality, alphaQuality: alphaQuality),
+    );
+  }
+  return _riffWebp(content.toBytes());
+}
+
+Uint8List _encodeVp8SolidFromRgba(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final average = _averageLossyColor(rgba);
+  final quantized = _quantizeLossyColor(average, quality);
+  return _encodeVp8SolidPayload(
+    width: width,
+    height: height,
+    color: _rgbToVp8Yuv(quantized),
+  );
+}
+
+Uint8List _lossyAnimationPayload(int loopCount) {
+  if (loopCount < 0 || loopCount > 0xffff) {
+    throw const OperationValidationException(
+      'WebP loop count must be 0..65535.',
+    );
+  }
+  final writer = ByteWriter()
+    ..writeUint32Le(0)
+    ..writeUint16Le(loopCount);
+  return writer.toBytes();
+}
+
+Uint8List _lossyFramePayload(
+  ImageFrame frame, {
+  required int quality,
+  required int alphaQuality,
+}) {
+  _validateLossyDimensions(frame.pixels);
+  final rgba = rawToRgba(frame.pixels);
+  final vp8 = _encodeVp8SolidFromRgba(
+    rgba,
+    width: frame.width,
+    height: frame.height,
+    quality: quality,
+  );
+  final writer = ByteWriter();
+  _writeUint24Le(writer, 0);
+  _writeUint24Le(writer, 0);
+  _writeUint24Le(writer, frame.width - 1);
+  _writeUint24Le(writer, frame.height - 1);
+  final durationMs = frame.delay?.inMilliseconds ?? 0;
+  if (durationMs < 0 || durationMs > 0xffffff) {
+    throw const OperationValidationException(
+      'WebP frame delay must be 0..16777215 ms.',
+    );
+  }
+  _writeUint24Le(writer, durationMs);
+  writer.writeByte(0x02);
+  final alpha = _lossyAlphaPayload(rgba, alphaQuality);
+  if (alpha != null) {
+    _writeWebpChunk(writer, 'ALPH', alpha);
+  }
+  _writeWebpChunk(writer, 'VP8 ', vp8);
+  return writer.toBytes();
+}
+
+void _validateLossyDimensions(RawPixels raw) {
+  if (raw.width > 16383 || raw.height > 16383) {
+    throw const OperationValidationException(
+      'Lossy WebP dimensions must be at most 16383x16383.',
+    );
+  }
+}
+
+bool _hasLossyAnimationAlpha(PixelImage image) {
+  for (final frame in image.frames) {
+    final bytes = rawToRgba(frame.pixels);
+    for (var offset = 3; offset < bytes.length; offset += 4) {
+      if (bytes[offset] != 255) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 _Rgb _averageLossyColor(Uint8List rgba) {

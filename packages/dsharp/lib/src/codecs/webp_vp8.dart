@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../api/exceptions.dart';
+import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec_pixels.dart';
