@@ -116,6 +116,35 @@ List<int> _lossyLumaSecondHorizontalSecondVerticalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaThirdHorizontalVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaThirdHorizontalVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaSecondHorizontalVerticalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -212,6 +241,30 @@ int _lossyLumaSecondHorizontalSecondVerticalAcBlock(
       final isOuterColumn = localX == 0 || localX == 3;
       final isOuterRow = localY == 0 || localY == 3;
       return isOuterColumn == isOuterRow;
+    },
+    scale: 2,
+  );
+}
+
+int _lossyLumaThirdHorizontalVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyLumaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (localX, localY) {
+      return localX.isEven == (localY < 2);
     },
     scale: 2,
   );
