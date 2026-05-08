@@ -15,6 +15,7 @@ import 'output.dart';
 
 part 'tiff_samples.dart';
 part 'tiff_color.dart';
+part 'tiff_decode.dart';
 part 'tiff_fax.dart';
 part 'tiff_jpeg.dart';
 
@@ -28,120 +29,7 @@ final class TiffImageCodec implements ImageCodec {
 
   @override
   PixelImage decode(Uint8List bytes) {
-    final endian = _TiffEndian.fromHeader(bytes);
-    if (endian == null) {
-      throw const UnsupportedCodecException(
-        'Only baseline TIFF byte orders are supported.',
-      );
-    }
-    if (endian.readUint16(bytes, 2) != 42) {
-      throw const InvalidImageException('Invalid TIFF header.');
-    }
-    final tags = _readIfd(bytes, endian.readUint32(bytes, 4), endian);
-    final width = tags.value(256);
-    final height = tags.value(257);
-    final compression = tags.value(259);
-    final photometric = tags.value(262);
-    final samples = tags.value(277, fallback: 1);
-    final bitsPerSample = tags.values(258, fallback: const <int>[8]);
-    final predictor = tags.value(317, fallback: 1);
-    if (compression == 7) {
-      return PixelImage.fromRawPixels(
-        _decodeJpegCompressedTiff(bytes, tags, width, height),
-      );
-    }
-    final source = compression == 3
-        ? _decodeGroup3FaxTiff(bytes, tags, width, height)
-        : _decodeTiffStrips(
-            bytes,
-            tags.values(273),
-            tags.values(279),
-            compression,
-          );
-    if (predictor == 2) {
-      if (photometric == 3) {
-        throw const UnsupportedCodecException(
-          'TIFF horizontal predictor is not supported for palette images.',
-        );
-      }
-      final predictorBitDepth = bitsPerSample.first;
-      if (!_allTiffBitsPerSample(bitsPerSample, 8) &&
-          !_allTiffBitsPerSample(bitsPerSample, 16)) {
-        throw const UnsupportedCodecException(
-          'TIFF horizontal predictor requires 8-bit or 16-bit samples.',
-        );
-      }
-      _undoHorizontalPredictor(
-        source,
-        width,
-        height,
-        samples,
-        predictorBitDepth,
-        endian,
-      );
-    } else if (predictor != 1) {
-      throw const UnsupportedCodecException(
-        'Only TIFF predictors 1 and 2 are supported.',
-      );
-    }
-    if (photometric == 3) {
-      final indices = _normalizeTiffPaletteIndices(
-        source,
-        width,
-        height,
-        samples,
-        bitsPerSample,
-      );
-      final rgba = _paletteToRgba(
-        indices,
-        width * height,
-        tags.values(320),
-        bitsPerSample.first,
-      );
-      return PixelImage.fromRawPixels(
-        RawPixels(
-          bytes: Uint8List.fromList(rgba),
-          width: width,
-          height: height,
-          channels: ChannelCount.four,
-        ),
-      );
-    }
-    if (photometric == 8) {
-      final rgba = _cielabToRgba(
-        source,
-        width,
-        height,
-        samples,
-        bitsPerSample,
-        endian,
-      );
-      return PixelImage.fromRawPixels(
-        RawPixels(
-          bytes: Uint8List.fromList(rgba),
-          width: width,
-          height: height,
-          channels: ChannelCount.four,
-        ),
-      );
-    }
-    final normalized = _normalizeTiffSamples(
-      source,
-      width,
-      height,
-      samples,
-      bitsPerSample,
-      endian,
-    );
-    final rgba = _toRgba(normalized, width, height, samples, photometric);
-    return PixelImage.fromRawPixels(
-      RawPixels(
-        bytes: Uint8List.fromList(rgba),
-        width: width,
-        height: height,
-        channels: ChannelCount.four,
-      ),
-    );
+    return _decodeTiffImage(bytes);
   }
 
   @override
@@ -234,11 +122,12 @@ final class TiffImageCodec implements ImageCodec {
 }
 
 final class _Ifd {
-  _Ifd(this.tags, this.bytes, this.endian);
+  _Ifd(this.tags, this.bytes, this.endian, this.nextOffset);
 
   final Map<int, _IfdEntry> tags;
   final Uint8List bytes;
   final _TiffEndian endian;
+  final int nextOffset;
 
   int value(int tag, {int? fallback}) {
     final entry = tags[tag];
@@ -290,7 +179,8 @@ _Ifd _readIfd(Uint8List bytes, int offset, _TiffEndian endian) {
       inlineOffset: entry + 8,
     );
   }
-  return _Ifd(tags, bytes, endian);
+  final nextOffset = endian.readUint32(bytes, offset + 2 + count * 12);
+  return _Ifd(tags, bytes, endian, nextOffset);
 }
 
 final class _IfdEntry {
