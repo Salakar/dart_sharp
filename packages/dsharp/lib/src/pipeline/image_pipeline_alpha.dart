@@ -22,6 +22,9 @@ extension ImagePipelineAlpha on ImagePipeline {
     if (flatten is bool) {
       return flatten ? _append(const FlattenOperation()) : this;
     }
+    if (flatten is FlattenOptions) {
+      return _append(FlattenOperation(flatten.background));
+    }
     if (flatten is RgbaColor) {
       return _append(FlattenOperation(flatten));
     }

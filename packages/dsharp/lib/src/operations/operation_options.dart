@@ -305,6 +305,15 @@ final class NegateOptions {
   final bool alpha;
 }
 
+/// Options for flattening alpha against a background.
+final class FlattenOptions {
+  /// Creates flatten options.
+  const FlattenOptions({required this.background});
+
+  /// Background color.
+  final RgbaColor background;
+}
+
 /// Options for percentile-based normalization.
 final class NormalizeOptions {
   /// Creates normalize options.

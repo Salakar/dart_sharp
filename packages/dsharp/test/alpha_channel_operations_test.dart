@@ -47,6 +47,13 @@ void main() {
         rawRgba(1, 1, <int>[100, 0, 0, 128]),
       ).flatten(const RgbaColor(red: 0, green: 0, blue: 100)),
     );
+    final flattenedOptions = await pixels(
+      ImagePipeline.fromRawPixels(rawRgba(1, 1, <int>[100, 0, 0, 128])).flatten(
+        const FlattenOptions(
+          background: RgbaColor(red: 0, green: 100, blue: 0),
+        ),
+      ),
+    );
     final flattenedDefault = await pixels(
       ImagePipeline.fromRawPixels(
         rawRgba(1, 1, <int>[100, 0, 0, 128]),
@@ -61,6 +68,7 @@ void main() {
     expect(removed.channels, ChannelCount.three);
     expect(firstBytes(removed), <int>[1, 2, 3]);
     expect(firstBytes(flattened), <int>[50, 0, 50]);
+    expect(firstBytes(flattenedOptions), <int>[50, 50, 0]);
     expect(firstBytes(flattenedDefault), <int>[50, 0, 0]);
     expect(firstBytes(flattenDisabled), <int>[100, 0, 0, 128]);
     expect(
