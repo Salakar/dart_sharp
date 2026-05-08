@@ -47,8 +47,8 @@ Uint8List _cielabToRgba(
 (double, double, double) _read8BitCielab(Uint8List source, int offset) {
   return (
     source[offset] * 100 / 255,
-    source[offset + 1] - 128,
-    source[offset + 2] - 128,
+    _signed8(source[offset + 1]).toDouble(),
+    _signed8(source[offset + 2]).toDouble(),
   );
 }
 
@@ -58,10 +58,14 @@ Uint8List _cielabToRgba(
   _TiffEndian endian,
 ) {
   final l = endian.readUint16(source, offset) ~/ 257;
-  final a = endian.readUint16(source, offset + 2) ~/ 256;
-  final b = endian.readUint16(source, offset + 4) ~/ 256;
-  return (l * 100 / 255, a - 128, b - 128);
+  final a = _signed16(endian.readUint16(source, offset + 2)) / 256;
+  final b = _signed16(endian.readUint16(source, offset + 4)) / 256;
+  return (l * 100 / 255, a, b);
 }
+
+int _signed8(int value) => value >= 128 ? value - 256 : value;
+
+int _signed16(int value) => value >= 32768 ? value - 65536 : value;
 
 int _extraTiffSample(
   Uint8List source,

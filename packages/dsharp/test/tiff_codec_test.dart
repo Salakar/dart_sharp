@@ -298,7 +298,7 @@ void main() {
         compression: 1,
         photometric: 8,
         bitsPerSample: const <int>[8, 8, 8],
-        strip: Uint8List.fromList(<int>[0, 128, 128, 255, 128, 128]),
+        strip: Uint8List.fromList(<int>[0, 0, 0, 255, 0, 0]),
       ),
     ).toPixelImage();
 

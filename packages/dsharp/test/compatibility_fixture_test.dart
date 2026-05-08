@@ -106,6 +106,12 @@ void main() {
     expect(image.width, 400);
     expect(image.height, 266);
     expect(image.firstFrameBytes().length, 400 * 266 * 4);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 0, 0, <int>[
+      67,
+      96,
+      42,
+      255,
+    ], tolerance: 6);
   });
 
   test('optional upstream JPEG-compressed CMYK TIFF fixture decodes', () async {
