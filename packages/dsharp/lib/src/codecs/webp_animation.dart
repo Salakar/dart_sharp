@@ -157,6 +157,11 @@ _AnimationFrame _readFrame(Uint8List data) {
       }
       vp8 = data.sublist(start, end);
     } else if (type == 'ALPH') {
+      if (alpha != null) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple ALPH chunks.',
+        );
+      }
       alpha = data.sublist(start, end);
     }
     offset = end + (length.isOdd ? 1 : 0);

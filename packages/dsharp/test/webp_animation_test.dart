@@ -162,6 +162,23 @@ void main() {
     );
   });
 
+  test('rejects animation frames with duplicate ALPH chunks', () async {
+    final bytes = animatedVp8WebpWithDuplicateAlphaChunks(
+      width: 2,
+      height: 1,
+      alpha: <int>[0, 255],
+    );
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects animated WebP missing ANIM header', () async {
     final bytes = animatedVp8lWebpWithoutAnimHeader();
 

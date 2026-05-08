@@ -170,6 +170,49 @@ Uint8List animatedVp8Webp({
   return _riffWebp(chunks.finish());
 }
 
+/// Builds an invalid animated VP8 WebP with duplicate frame ALPH chunks.
+Uint8List animatedVp8WebpWithDuplicateAlphaChunks({
+  required int width,
+  required int height,
+  required List<int> alpha,
+}) {
+  if (alpha.length != width * height) {
+    throw ArgumentError.value(alpha.length, 'alpha.length');
+  }
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final frame = _ByteWriter()
+    ..u24(0)
+    ..u24(0)
+    ..u24(width - 1)
+    ..u24(height - 1)
+    ..u24(15)
+    ..byte(2);
+  final alphaPayload = Uint8List.fromList(<int>[0, ...alpha]);
+  _writeChunk(frame, 'ALPH', alphaPayload);
+  _writeChunk(frame, 'ALPH', alphaPayload);
+  _writeChunk(frame, 'VP8 ', vp8);
+
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x12)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(
+    chunks,
+    'ANIM',
+    (_ByteWriter()
+          ..u32(0)
+          ..u16(1))
+        .finish(),
+  );
+  _writeChunk(chunks, 'ANMF', frame.finish());
+  return _riffWebp(chunks.finish());
+}
+
 Uint8List _lossyAnimationFramePayload({
   required int width,
   required int height,

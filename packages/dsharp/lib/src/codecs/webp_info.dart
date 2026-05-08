@@ -302,6 +302,11 @@ WebpFrameInfo _frameInfo(Uint8List data) {
       throw const InvalidImageException('Truncated WebP animation frame.');
     }
     if (type == 'ALPH') {
+      if (hasAlpha) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple ALPH chunks.',
+        );
+      }
       hasAlpha = true;
     } else if (type == 'VP8L') {
       imageChunkCount += 1;
