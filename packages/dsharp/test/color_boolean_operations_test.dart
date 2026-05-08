@@ -142,6 +142,16 @@ void main() {
           rawRgba(2, 1, <int>[10, 20, 30, 77, 30, 40, 50, 99]),
         ).normalize(),
       );
+      final normalisedAlias = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawRgba(2, 1, <int>[10, 20, 30, 77, 30, 40, 50, 99]),
+        ).normalise(const NormalizeOptions(lower: 0, upper: 100)),
+      );
+      final normalizedClip = await pixels(
+        ImagePipeline.fromRawPixels(
+          rawGray(5, 1, <int>[0, 10, 20, 30, 255]),
+        ).normalize(const NormalizeOptions(lower: 20, upper: 80)),
+      );
       final recombed = await pixels(
         ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
@@ -183,6 +193,17 @@ void main() {
       expect(firstBytes(linearChannels), <int>[20, 60, 120]);
       expect(firstBytes(tinted), <int>[60, 20, 130]);
       expect(firstBytes(normalized), <int>[0, 64, 128, 77, 128, 191, 255, 99]);
+      expect(firstBytes(normalisedAlias), <int>[
+        0,
+        64,
+        128,
+        77,
+        128,
+        191,
+        255,
+        99,
+      ]);
+      expect(firstBytes(normalizedClip), <int>[0, 0, 128, 255, 255]);
       expect(firstBytes(recombed), <int>[20, 10, 30]);
       expect(firstBytes(recombedNested), <int>[20, 10, 30]);
       expect(firstBytes(recombedRgba), <int>[20, 10, 30, 40]);
@@ -198,6 +219,30 @@ void main() {
         ImagePipeline.fromRawPixels(
           rawRgb(1, 1, <int>[10, 20, 30]),
         ).linear(<num>[1, 2], <num>[0, 0]).toPixelImage(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).normalize(const NormalizeOptions(lower: -1)),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).normalize(const NormalizeOptions(upper: 101)),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).normalise(const NormalizeOptions(lower: 50, upper: 50)),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          rawRgb(1, 1, <int>[10, 20, 30]),
+        ).normalize(const NormalizeOptions(lower: 90, upper: 10)),
         throwsA(isA<OperationValidationException>()),
       );
       expect(

@@ -58,13 +58,18 @@ extension ImagePipelineColor on ImagePipeline {
     return _append(GammaOperation(gamma));
   }
 
-  /// Normalizes channel values.
-  ImagePipeline normalize() {
-    return _append(const NormalizeOperation());
+  /// Normalizes channel values between lower and upper percentiles.
+  ImagePipeline normalize([
+    NormalizeOptions options = const NormalizeOptions(),
+  ]) {
+    options.validate();
+    return _append(NormalizeOperation(options));
   }
 
-  /// Normalises channel values.
-  ImagePipeline normalise() => normalize();
+  /// Normalises channel values between lower and upper percentiles.
+  ImagePipeline normalise([
+    NormalizeOptions options = const NormalizeOptions(),
+  ]) => normalize(options);
 
   /// Applies brightness modulation.
   ImagePipeline modulate({

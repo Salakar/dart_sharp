@@ -248,13 +248,17 @@ final class GammaOperation implements PipelineOperation {
 /// Stretches byte values to full range.
 final class NormalizeOperation implements PipelineOperation {
   /// Creates a normalize operation.
-  const NormalizeOperation();
+  const NormalizeOperation([this.options = const NormalizeOptions()]);
+
+  /// Options.
+  final NormalizeOptions options;
 
   @override
   String get name => 'normalize';
 
   @override
   PixelImage apply(PixelImage image) {
+    options.validate();
     return mapFrames(image, (raw) {
       final output = raw.bytes;
       final channels = raw.channels.value;
@@ -264,8 +268,9 @@ final class NormalizeOperation implements PipelineOperation {
           samples.add(output[i + c]);
         }
       }
-      final minValue = samples.reduce(min);
-      final maxValue = samples.reduce(max);
+      samples.sort();
+      final minValue = _nearestPercentile(samples, options.lower);
+      final maxValue = _nearestPercentile(samples, options.upper);
       if (minValue == maxValue) {
         return sameSizeRaw(raw, output, raw.channels);
       }
@@ -279,6 +284,11 @@ final class NormalizeOperation implements PipelineOperation {
       return sameSizeRaw(raw, output, raw.channels);
     });
   }
+}
+
+int _nearestPercentile(List<int> sortedSamples, num percentile) {
+  final position = (percentile / 100) * (sortedSamples.length - 1);
+  return sortedSamples[position.round()];
 }
 
 /// Applies a simple RGB recombination matrix.

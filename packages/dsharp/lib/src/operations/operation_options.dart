@@ -206,6 +206,37 @@ final class ThresholdOptions {
   }
 }
 
+/// Options for percentile-based normalization.
+final class NormalizeOptions {
+  /// Creates normalize options.
+  const NormalizeOptions({this.lower = 1, this.upper = 99});
+
+  /// Lower percentile to clip before stretching.
+  final num lower;
+
+  /// Upper percentile to clip before stretching.
+  final num upper;
+
+  /// Validates percentile bounds.
+  void validate() {
+    if (lower < 0 || lower > 99) {
+      throw const OperationValidationException(
+        'Normalize lower must be between 0 and 99.',
+      );
+    }
+    if (upper < 1 || upper > 100) {
+      throw const OperationValidationException(
+        'Normalize upper must be between 1 and 100.',
+      );
+    }
+    if (lower >= upper) {
+      throw const OperationValidationException(
+        'Normalize lower must be less than upper.',
+      );
+    }
+  }
+}
+
 /// Options for brightness, saturation, hue, and lightness modulation.
 final class ModulateOptions {
   /// Creates modulate options.
