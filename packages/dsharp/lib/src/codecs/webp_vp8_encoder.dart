@@ -69,7 +69,19 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
-  return _encodeVp8SolidPayload(width: width, height: height, colors: colors);
+  final lumaBlocks = _lossyLumaBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    macroblockColors: colors,
+  );
+  return _encodeVp8SolidPayload(
+    width: width,
+    height: height,
+    colors: colors,
+    lumaBlocks: lumaBlocks,
+  );
 }
 
 Uint8List _lossyAnimationPayload(int loopCount) {
@@ -194,6 +206,83 @@ _Rgb _averageLossyMacroblock(
   );
 }
 
+List<int> _lossyLumaBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required List<_Vp8Yuv> macroblockColors,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      final fallback = macroblockColors[mbY * mbCols + mbX].y;
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+            fallback: fallback,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
+int _lossyLumaBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+  required int fallback,
+}) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final xStart = mbX * 16 + blockX * 4;
+  final yStart = mbY * 16 + blockY * 4;
+  if (xStart >= width || yStart >= height) {
+    return fallback;
+  }
+  var red = 0;
+  var green = 0;
+  var blue = 0;
+  var pixels = 0;
+  final xEnd = xStart + 4 < width ? xStart + 4 : width;
+  final yEnd = yStart + 4 < height ? yStart + 4 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      red += rgba[offset];
+      green += rgba[offset + 1];
+      blue += rgba[offset + 2];
+      pixels += 1;
+      offset += 4;
+    }
+  }
+  return _rgbToVp8Yuv(
+    _quantizeLossyColor(
+      _Rgb(
+        (red + pixels ~/ 2) ~/ pixels,
+        (green + pixels ~/ 2) ~/ pixels,
+        (blue + pixels ~/ 2) ~/ pixels,
+      ),
+      quality,
+    ),
+  ).y;
+}
+
 _Rgb _quantizeLossyColor(_Rgb color, int quality) {
   final step = _lossyStep(quality);
   return _Rgb(
@@ -216,6 +305,7 @@ Uint8List _encodeVp8SolidPayload({
   required int width,
   required int height,
   required List<_Vp8Yuv> colors,
+  required List<int> lumaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -238,7 +328,10 @@ Uint8List _encodeVp8SolidPayload({
   }
   first.bit(false);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
-    _writeVp8YMode0(first);
+    _writeVp8BPredMode(first);
+    for (var block = 0; block < 16; block += 1) {
+      _writeVp8BMode0(first);
+    }
     first.prob(142, false);
   }
   final firstPartition = first.finish();
@@ -248,16 +341,16 @@ Uint8List _encodeVp8SolidPayload({
     contexts.resetLeft();
     for (var mbX = 0; mbX < mbCols; mbX += 1) {
       final color = colors[mbY * mbCols + mbX];
-      _writeY2Dc(
-        coeffs,
-        contexts,
-        mbX,
-        (color.y -
-                _predictedMacroblockDc(colors, mbCols, mbX, mbY, (c) => c.y)) *
-            8,
-      );
       for (var block = 0; block < 16; block += 1) {
-        _writeLumaAcEob(coeffs, contexts, mbX, block);
+        final target = lumaBlocks[(mbY * mbCols + mbX) * 16 + block];
+        _writeLumaDc(
+          coeffs,
+          contexts,
+          mbX,
+          block,
+          (target - _predictedSubblockDc(lumaBlocks, mbCols, mbX, mbY, block)) *
+              2,
+        );
       }
       for (var block = 0; block < 4; block += 1) {
         _writeChromaDc(
@@ -310,6 +403,29 @@ Uint8List _encodeVp8SolidPayload({
   return writer.toBytes();
 }
 
+int _predictedSubblockDc(
+  List<int> lumaBlocks,
+  int mbCols,
+  int mbX,
+  int mbY,
+  int block,
+) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final mbBase = (mbY * mbCols + mbX) * 16;
+  final top = blockY > 0
+      ? lumaBlocks[mbBase + block - 4]
+      : mbY > 0
+      ? lumaBlocks[((mbY - 1) * mbCols + mbX) * 16 + 12 + blockX]
+      : 127;
+  final left = blockX > 0
+      ? lumaBlocks[mbBase + block - 1]
+      : mbX > 0
+      ? lumaBlocks[(mbY * mbCols + mbX - 1) * 16 + blockY * 4 + 3]
+      : 129;
+  return (4 + top * 4 + left * 4) >> 3;
+}
+
 int _predictedMacroblockDc(
   List<_Vp8Yuv> colors,
   int mbCols,
@@ -333,47 +449,24 @@ int _predictedMacroblockDc(
   return sample(colors[mbY * mbCols + mbX - 1]);
 }
 
-void _writeY2Dc(
-  _Vp8BoolWriter out,
-  _Vp8TokenContexts contexts,
-  int mbX,
-  int coefficient,
-) {
-  if (coefficient == 0) {
-    out.prob(
-      _Vp8Y2Probs.defaults().probabilityAt(
-        0,
-        contexts.contextFor(mbX, _y2BlockIndex),
-        _dctEobNode,
-      ),
-      false,
-    );
-    contexts.setHasCoefficients(mbX, _y2BlockIndex, false);
-    return;
-  }
-  final probs = _Vp8Y2Probs.defaults();
-  final context = contexts.contextFor(mbX, _y2BlockIndex);
-  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
-    return probs.probabilityAt(coefficientIndex, context, node);
-  });
-  contexts.setHasCoefficients(mbX, _y2BlockIndex, true);
-}
-
-void _writeLumaAcEob(
+void _writeLumaDc(
   _Vp8BoolWriter out,
   _Vp8TokenContexts contexts,
   int mbX,
   int block,
+  int coefficient,
 ) {
-  out.prob(
-    _Vp8LumaAcProbs.defaults().probabilityAt(
-      1,
-      contexts.contextFor(mbX, block),
-      _dctEobNode,
-    ),
-    false,
-  );
-  contexts.setHasCoefficients(mbX, block, false);
+  final probs = _Vp8LumaProbs.defaults();
+  final context = contexts.contextFor(mbX, block);
+  if (coefficient == 0) {
+    out.prob(probs.probabilityAt(0, context, _dctEobNode), false);
+    contexts.setHasCoefficients(mbX, block, false);
+    return;
+  }
+  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
+    return probs.probabilityAt(coefficientIndex, context, node);
+  });
+  contexts.setHasCoefficients(mbX, block, true);
 }
 
 void _writeChromaDc(
@@ -485,12 +578,10 @@ void _writeExtraBits(_Vp8BoolWriter out, int value, List<int> probabilities) {
   }
 }
 
-void _writeVp8YMode0(_Vp8BoolWriter out) {
-  out
-    ..prob(145, true)
-    ..prob(156, false)
-    ..prob(163, false);
-}
+void _writeVp8BPredMode(_Vp8BoolWriter out) => out.prob(145, false);
+
+void _writeVp8BMode0(_Vp8BoolWriter out) =>
+    out.prob(_kfBModeProb[0][0][0], false);
 
 Uint8List? _lossyAlphaPayload(Uint8List rgba, int quality) {
   var hasAlpha = false;
