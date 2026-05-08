@@ -11,11 +11,11 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
 
 - Inputs: encoded bytes, `ByteBuffer`, `ByteData`, bounded byte streams, raw
   pixels, decoded `PixelImage`, and generated solid images.
-- Codecs: raw plus first-party PNG, JPEG, GIF, TIFF, WebP, and PPM/PGM
-  support without runtime package dependencies. PNG,
+- Codecs: raw plus first-party PNG, JPEG, GIF, TIFF, WebP, PPM/PGM, and
+  Radiance HDR/RGBE support without runtime package dependencies. PNG,
   baseline/progressive/lossless JPEG, GIF, TIFF, WebP VP8 lossy
   static/animated, WebP VP8L lossless/near-lossless static/animated,
-  PPM/PGM Netpbm, and raw output are implemented.
+  PPM/PGM Netpbm, Radiance HDR/RGBE, and raw output are implemented.
   WebP metadata, VP8L, VP8 lossy, alpha, and animation decoding are implemented
   for supported bitstreams.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
@@ -30,8 +30,8 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   cancellation, timeout, and VM-only `writeToFile`.
 
 Unsupported native-only or advanced formats such as AVIF, HEIF, JP2, JXL, PDF,
-OpenSlide, Magick, camera raw, FITS, Radiance HDR, and SVG rasterization fail
-with typed `UnsupportedCodecException`s.
+OpenSlide, Magick, camera raw, FITS, native V, deep zoom, and SVG
+rasterization fail with typed `UnsupportedCodecException`s.
 
 ## Examples
 

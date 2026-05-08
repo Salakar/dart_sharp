@@ -51,8 +51,8 @@ enum ImageFormat {
   /// Flexible Image Transport System input.
   fits('fits'),
 
-  /// Radiance HDR image input.
-  rad('rad'),
+  /// Radiance HDR RGBE image data.
+  rad('rad', aliases: ['hdr', 'rgbe']),
 
   /// Native V image data.
   vips('v'),

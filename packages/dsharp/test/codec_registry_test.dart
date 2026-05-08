@@ -25,6 +25,10 @@ void main() {
       sniffImageFormat(Uint8List.fromList('RIFFxxxxWEBP'.codeUnits)),
       ImageFormat.webp,
     );
+    expect(
+      sniffImageFormat(Uint8List.fromList('#?RADIANCE\n'.codeUnits)),
+      ImageFormat.rad,
+    );
     expect(sniffImageFormat(Uint8List(0)), ImageFormat.unknown);
   });
 
@@ -536,7 +540,6 @@ void main() {
       ImageFormat.magick,
       ImageFormat.dcraw,
       ImageFormat.fits,
-      ImageFormat.rad,
       ImageFormat.vips,
       ImageFormat.deepZoom,
     ]) {

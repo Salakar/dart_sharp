@@ -13,6 +13,7 @@ import 'jpeg_codec.dart';
 import 'output.dart';
 import 'png_codec.dart';
 import 'ppm_codec.dart';
+import 'rad_codec.dart';
 import 'raw_codec.dart';
 import 'tiff_codec.dart';
 import 'unsupported_codec.dart';
@@ -36,6 +37,7 @@ final class CodecRegistry {
       const TiffImageCodec(),
       const WebpImageCodec(),
       const PpmImageCodec(),
+      const RadImageCodec(),
       const UnsupportedImageCodec(
         ImageFormat.avif,
         reason: 'No pure Dart AVIF codec is wired yet.',
@@ -75,10 +77,6 @@ final class CodecRegistry {
       const UnsupportedImageCodec(
         ImageFormat.fits,
         reason: 'FITS decoding is not implemented in pure Dart.',
-      ),
-      const UnsupportedImageCodec(
-        ImageFormat.rad,
-        reason: 'Radiance HDR decoding is not implemented in pure Dart.',
       ),
       const UnsupportedImageCodec(
         ImageFormat.vips,

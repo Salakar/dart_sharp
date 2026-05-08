@@ -113,9 +113,9 @@ final class DsharpCapabilities {
         ),
         ImageFormat.rad: CodecSupport(
           format: ImageFormat.rad,
-          input: CodecAvailability.unsupported,
-          output: CodecAvailability.unsupported,
-          reason: 'Radiance HDR decoding is not implemented in pure Dart.',
+          input: CodecAvailability.supported,
+          output: CodecAvailability.supported,
+          metadata: CodecAvailability.unsupported,
         ),
         ImageFormat.vips: CodecSupport(
           format: ImageFormat.vips,
