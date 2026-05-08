@@ -77,6 +77,7 @@ _Animation _readAnimation(Uint8List bytes) {
   int? height;
   var background = 0;
   var loopCount = 1;
+  var hasAnimationHeader = false;
   final frames = <_AnimationFrame>[];
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
@@ -100,6 +101,7 @@ _Animation _readAnimation(Uint8List bytes) {
       if (data.length < 6) {
         throw const InvalidImageException('Invalid WebP animation header.');
       }
+      hasAnimationHeader = true;
       background = _bgraToRgba(readUint32Le(data, 0));
       loopCount = readUint16Le(data, 4);
     } else if (type == 'ANMF') {
@@ -111,6 +113,9 @@ _Animation _readAnimation(Uint8List bytes) {
   final currentHeight = height;
   if (currentWidth == null || currentHeight == null) {
     throw const InvalidImageException('WebP animation is missing VP8X.');
+  }
+  if (!hasAnimationHeader) {
+    throw const InvalidImageException('WebP animation is missing ANIM.');
   }
   return _Animation(
     width: currentWidth,

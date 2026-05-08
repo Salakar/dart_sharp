@@ -144,6 +144,70 @@ Uint8List blendedAnimatedVp8lWebp() {
       .finish();
 }
 
+/// Builds an invalid animated WebP missing the required ANIM chunk.
+Uint8List animatedVp8lWebpWithoutAnimHeader() {
+  return _invalidAnimatedVp8lWebp(vp8xFlags: 0x02, includeAnim: false);
+}
+
+/// Builds an invalid animated WebP missing the VP8X animation flag.
+Uint8List animatedVp8lWebpWithoutAnimationFlag() {
+  return _invalidAnimatedVp8lWebp(vp8xFlags: 0, includeAnim: true);
+}
+
+Uint8List _invalidAnimatedVp8lWebp({
+  required int vp8xFlags,
+  required bool includeAnim,
+}) {
+  final frame = _vp8lPayload(
+    width: 1,
+    height: 1,
+    red: 12,
+    green: 34,
+    blue: 56,
+    alpha: 255,
+  );
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(vp8xFlags)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(0)
+    ..u24(0);
+  if (includeAnim) {
+    _writeChunk(
+      chunks,
+      'ANIM',
+      (_ByteWriter()
+            ..u32(0)
+            ..u16(1))
+          .finish(),
+    );
+  }
+  _writeChunk(
+    chunks,
+    'ANMF',
+    _animationFramePayload(
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+      durationMs: 10,
+      dispose: false,
+      blend: false,
+      vp8l: frame,
+    ),
+  );
+  final payload = chunks.finish();
+  return (_ByteWriter()
+        ..ascii('RIFF')
+        ..u32(4 + payload.length)
+        ..ascii('WEBP')
+        ..bytes(payload))
+      .finish();
+}
+
 /// Builds an extended static WebP whose image payload is VP8L.
 Uint8List extendedVp8lWebp({
   required int width,

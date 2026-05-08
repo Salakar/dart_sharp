@@ -111,6 +111,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   var hasExif = false;
   var hasXmp = false;
   var loopCount = 1;
+  var hasAnimationHeader = false;
   final frames = <WebpFrameInfo>[];
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
@@ -143,6 +144,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       if (data.length < 6) {
         throw const InvalidImageException('Invalid WebP animation header.');
       }
+      hasAnimationHeader = true;
       loopCount = readUint16Le(data, 4);
     } else if (type == 'ANMF') {
       frames.add(_frameInfo(data));
@@ -152,6 +154,16 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   final parsed = info;
   if (parsed == null) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
+  }
+  if (parsed.isAnimated) {
+    if (!hasAnimationHeader) {
+      throw const InvalidImageException('WebP animation is missing ANIM.');
+    }
+    if (frames.isEmpty) {
+      throw const InvalidImageException('WebP animation has no frames.');
+    }
+  } else if (frames.isNotEmpty) {
+    throw const InvalidImageException('WebP animation flag is not set.');
   }
   for (final frame in frames) {
     if (frame.x + frame.width > parsed.width ||
