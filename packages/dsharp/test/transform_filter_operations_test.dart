@@ -37,12 +37,28 @@ void main() {
       final flopped = await pixels(
         ImagePipeline.fromRawPixels(raw2x2()).flop(),
       );
+      final flipDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).flip(false),
+      );
+      final flopDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).flop(false),
+      );
       final rotated = await pixels(
         ImagePipeline.fromRawPixels(raw2x2()).rotate(90),
       );
 
       expect(redBytes(flipped), <int>[3, 4, 1, 2]);
       expect(redBytes(flopped), <int>[2, 1, 4, 3]);
+      expect(redBytes(flipDisabled), <int>[1, 2, 3, 4]);
+      expect(redBytes(flopDisabled), <int>[1, 2, 3, 4]);
+      expect(
+        ImagePipeline.fromRawPixels(raw2x2()).flip(false).operations,
+        isEmpty,
+      );
+      expect(
+        ImagePipeline.fromRawPixels(raw2x2()).flop(false).operations,
+        isEmpty,
+      );
       expect(redBytes(rotated), <int>[3, 1, 4, 2]);
     },
   );

@@ -2,14 +2,14 @@ part of 'image_pipeline.dart';
 
 /// Transform pipeline operations.
 extension ImagePipelineTransform on ImagePipeline {
-  /// Flips vertically.
-  ImagePipeline flip() {
-    return _append(const FlipOperation());
+  /// Flips vertically when [flip] is true.
+  ImagePipeline flip([bool flip = true]) {
+    return flip ? _append(const FlipOperation()) : this;
   }
 
-  /// Flops horizontally.
-  ImagePipeline flop() {
-    return _append(const FlopOperation());
+  /// Flops horizontally when [flop] is true.
+  ImagePipeline flop([bool flop = true]) {
+    return flop ? _append(const FlopOperation()) : this;
   }
 
   /// Rotates by a multiple of 90 degrees.
