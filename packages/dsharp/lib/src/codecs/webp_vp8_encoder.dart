@@ -126,6 +126,13 @@ Uint8List _encodeVp8SolidFromRgba(
         height: height,
         quality: quality,
       );
+  final lumaHorizontalSecondVerticalAcBlocks =
+      _lossyLumaHorizontalSecondVerticalAcBlocks(
+        rgba,
+        width: width,
+        height: height,
+        quality: quality,
+      );
   final lumaThirdVerticalAcBlocks = _lossyLumaThirdVerticalAcBlocks(
     rgba,
     width: width,
@@ -143,6 +150,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
     lumaThirdHorizontalAcBlocks: lumaThirdHorizontalAcBlocks,
     lumaSecondHorizontalVerticalAcBlocks: lumaSecondHorizontalVerticalAcBlocks,
+    lumaHorizontalSecondVerticalAcBlocks: lumaHorizontalSecondVerticalAcBlocks,
     lumaThirdVerticalAcBlocks: lumaThirdVerticalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
@@ -225,6 +233,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaSecondHorizontalAcBlocks,
   required List<int> lumaThirdHorizontalAcBlocks,
   required List<int> lumaSecondHorizontalVerticalAcBlocks,
+  required List<int> lumaHorizontalSecondVerticalAcBlocks,
   required List<int> lumaThirdVerticalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
@@ -278,6 +287,7 @@ Uint8List _encodeVp8SolidPayload({
           lumaSecondHorizontalAcBlocks[blockOffset],
           lumaThirdHorizontalAcBlocks[blockOffset],
           lumaSecondHorizontalVerticalAcBlocks[blockOffset],
+          lumaHorizontalSecondVerticalAcBlocks[blockOffset],
           lumaThirdVerticalAcBlocks[blockOffset],
         );
       }
@@ -345,6 +355,7 @@ void _writeLumaDct(
   int secondHorizontalAcCoefficient,
   int thirdHorizontalAcCoefficient,
   int secondHorizontalVerticalAcCoefficient,
+  int horizontalSecondVerticalAcCoefficient,
   int thirdVerticalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
@@ -360,7 +371,7 @@ void _writeLumaDct(
       secondHorizontalAcCoefficient,
       thirdHorizontalAcCoefficient,
       secondHorizontalVerticalAcCoefficient,
-      0,
+      horizontalSecondVerticalAcCoefficient,
       thirdVerticalAcCoefficient,
     ],
     context,
@@ -379,6 +390,7 @@ void _writeLumaDct(
         secondHorizontalAcCoefficient != 0 ||
         thirdHorizontalAcCoefficient != 0 ||
         secondHorizontalVerticalAcCoefficient != 0 ||
+        horizontalSecondVerticalAcCoefficient != 0 ||
         thirdVerticalAcCoefficient != 0,
   );
 }
