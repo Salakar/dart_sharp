@@ -78,6 +78,8 @@ void _validateMetadataWrites(ImagePipeline pipeline) {
 
 bool _isSupportedMetadataWrite(MetadataWriteOptions writes) {
   return writes.xmp != null ||
+      writes.exif != null ||
+      writes.iccProfile != null ||
       writes.keepXmp ||
       writes.keepExif ||
       writes.keepIcc ||
@@ -95,8 +97,12 @@ EncodedImage _applyMetadataWrites(
   final keepAll = writes.withMetadata;
   final xmp =
       writes.xmp ?? (writes.keepXmp || keepAll ? _sourceXmp(pipeline) : null);
-  final exif = writes.keepExif || keepAll ? _sourceExif(pipeline) : null;
-  final icc = writes.keepIcc || keepAll ? _sourceIcc(pipeline) : null;
+  final exif =
+      writes.exif ??
+      (writes.keepExif || keepAll ? _sourceExif(pipeline) : null);
+  final icc =
+      writes.iccProfile ??
+      (writes.keepIcc || keepAll ? _sourceIcc(pipeline) : null);
   if (xmp == null && exif == null && icc == null) {
     return encoded;
   }

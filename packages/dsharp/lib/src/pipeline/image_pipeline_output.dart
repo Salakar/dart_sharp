@@ -94,6 +94,24 @@ extension ImagePipelineOutput on ImagePipeline {
     );
   }
 
+  /// Requests EXIF metadata writing.
+  ImagePipeline withExifMetadata(Uint8List exif) {
+    return _copyPipelineWith(
+      this,
+      metadataWrites: _metadataWrites.copyWith(exif: Uint8List.fromList(exif)),
+    );
+  }
+
+  /// Requests ICC profile writing.
+  ImagePipeline withIccProfile(Uint8List iccProfile) {
+    return _copyPipelineWith(
+      this,
+      metadataWrites: _metadataWrites.copyWith(
+        iccProfile: Uint8List.fromList(iccProfile),
+      ),
+    );
+  }
+
   /// Requests XMP metadata writing.
   ImagePipeline withXmpMetadata(XmpMetadata xmp) {
     return _copyPipelineWith(

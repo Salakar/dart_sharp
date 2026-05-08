@@ -148,6 +148,37 @@ void main() {
     expect(webpMetadata.hasXmp, isTrue);
   });
 
+  test('writes explicit EXIF and ICC metadata to supported outputs', () async {
+    final exif = _exifTiffOrientation(6);
+    final profile = Uint8List.fromList(<int>[7, 8, 9]);
+    final jpeg = await ImagePipeline.fromRawPixels(
+      raw(),
+    ).withExifMetadata(exif).withIccProfile(profile).jpeg().toBytes();
+    final png = await ImagePipeline.fromRawPixels(
+      raw(),
+    ).withExifMetadata(exif).withIccProfile(profile).png().toBytes();
+    final webp = await ImagePipeline.fromRawPixels(
+      raw(),
+    ).withExifMetadata(exif).withIccProfile(profile).webp().toBytes();
+
+    final jpegMetadata = await ImagePipeline.fromBytes(jpeg).metadata();
+    final pngMetadata = await ImagePipeline.fromBytes(png).metadata();
+    final webpMetadata = await ImagePipeline.fromBytes(webp).metadata();
+    for (final metadata in <ImageMetadata>[
+      jpegMetadata,
+      pngMetadata,
+      webpMetadata,
+    ]) {
+      expect(metadata.hasExif, isTrue);
+      expect(metadata.orientation, 6);
+      expect(metadata.hasProfile, isTrue);
+      expect(metadata.iccProfile, profile);
+    }
+    expect(_jpegIccProfile(jpeg), profile);
+    expect(_pngIccProfile(png), profile);
+    expect(_webpChunk(webp, 'ICCP'), profile);
+  });
+
   test('keeps XMP metadata across supported encoded outputs', () async {
     final xmp = XmpMetadata.parse('<xmp><title>Kept</title></xmp>');
     final jpegSource = await ImagePipeline.fromRawPixels(
@@ -317,6 +348,12 @@ void main() {
       ImagePipeline.fromRawPixels(
         raw(),
       ).withXmpMetadata(XmpMetadata.parse('<xmp />')).gif().toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).withIccProfile(Uint8List.fromList(<int>[1])).gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
     final jpegWithXmp = await ImagePipeline.fromRawPixels(
