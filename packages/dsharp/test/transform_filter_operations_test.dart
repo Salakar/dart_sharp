@@ -56,6 +56,20 @@ void main() {
       final rotated = await pixels(
         ImagePipeline.fromRawPixels(raw2x2()).rotate(90),
       );
+      final flipThenRotate = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).flip().rotate(90),
+      );
+      final rotateThenFlip = ImagePipeline.fromRawPixels(
+        raw2x2(),
+      ).rotate(90).flip();
+      final rotateThenFlipPixels = await pixels(rotateThenFlip);
+      final flopThenRotate = await pixels(
+        ImagePipeline.fromRawPixels(raw2x2()).flop().rotate(90),
+      );
+      final rotateThenFlop = ImagePipeline.fromRawPixels(
+        raw2x2(),
+      ).rotate(90).flop();
+      final rotateThenFlopPixels = await pixels(rotateThenFlop);
 
       expect(redBytes(flipped), <int>[3, 4, 1, 2]);
       expect(redBytes(flopped), <int>[2, 1, 4, 3]);
@@ -70,6 +84,10 @@ void main() {
         isEmpty,
       );
       expect(redBytes(rotated), <int>[3, 1, 4, 2]);
+      expect(rotateThenFlip.operations, <String>['flip', 'rotate']);
+      expect(redBytes(rotateThenFlipPixels), redBytes(flipThenRotate));
+      expect(rotateThenFlop.operations, <String>['flop', 'rotate']);
+      expect(redBytes(rotateThenFlopPixels), redBytes(flopThenRotate));
     },
   );
 

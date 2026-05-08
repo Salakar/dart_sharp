@@ -4,12 +4,22 @@ part of 'image_pipeline.dart';
 extension ImagePipelineTransform on ImagePipeline {
   /// Flips vertically when [flip] is true.
   ImagePipeline flip([bool flip = true]) {
-    return flip ? _append(const FlipOperation()) : this;
+    return flip
+        ? _appendBefore(
+            const FlipOperation(),
+            (step) => step is RotateOperation,
+          )
+        : this;
   }
 
   /// Flops horizontally when [flop] is true.
   ImagePipeline flop([bool flop = true]) {
-    return flop ? _append(const FlopOperation()) : this;
+    return flop
+        ? _appendBefore(
+            const FlopOperation(),
+            (step) => step is RotateOperation,
+          )
+        : this;
   }
 
   /// Rotates by [degrees], or auto-orients when no angle is provided.
