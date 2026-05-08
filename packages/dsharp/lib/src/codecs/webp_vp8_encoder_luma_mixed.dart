@@ -58,6 +58,35 @@ List<int> _lossyLumaHorizontalSecondVerticalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaHorizontalThirdVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaHorizontalThirdVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaSecondHorizontalVerticalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -108,6 +137,31 @@ int _lossyLumaHorizontalSecondVerticalAcBlock(
   );
 }
 
+int _lossyLumaHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyLumaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (localX, localY) {
+      final isLeft = localX < 2;
+      return isLeft == localY.isEven;
+    },
+    scale: 2,
+  );
+}
+
 int _lossyLumaMixedAcBlock(
   Uint8List rgba, {
   required int width,
@@ -117,6 +171,7 @@ int _lossyLumaMixedAcBlock(
   required int mbY,
   required int block,
   required bool Function(int localX, int localY) positive,
+  int scale = 1,
 }) {
   final blockX = block & 3;
   final blockY = block >> 2;
@@ -146,5 +201,5 @@ int _lossyLumaMixedAcBlock(
   }
   final positiveAverage = (positiveTotal + 4) ~/ 8;
   final negativeAverage = (negativeTotal + 4) ~/ 8;
-  return _clampDctCoefficient(positiveAverage - negativeAverage);
+  return _clampDctCoefficient((positiveAverage - negativeAverage) * scale);
 }
