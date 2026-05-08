@@ -110,6 +110,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
   WebpImageInfo? info;
+  WebpImageInfo? payloadInfo;
   WebpCompression? imageCompression;
   var hasVp8x = false;
   var hasAlphaChunk = false;
@@ -135,14 +136,16 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
         throw const InvalidImageException('WebP has multiple image chunks.');
       }
       imageCompression = WebpCompression.vp8;
-      info ??= _vp8Info(data);
+      payloadInfo = _vp8Info(data);
+      info ??= payloadInfo;
     } else if (type == 'VP8L') {
       imageChunkCount += 1;
       if (imageChunkCount > 1) {
         throw const InvalidImageException('WebP has multiple image chunks.');
       }
       imageCompression = WebpCompression.vp8l;
-      info ??= _vp8lInfo(data);
+      payloadInfo = _vp8lInfo(data);
+      info ??= payloadInfo;
     } else if (type == 'VP8X') {
       if (hasVp8x) {
         throw const InvalidImageException('WebP has multiple VP8X chunks.');
@@ -196,6 +199,16 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       !parsed.isAnimated &&
       imageChunkCount != 1) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
+  }
+  final embeddedPayload = payloadInfo;
+  if (parsed.compression == WebpCompression.extended &&
+      !parsed.isAnimated &&
+      embeddedPayload != null &&
+      (embeddedPayload.width != parsed.width ||
+          embeddedPayload.height != parsed.height)) {
+    throw const InvalidImageException(
+      'WebP VP8X dimensions do not match image payload.',
+    );
   }
   if (parsed.isAnimated) {
     if (imageChunkCount != 0) {
