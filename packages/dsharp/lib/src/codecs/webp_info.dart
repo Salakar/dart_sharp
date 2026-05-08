@@ -5,6 +5,7 @@ import 'binary_io.dart';
 import 'webp_riff.dart';
 
 const _vp8xReservedFeatureFlags = 0xc1;
+const _animationFrameReservedFlags = 0xfc;
 
 /// WebP compression payload kind.
 enum WebpCompression {
@@ -358,6 +359,9 @@ WebpFrameInfo _frameInfo(Uint8List data) {
     throw const InvalidImageException('Invalid WebP animation frame header.');
   }
   final flags = data[15];
+  if ((flags & _animationFrameReservedFlags) != 0) {
+    throw const InvalidImageException('Invalid WebP animation frame flags.');
+  }
   final payload = _framePayloadInfo(data, start: 16);
   if (payload.hasVp8l == payload.hasVp8) {
     throw const InvalidImageException(

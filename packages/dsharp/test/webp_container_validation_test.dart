@@ -140,6 +140,20 @@ void main() {
     );
   });
 
+  test('rejects animation frames with reserved flag bits', () async {
+    final bytes = animatedVp8Webp(width: 1, height: 1);
+    bytes[67] |= 0x04;
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;
