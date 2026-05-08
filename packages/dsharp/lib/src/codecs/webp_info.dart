@@ -292,6 +292,7 @@ WebpFrameInfo _frameInfo(Uint8List data) {
   var hasAlpha = false;
   var hasVp8l = false;
   var hasVp8 = false;
+  var imageChunkCount = 0;
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
@@ -303,8 +304,20 @@ WebpFrameInfo _frameInfo(Uint8List data) {
     if (type == 'ALPH') {
       hasAlpha = true;
     } else if (type == 'VP8L') {
+      imageChunkCount += 1;
+      if (imageChunkCount > 1) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple image chunks.',
+        );
+      }
       hasVp8l = true;
     } else if (type == 'VP8 ') {
+      imageChunkCount += 1;
+      if (imageChunkCount > 1) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple image chunks.',
+        );
+      }
       hasVp8 = true;
     }
     offset = dataEnd + (length.isOdd ? 1 : 0);

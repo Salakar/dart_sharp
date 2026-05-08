@@ -143,8 +143,18 @@ _AnimationFrame _readFrame(Uint8List data) {
       throw const InvalidImageException('Truncated WebP animation frame.');
     }
     if (type == 'VP8L') {
+      if (vp8l != null || vp8 != null) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple image chunks.',
+        );
+      }
       vp8l = data.sublist(start, end);
     } else if (type == 'VP8 ') {
+      if (vp8l != null || vp8 != null) {
+        throw const InvalidImageException(
+          'WebP animation frame has multiple image chunks.',
+        );
+      }
       vp8 = data.sublist(start, end);
     } else if (type == 'ALPH') {
       alpha = data.sublist(start, end);
