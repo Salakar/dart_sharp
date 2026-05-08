@@ -340,6 +340,9 @@ WebpImageInfo _vp8xInfo(Uint8List data) {
   if ((flags & _vp8xReservedFeatureFlags) != 0) {
     throw const InvalidImageException('Invalid VP8X feature flags.');
   }
+  if (data[1] != 0 || data[2] != 0 || data[3] != 0) {
+    throw const InvalidImageException('Invalid VP8X reserved fields.');
+  }
   return WebpImageInfo(
     width: _uint24Le(data, 4) + 1,
     height: _uint24Le(data, 7) + 1,
