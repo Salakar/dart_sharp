@@ -136,12 +136,10 @@ Uint8List _decodeImageData(
       pixel += length;
       continue;
     }
-    final argb = _argb(
-      group.alpha.decode(reader),
-      group.red.decode(reader),
-      g,
-      group.blue.decode(reader),
-    );
+    final red = group.red.decode(reader);
+    final blue = group.blue.decode(reader);
+    final alpha = group.alpha.decode(reader);
+    final argb = _argb(alpha, red, g, blue);
     _writeArgbToRgba(out, pixel, argb);
     colorCache.insert(argb);
     pixel += 1;

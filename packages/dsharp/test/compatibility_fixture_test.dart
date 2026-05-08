@@ -402,11 +402,13 @@ void main() {
     expect(image.frames.first.pixels.bytes.length, 13 * 169 * 4);
   });
 
-  test('optional upstream VP8L prefix-code fixtures decode pixels', () async {
+  test('optional upstream VP8L fixtures decode pixels', () async {
     final paths = <String>[
       '../../sharp_clone/test/fixtures/expected/gravity-center-height.webp',
       '../../sharp_clone/test/fixtures/expected/negate-trans.webp',
       '../../sharp_clone/test/fixtures/expected/webp-alpha-80.webp',
+      '../../sharp_clone/test/fixtures/expected/webp-lossless.webp',
+      '../../sharp_clone/test/fixtures/expected/webp-near-lossless-50.webp',
     ];
     for (final path in paths) {
       final fixture = File(path);

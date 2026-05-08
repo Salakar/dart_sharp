@@ -45,9 +45,9 @@ Uint8List _encodeVp8lPayload(RawPixels raw) {
   for (var i = 0; i < rgba.length; i += 4) {
     bits
       ..write(_reverseBits(rgba[i + 1], 8), 8)
-      ..write(_reverseBits(rgba[i + 3], 8), 8)
       ..write(_reverseBits(rgba[i], 8), 8)
-      ..write(_reverseBits(rgba[i + 2], 8), 8);
+      ..write(_reverseBits(rgba[i + 2], 8), 8)
+      ..write(_reverseBits(rgba[i + 3], 8), 8);
   }
   return Uint8List.fromList(<int>[0x2f, ...bits.finish()]);
 }
