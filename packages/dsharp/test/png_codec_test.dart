@@ -7,6 +7,15 @@ import 'package:dsharp/src/codecs/deflate_codec.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('rejects oversized PNG dimensions before pixel allocation', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _pngHeaderOnly(width: 65536, height: 1),
+      ).toPixelImage(),
+      throwsA(isA<ImageLimitException>()),
+    );
+  });
+
   test('decodes 16-bit grayscale PNG samples', () async {
     final image = await ImagePipeline.fromBytes(
       _png(
@@ -202,6 +211,22 @@ Uint8List _png({
     _writeChunk(writer, 'tRNS', trns.toBytes());
   }
   _writeChunk(writer, 'IDAT', zlibEncodeStored(raw.toBytes()));
+  _writeChunk(writer, 'IEND', Uint8List(0));
+  return writer.toBytes();
+}
+
+Uint8List _pngHeaderOnly({required int width, required int height}) {
+  final writer = ByteWriter()
+    ..writeBytes(const <int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  final ihdr = ByteWriter()
+    ..writeUint32Be(width)
+    ..writeUint32Be(height)
+    ..writeByte(8)
+    ..writeByte(6)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeChunk(writer, 'IHDR', ihdr.toBytes());
   _writeChunk(writer, 'IEND', Uint8List(0));
   return writer.toBytes();
 }

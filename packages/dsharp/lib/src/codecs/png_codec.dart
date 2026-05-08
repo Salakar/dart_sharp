@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
+import '../source/input_options.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec.dart';
@@ -83,6 +84,11 @@ final class PngImageCodec implements ImageCodec {
     if (width <= 0 || height <= 0) {
       throw const InvalidImageException('Invalid PNG dimensions.');
     }
+    const InputSafetyLimits().checkImage(
+      width: width,
+      height: height,
+      frames: 1,
+    );
     if (!_supportsPngBitDepth(colorType, bitDepth)) {
       throw const UnsupportedCodecException(
         'Unsupported PNG colour type or bit depth.',

@@ -20,6 +20,15 @@ void main() {
     }
   });
 
+  test('corrupt JPEG marker lengths fail with typed exceptions', () async {
+    final bytes = Uint8List.fromList(<int>[0xff, 0xd8, 0xff, 0xe0, 0x25, 0x4c]);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test(
     'oversized and invalid descriptors fail before allocation-heavy work',
     () {

@@ -45,6 +45,39 @@ void main() {
     expect(rgba.sublist(76799 * 4, 76800 * 4), <int>[17, 15, 16, 255]);
   });
 
+  test(
+    'optional upstream corrupt JPEG fixture fails with typed error',
+    () async {
+      final fixture = File(
+        '../../sharp_clone/test/fixtures/corrupt-header.jpg',
+      );
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+
+      await expectLater(
+        ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    },
+  );
+
+  test('optional upstream oversized PNG fixture fails at limits', () async {
+    final fixture = File(
+      '../../sharp_clone/test/fixtures/65536-uint32-limit.png',
+    );
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    await expectLater(
+      ImagePipeline.fromBytes(await fixture.readAsBytes()).toPixelImage(),
+      throwsA(isA<ImageLimitException>()),
+    );
+  });
+
   test('optional upstream restart JPEG fixture decodes pixels', () async {
     final fixture = File('../../sharp_clone/test/fixtures/Landscape_9.jpg');
     if (!fixture.existsSync()) {

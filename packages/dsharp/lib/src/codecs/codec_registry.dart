@@ -106,7 +106,16 @@ final class CodecRegistry {
   /// Decodes bytes after sniffing the format when [format] is omitted.
   PixelImage decode(Uint8List bytes, {ImageFormat? format}) {
     final resolved = format ?? sniffImageFormat(bytes);
-    return codecFor(resolved).decode(bytes);
+    try {
+      return codecFor(resolved).decode(bytes);
+    } on ImageProcessingException {
+      rethrow;
+    } on RangeError catch (error) {
+      throw InvalidImageException(
+        'Invalid ${resolved.id} image data.',
+        cause: error,
+      );
+    }
   }
 
   /// Decodes raw pixels.
