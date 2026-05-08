@@ -121,6 +121,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     bitDepth: bitDepth,
     orientation: orientation,
     isProgressive: interlace == 1,
+    isPalette: colorType == 3,
   );
 }
 
@@ -327,6 +328,7 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
     frameDelays: frameDelays,
     bitDepth: (packed & 0x07) + 1,
     isProgressive: progressive,
+    isPalette: true,
   );
 }
 
@@ -376,6 +378,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
   var bitDepth = 0;
   var hasAlpha = false;
   var hasProfile = false;
+  var isPalette = false;
   double? density;
   while (ifdOffset != 0) {
     if (ifdOffset < 8 ||
@@ -403,6 +406,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     bitDepth = _tiffFirstInt(bytes, tags[258], little) ?? bitDepth;
     final samples = _tiffFirstInt(bytes, tags[277], little);
     final photometric = _tiffFirstInt(bytes, tags[262], little);
+    isPalette = isPalette || photometric == 3;
     channels = channels == 0
         ? samples ?? _tiffPhotometricChannels(photometric)
         : channels;
@@ -430,6 +434,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     density: density,
     hasProfile: hasProfile,
     bitDepth: bitDepth == 0 ? null : bitDepth,
+    isPalette: isPalette,
   );
 }
 

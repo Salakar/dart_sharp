@@ -28,6 +28,7 @@ final class ImageMetadata {
     this.bitDepth,
     this.orientation,
     this.isProgressive = false,
+    this.isPalette = false,
   }) : _frameDelays = frameDelays,
        _iccProfile = iccProfile,
        _exif = exif,
@@ -61,6 +62,12 @@ final class ImageMetadata {
 
   /// Optional animation loop count.
   final int? loopCount;
+
+  /// Sharp-style page/frame count when multi-frame.
+  int? get pages => frames > 1 ? frames : null;
+
+  /// Sharp-style animation loop count.
+  int? get loop => loopCount;
 
   final List<Duration> _frameDelays;
 
@@ -107,11 +114,29 @@ final class ImageMetadata {
   /// Encoded bits per sample when known.
   final int? bitDepth;
 
+  /// Sharp-style bits per sample when known.
+  int? get bitsPerSample => bitDepth;
+
   /// EXIF orientation value when present.
   final int? orientation;
 
+  /// Dimensions after applying EXIF orientation.
+  ImageDimensions get autoOrient {
+    final shouldSwap = switch (orientation) {
+      5 || 6 || 7 || 8 => true,
+      _ => false,
+    };
+    return ImageDimensions(
+      width: shouldSwap ? height : width,
+      height: shouldSwap ? width : height,
+    );
+  }
+
   /// Whether the encoded image uses progressive/interlaced storage.
   final bool isProgressive;
+
+  /// Whether the encoded image is palette-based.
+  final bool isPalette;
 
   /// Creates metadata from decoded pixels.
   factory ImageMetadata.fromPixelImage({
@@ -136,6 +161,18 @@ final class ImageMetadata {
       bitDepth: 8,
     );
   }
+}
+
+/// Pixel dimensions.
+final class ImageDimensions {
+  /// Creates pixel dimensions.
+  const ImageDimensions({required this.width, required this.height});
+
+  /// Pixel width.
+  final int width;
+
+  /// Pixel height.
+  final int height;
 }
 
 Uint8List? _copyBytes(Uint8List? bytes) {

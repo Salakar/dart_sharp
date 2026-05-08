@@ -20,15 +20,19 @@ void main() {
     expect(metadata.channels, 4);
     expect(metadata.hasAlpha, isTrue);
     expect(metadata.bitDepth, 16);
+    expect(metadata.bitsPerSample, 16);
     expect(metadata.density, closeTo(300, 0.05));
     expect(metadata.hasProfile, isTrue);
     expect(metadata.iccProfile, <int>[1, 2, 3]);
     expect(metadata.hasExif, isTrue);
     expect(metadata.exif, isNotNull);
     expect(metadata.orientation, 6);
+    expect(metadata.autoOrient.width, 2);
+    expect(metadata.autoOrient.height, 3);
     expect(metadata.hasXmp, isTrue);
     expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.isProgressive, isTrue);
+    expect(metadata.isPalette, isFalse);
   });
 
   test('reads JPEG frame and app marker metadata', () async {
@@ -41,8 +45,11 @@ void main() {
     expect(metadata.height, 4);
     expect(metadata.channels, 3);
     expect(metadata.bitDepth, 8);
+    expect(metadata.bitsPerSample, 8);
     expect(metadata.density, 72);
     expect(metadata.orientation, 6);
+    expect(metadata.autoOrient.width, 4);
+    expect(metadata.autoOrient.height, 5);
     expect(metadata.hasProfile, isTrue);
     expect(metadata.iccProfile, <int>[0]);
     expect(metadata.hasExif, isTrue);
@@ -61,13 +68,17 @@ void main() {
     expect(metadata.width, 1);
     expect(metadata.height, 1);
     expect(metadata.frames, 2);
+    expect(metadata.pages, 2);
     expect(metadata.loopCount, 3);
+    expect(metadata.loop, 3);
     expect(metadata.frameDelays, <Duration>[
       Duration(milliseconds: 30),
       Duration(milliseconds: 40),
     ]);
     expect(metadata.delay, <int>[30, 40]);
     expect(metadata.hasAlpha, isTrue);
+    expect(metadata.bitsPerSample, 1);
+    expect(metadata.isPalette, isTrue);
   });
 
   test('reads TIFF page metadata without strip data', () async {
@@ -79,9 +90,12 @@ void main() {
     expect(metadata.width, 3);
     expect(metadata.height, 2);
     expect(metadata.frames, 2);
+    expect(metadata.pages, 2);
     expect(metadata.pageHeight, 2);
     expect(metadata.channels, 3);
     expect(metadata.bitDepth, 8);
+    expect(metadata.bitsPerSample, 8);
+    expect(metadata.isPalette, isFalse);
   });
 
   test('transformed WebP metadata reflects transformed pixels', () async {
