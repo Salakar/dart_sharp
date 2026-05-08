@@ -13,6 +13,10 @@ final class ChannelStats {
     required this.squaresSum,
     required this.mean,
     required this.stdev,
+    this.minX = 0,
+    this.minY = 0,
+    this.maxX = 0,
+    this.maxY = 0,
   });
 
   /// Minimum sample.
@@ -32,6 +36,18 @@ final class ChannelStats {
 
   /// Standard deviation.
   final double stdev;
+
+  /// X-coordinate of a pixel containing [min].
+  final int minX;
+
+  /// Y-coordinate of a pixel containing [min].
+  final int minY;
+
+  /// X-coordinate of a pixel containing [max].
+  final int maxX;
+
+  /// Y-coordinate of a pixel containing [max].
+  final int maxY;
 }
 
 /// Image-wide statistics.
@@ -41,6 +57,7 @@ final class ImageStats {
     required this.channels,
     required this.isOpaque,
     required this.entropy,
+    this.sharpness = 0,
     required this.dominant,
   });
 
@@ -50,10 +67,13 @@ final class ImageStats {
   /// Whether all alpha samples are fully opaque.
   final bool isOpaque;
 
-  /// Shannon entropy over first-channel byte values.
+  /// Histogram-based greyscale entropy.
   final double entropy;
 
-  /// Dominant color approximation.
+  /// Greyscale sharpness estimated from a Laplacian convolution.
+  final double sharpness;
+
+  /// Dominant sRGB color approximated with a 4096-bin histogram.
   final RgbaColor dominant;
 
   /// Computes statistics for the first frame of [image].
@@ -66,12 +86,26 @@ final class ImageStats {
     for (var channel = 0; channel < channelCount; channel += 1) {
       var minValue = 255;
       var maxValue = 0;
+      var minX = 0;
+      var minY = 0;
+      var maxX = 0;
+      var maxY = 0;
       var sum = 0;
       var squares = 0;
-      for (var i = channel; i < bytes.length; i += channelCount) {
-        final value = bytes[i];
-        minValue = min(minValue, value);
-        maxValue = max(maxValue, value);
+      for (var pixel = 0; pixel < pixelCount; pixel += 1) {
+        final value = bytes[pixel * channelCount + channel];
+        final x = pixel % raw.width;
+        final y = pixel ~/ raw.width;
+        if (value < minValue) {
+          minValue = value;
+          minX = x;
+          minY = y;
+        }
+        if (value > maxValue) {
+          maxValue = value;
+          maxX = x;
+          maxY = y;
+        }
         sum += value;
         squares += value * value;
       }
@@ -85,6 +119,10 @@ final class ImageStats {
           squaresSum: squares,
           mean: mean,
           stdev: sqrt(variance),
+          minX: minX,
+          minY: minY,
+          maxX: maxX,
+          maxY: maxY,
         ),
       );
     }
@@ -92,6 +130,7 @@ final class ImageStats {
       channels: List<ChannelStats>.unmodifiable(stats),
       isOpaque: _isOpaque(bytes, channelCount),
       entropy: _entropy(bytes, channelCount, pixelCount),
+      sharpness: _sharpness(raw.width, raw.height, bytes, channelCount),
       dominant: _dominant(bytes, channelCount),
     );
   }
@@ -113,7 +152,7 @@ bool _isOpaque(List<int> bytes, int channelCount) {
 double _entropy(List<int> bytes, int channelCount, int pixelCount) {
   final histogram = List<int>.filled(256, 0);
   for (var i = 0; i < bytes.length; i += channelCount) {
-    histogram[bytes[i]] += 1;
+    histogram[_luminance(bytes, i, channelCount)] += 1;
   }
   var entropy = 0.0;
   for (final count in histogram) {
@@ -130,9 +169,59 @@ RgbaColor _dominant(List<int> bytes, int channelCount) {
   if (bytes.isEmpty) {
     return RgbaColor.transparent;
   }
-  final red = bytes[0];
-  final green = channelCount > 1 ? bytes[1] : red;
-  final blue = channelCount > 2 ? bytes[2] : red;
-  final alpha = channelCount > 3 ? bytes[3] : 255;
-  return RgbaColor(red: red, green: green, blue: blue, alpha: alpha);
+  final counts = List<int>.filled(4096, 0);
+  final redSums = List<int>.filled(4096, 0);
+  final greenSums = List<int>.filled(4096, 0);
+  final blueSums = List<int>.filled(4096, 0);
+  var bestBin = 0;
+  for (var i = 0; i < bytes.length; i += channelCount) {
+    final red = bytes[i];
+    final green = channelCount > 1 ? bytes[i + 1] : red;
+    final blue = channelCount > 2 ? bytes[i + 2] : red;
+    final bin = (red >> 4) << 8 | (green >> 4) << 4 | (blue >> 4);
+    counts[bin] += 1;
+    redSums[bin] += red;
+    greenSums[bin] += green;
+    blueSums[bin] += blue;
+    if (counts[bin] > counts[bestBin]) {
+      bestBin = bin;
+    }
+  }
+  final count = counts[bestBin];
+  return RgbaColor(
+    red: (redSums[bestBin] / count).round(),
+    green: (greenSums[bestBin] / count).round(),
+    blue: (blueSums[bestBin] / count).round(),
+  );
+}
+
+double _sharpness(int width, int height, List<int> bytes, int channelCount) {
+  if (width < 3 || height < 3) {
+    return 0;
+  }
+  final samples = (width - 2) * (height - 2);
+  var sum = 0.0;
+  var squares = 0.0;
+  for (var y = 1; y < height - 1; y += 1) {
+    for (var x = 1; x < width - 1; x += 1) {
+      final center = (y * width + x) * channelCount;
+      final value =
+          _luminance(bytes, center - channelCount, channelCount) +
+          _luminance(bytes, center + channelCount, channelCount) +
+          _luminance(bytes, center - width * channelCount, channelCount) +
+          _luminance(bytes, center + width * channelCount, channelCount) -
+          4 * _luminance(bytes, center, channelCount);
+      sum += value;
+      squares += value * value;
+    }
+  }
+  final mean = sum / samples;
+  return sqrt(max(0, squares / samples - mean * mean));
+}
+
+int _luminance(List<int> bytes, int offset, int channelCount) {
+  final red = bytes[offset];
+  final green = channelCount > 1 ? bytes[offset + 1] : red;
+  final blue = channelCount > 2 ? bytes[offset + 2] : red;
+  return (red * 299 + green * 587 + blue * 114 + 500) ~/ 1000;
 }

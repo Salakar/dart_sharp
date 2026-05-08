@@ -53,9 +53,62 @@ void main() {
     expect(stats.channels.first.max, 100);
     expect(stats.channels.first.sum, 100);
     expect(stats.channels.first.mean, 50);
+    expect(stats.channels.first.minX, 0);
+    expect(stats.channels.first.minY, 0);
+    expect(stats.channels.first.maxX, 1);
+    expect(stats.channels.first.maxY, 0);
     expect(stats.isOpaque, isTrue);
     expect(stats.entropy, 1);
+    expect(stats.sharpness, 0);
     expect(stats.dominant.red, 0);
+  });
+
+  test('stats estimate sharpness and dominant color', () async {
+    final sharpStats = await ImagePipeline.fromRawPixels(
+      RawPixels(
+        bytes: Uint8List.fromList(<int>[
+          for (var y = 0; y < 4; y += 1)
+            for (var x = 0; x < 4; x += 1) ...[
+              if (x < 2) ...[0, 0, 0, 255] else ...[255, 255, 255, 255],
+            ],
+        ]),
+        width: 4,
+        height: 4,
+        channels: ChannelCount.four,
+      ),
+    ).stats();
+
+    final dominantStats = await ImagePipeline.fromRawPixels(
+      RawPixels(
+        bytes: Uint8List.fromList(<int>[
+          240,
+          10,
+          20,
+          255,
+          241,
+          11,
+          21,
+          255,
+          242,
+          12,
+          22,
+          128,
+          10,
+          200,
+          230,
+          255,
+        ]),
+        width: 4,
+        height: 1,
+        channels: ChannelCount.four,
+      ),
+    ).stats();
+
+    expect(sharpStats.sharpness, closeTo(255, 0.001));
+    expect(dominantStats.dominant.red, 241);
+    expect(dominantStats.dominant.green, 11);
+    expect(dominantStats.dominant.blue, 21);
+    expect(dominantStats.dominant.alpha, 255);
   });
 
   test('safety limits reject oversized inputs', () {
