@@ -9,6 +9,7 @@ import '../codecs/encoder_options.dart';
 import '../codecs/format_sniffer.dart';
 import '../codecs/image_format.dart';
 import '../codecs/output.dart';
+import '../codecs/webp_info.dart';
 import '../composite/composite_layer.dart';
 import '../composite/composite_operation.dart';
 import '../geometry/geometry.dart';
