@@ -68,6 +68,59 @@ void main() {
     expect(decoded.frames[1].delay, const Duration(milliseconds: 50));
   });
 
+  test('WebP loop and delay aliases map to animation metadata', () async {
+    final decoded = await ImagePipeline.fromPixelImage(_animation())
+        .webp(
+          const WebpEncoderOptions(loop: 4, delay: Duration(milliseconds: 70)),
+        )
+        .toBytes()
+        .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+
+    expect(decoded.loopCount, 4);
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 70));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 70));
+  });
+
+  test(
+    'WebP parity options validate and unsupported modes fail clearly',
+    () async {
+      final pipeline = ImagePipeline.fromPixelImage(_animation());
+
+      await expectLater(
+        pipeline
+            .webp(
+              const WebpEncoderOptions(
+                alphaQuality: 0,
+                smartSubsample: true,
+                smartDeblock: true,
+                preset: 'picture',
+                effort: 0,
+                minSize: true,
+                mixed: true,
+              ),
+            )
+            .toBytes(),
+        completes,
+      );
+      expect(
+        pipeline.webp(const WebpEncoderOptions(alphaQuality: -1)).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        pipeline.webp(const WebpEncoderOptions(alphaQuality: 101)).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        pipeline.webp(const WebpEncoderOptions(preset: 'fail')).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        pipeline.webp(const WebpEncoderOptions(nearLossless: true)).toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    },
+  );
+
   test('WebP animation option ranges are validated', () {
     expect(
       ImagePipeline.fromPixelImage(
@@ -79,7 +132,7 @@ void main() {
       ImagePipeline.fromPixelImage(_animation())
           .webp(
             const WebpEncoderOptions(
-              frameDelay: Duration(milliseconds: 0x1000000),
+              frameDelay: Duration(milliseconds: 0x10000),
             ),
           )
           .toBytes(),

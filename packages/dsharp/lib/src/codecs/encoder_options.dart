@@ -180,19 +180,46 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Creates WebP options.
   const WebpEncoderOptions({
     this.quality = 80,
+    this.alphaQuality = 100,
     this.lossless = true,
+    this.nearLossless = false,
+    this.smartSubsample = false,
+    this.smartDeblock = false,
+    this.preset = 'default',
     this.effort = 4,
-    this.loopCount,
-    this.frameDelay,
-    this.frameDelays = const <Duration>[],
+    int? loopCount,
+    int? loop,
+    Duration? frameDelay,
+    Duration? delay,
+    List<Duration>? frameDelays,
+    List<Duration>? delays,
+    this.minSize = false,
+    this.mixed = false,
     super.force,
-  });
+  }) : loopCount = loopCount ?? loop,
+       frameDelay = frameDelay ?? delay,
+       frameDelays = frameDelays ?? delays ?? const <Duration>[];
 
   /// Quality from 1 to 100.
   final int quality;
 
+  /// Alpha-layer quality from 0 to 100.
+  final int alphaQuality;
+
   /// Whether to encode losslessly.
   final bool lossless;
+
+  /// Whether to request near-lossless preprocessing.
+  final bool nearLossless;
+
+  /// Whether to request higher-quality chroma subsampling.
+  final bool smartSubsample;
+
+  /// Whether to request automatic deblocking.
+  final bool smartDeblock;
+
+  /// Named WebP preprocessing preset.
+  final String preset;
 
   /// Encoder effort from 0 to 6.
   final int effort;
@@ -206,12 +233,37 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Optional per-frame display delays for encoded animation frames.
   final List<Duration> frameDelays;
 
+  /// Whether to request minimum-size animation encoding.
+  final bool minSize;
+
+  /// Whether to request mixed lossy/lossless animation encoding.
+  final bool mixed;
+
   @override
   ImageFormat get format => ImageFormat.webp;
 
   @override
   void validate() {
     _quality(quality);
+    if (alphaQuality < 0 || alphaQuality > 100) {
+      throw const OperationValidationException(
+        'WebP alphaQuality must be between 0 and 100.',
+      );
+    }
+    const presets = <String>{
+      'default',
+      'photo',
+      'picture',
+      'drawing',
+      'icon',
+      'text',
+    };
+    if (!presets.contains(preset)) {
+      throw const OperationValidationException(
+        'WebP preset must be one of: default, photo, picture, drawing, icon, '
+        'text.',
+      );
+    }
     if (effort < 0 || effort > 6) {
       throw const OperationValidationException('WebP effort must be 0..6.');
     }
@@ -222,16 +274,15 @@ final class WebpEncoderOptions extends EncoderOptions {
       );
     }
     final delay = frameDelay;
-    if (delay != null &&
-        (delay.isNegative || delay.inMilliseconds > 0xffffff)) {
+    if (delay != null && (delay.isNegative || delay.inMilliseconds > 0xffff)) {
       throw const OperationValidationException(
-        'WebP frame delay must be 0..16777215 ms.',
+        'WebP frame delay must be 0..65535 ms.',
       );
     }
     for (final frameDelay in frameDelays) {
-      if (frameDelay.isNegative || frameDelay.inMilliseconds > 0xffffff) {
+      if (frameDelay.isNegative || frameDelay.inMilliseconds > 0xffff) {
         throw const OperationValidationException(
-          'WebP frame delay must be 0..16777215 ms.',
+          'WebP frame delay must be 0..65535 ms.',
         );
       }
     }

@@ -51,6 +51,11 @@ final class WebpImageCodec implements ImageCodec {
     final webpOptions = options is WebpEncoderOptions
         ? options
         : const WebpEncoderOptions();
+    if (webpOptions.nearLossless) {
+      throw const UnsupportedCodecException(
+        'Near-lossless WebP encoding is not implemented in pure Dart yet.',
+      );
+    }
     if (!webpOptions.lossless) {
       throw const UnsupportedCodecException(
         'Lossy WebP encoding is not implemented in pure Dart yet.',
