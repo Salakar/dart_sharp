@@ -104,7 +104,11 @@ extension ImagePipelineOutput on ImagePipeline {
   }
 
   /// Adds a timeout for byte output.
-  ImagePipeline timeout(Duration duration) {
+  ImagePipeline timeout(Object options) {
+    final duration = _resolveTimeoutArgument(options);
+    if (duration == null) {
+      return _copyPipelineWith(this, clearTimeout: true);
+    }
     return _copyPipelineWith(this, timeout: duration);
   }
 
@@ -206,4 +210,27 @@ ImageFormat _resolveFormatId(String id) {
     return format;
   }
   throw OperationValidationException('Unsupported output format "$id".');
+}
+
+Duration? _resolveTimeoutArgument(Object options) {
+  if (options is Duration) {
+    if (options.isNegative) {
+      throw const OperationValidationException(
+        'Timeout duration must not be negative.',
+      );
+    }
+    return options == Duration.zero ? null : options;
+  }
+  if (options is Map<Object?, Object?>) {
+    final seconds = options['seconds'];
+    if (seconds is int && seconds >= 0 && seconds <= 3600) {
+      return seconds == 0 ? null : Duration(seconds: seconds);
+    }
+    throw const OperationValidationException(
+      'Timeout seconds must be an integer between 0 and 3600.',
+    );
+  }
+  throw const OperationValidationException(
+    'Timeout options must be a Duration or map with seconds.',
+  );
 }
