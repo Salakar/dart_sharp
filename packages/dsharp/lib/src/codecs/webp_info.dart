@@ -248,10 +248,15 @@ bool _containsChunk(Uint8List bytes, String name, {required int start}) {
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + length;
+    if (dataEnd > bytes.length) {
+      throw const InvalidImageException('Truncated WebP animation frame.');
+    }
     if (type == name) {
       return true;
     }
-    offset += 8 + length + (length.isOdd ? 1 : 0);
+    offset = dataEnd + (length.isOdd ? 1 : 0);
   }
   return false;
 }
