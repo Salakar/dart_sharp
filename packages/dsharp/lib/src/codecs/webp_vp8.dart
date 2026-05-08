@@ -10,6 +10,7 @@ import 'webp_vp8_bool.dart';
 
 part 'webp_vp8_encoder.dart';
 part 'webp_vp8_encoder_chroma.dart';
+part 'webp_vp8_encoder_chroma_mixed.dart';
 part 'webp_vp8_encoder_luma.dart';
 part 'webp_vp8_encoder_luma_mixed.dart';
 part 'webp_vp8_encoder_pixels.dart';
