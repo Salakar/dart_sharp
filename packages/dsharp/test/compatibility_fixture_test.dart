@@ -141,6 +141,61 @@ void main() {
     expect(image.frames.first.pixels.bytes.length, 370 * 285 * 4);
   });
 
+  test(
+    'optional upstream offset alpha WebP animation decodes frames',
+    () async {
+      final fixture = File(
+        '../../sharp_clone/test/fixtures/rotating-squares.webp',
+      );
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+
+      final bytes = await fixture.readAsBytes();
+      final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+      final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+      final rgba = image.firstFrameBytes();
+
+      expect(metadata.format, ImageFormat.webp);
+      expect(metadata.width, 80);
+      expect(metadata.height, 80);
+      expect(metadata.hasAlpha, isTrue);
+      expect(metadata.frames, greaterThan(1));
+      expect(image.isAnimated, isTrue);
+      expect(image.frames.length, metadata.frames);
+      expect(rgba.length, 80 * 80 * 4);
+      expect(
+        [
+          for (var i = 3; i < rgba.length; i += 4) rgba[i],
+        ].any((alpha) => alpha < 255),
+        isTrue,
+      );
+    },
+  );
+
+  test('optional upstream tall WebP animation decodes frames', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/big-height.webp');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final bytes = await fixture.readAsBytes();
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.width, 13);
+    expect(metadata.height, 169);
+    expect(metadata.frames, greaterThan(0));
+    expect(image.width, 13);
+    expect(image.height, 169);
+    expect(image.isAnimated, isTrue);
+    expect(image.frames.length, metadata.frames);
+    expect(image.frames.first.pixels.bytes.length, 13 * 169 * 4);
+  });
+
   test('optional upstream WebP fixture decodes pixels when present', () async {
     final fixture = File('../../sharp_clone/test/fixtures/4.webp');
     if (!fixture.existsSync()) {
