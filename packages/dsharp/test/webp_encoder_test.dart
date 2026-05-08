@@ -39,7 +39,10 @@ void main() {
         .webp(
           const WebpEncoderOptions(
             loopCount: 3,
-            frameDelay: Duration(milliseconds: 40),
+            frameDelays: <Duration>[
+              Duration(milliseconds: 40),
+              Duration(milliseconds: 60),
+            ],
           ),
         )
         .toBytesWithInfo();
@@ -48,11 +51,21 @@ void main() {
     expect(encoded.info.loopCount, 3);
     expect(encoded.info.frameDelays, <Duration>[
       const Duration(milliseconds: 40),
-      const Duration(milliseconds: 40),
+      const Duration(milliseconds: 60),
     ]);
     expect(decoded.loopCount, 3);
     expect(decoded.frames[0].delay, const Duration(milliseconds: 40));
-    expect(decoded.frames[1].delay, const Duration(milliseconds: 40));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 60));
+  });
+
+  test('WebP frameDelay repeats one delay across animation frames', () async {
+    final decoded = await ImagePipeline.fromPixelImage(_animation())
+        .webp(const WebpEncoderOptions(frameDelay: Duration(milliseconds: 50)))
+        .toBytes()
+        .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+
+    expect(decoded.frames[0].delay, const Duration(milliseconds: 50));
+    expect(decoded.frames[1].delay, const Duration(milliseconds: 50));
   });
 
   test('WebP animation option ranges are validated', () {
@@ -67,6 +80,16 @@ void main() {
           .webp(
             const WebpEncoderOptions(
               frameDelay: Duration(milliseconds: 0x1000000),
+            ),
+          )
+          .toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromPixelImage(_animation())
+          .webp(
+            const WebpEncoderOptions(
+              frameDelays: <Duration>[Duration(milliseconds: 1)],
             ),
           )
           .toBytes(),

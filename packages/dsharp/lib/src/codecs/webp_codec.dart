@@ -81,15 +81,26 @@ PixelImage _applyAnimationOptions(
   PixelImage image,
   WebpEncoderOptions options,
 ) {
-  if (options.loopCount == null && options.frameDelay == null) {
+  final frameDelays = options.frameDelays;
+  if (options.loopCount == null &&
+      options.frameDelay == null &&
+      frameDelays.isEmpty) {
     return image;
   }
+  if (frameDelays.isNotEmpty && frameDelays.length != image.frames.length) {
+    throw const OperationValidationException(
+      'WebP frameDelays length must match frame count.',
+    );
+  }
+  final frames = image.frames;
   return PixelImage(
     frames: <ImageFrame>[
-      for (final frame in image.frames)
+      for (var index = 0; index < frames.length; index += 1)
         ImageFrame(
-          pixels: frame.pixels,
-          delay: options.frameDelay ?? frame.delay,
+          pixels: frames[index].pixels,
+          delay: frameDelays.isNotEmpty
+              ? frameDelays[index]
+              : options.frameDelay ?? frames[index].delay,
         ),
     ],
     loopCount: options.loopCount ?? image.loopCount,

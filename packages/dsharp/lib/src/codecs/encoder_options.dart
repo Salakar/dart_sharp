@@ -184,6 +184,7 @@ final class WebpEncoderOptions extends EncoderOptions {
     this.effort = 4,
     this.loopCount,
     this.frameDelay,
+    this.frameDelays = const <Duration>[],
     super.force,
   });
 
@@ -201,6 +202,9 @@ final class WebpEncoderOptions extends EncoderOptions {
 
   /// Optional display delay to apply to every encoded animation frame.
   final Duration? frameDelay;
+
+  /// Optional per-frame display delays for encoded animation frames.
+  final List<Duration> frameDelays;
 
   @override
   ImageFormat get format => ImageFormat.webp;
@@ -223,6 +227,13 @@ final class WebpEncoderOptions extends EncoderOptions {
       throw const OperationValidationException(
         'WebP frame delay must be 0..16777215 ms.',
       );
+    }
+    for (final frameDelay in frameDelays) {
+      if (frameDelay.isNegative || frameDelay.inMilliseconds > 0xffffff) {
+        throw const OperationValidationException(
+          'WebP frame delay must be 0..16777215 ms.',
+        );
+      }
     }
   }
 }
