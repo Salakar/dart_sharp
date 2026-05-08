@@ -48,10 +48,9 @@ extension ImagePipelineColor on ImagePipeline {
     );
   }
 
-  /// Applies a threshold when enabled.
-  ImagePipeline threshold([Object threshold = 128, Object grayscale = true]) {
-    final options = _thresholdOptions(threshold, grayscale);
-    return options == null ? this : _append(ThresholdOperation(options));
+  /// Applies a threshold.
+  ImagePipeline threshold([Object threshold = 128, Object options = true]) {
+    return _append(ThresholdOperation(_thresholdOptions(threshold, options)));
   }
 
   /// Applies linear channel adjustment.
@@ -202,22 +201,31 @@ extension ImagePipelineColor on ImagePipeline {
     );
   }
 
-  ThresholdOptions? _thresholdOptions(Object threshold, Object grayscale) {
-    if (threshold is bool && !threshold) {
-      return null;
+  ThresholdOptions _thresholdOptions(Object threshold, Object options) {
+    if (threshold is ThresholdOptions) {
+      if (options != true) {
+        throw const OperationValidationException(
+          'Threshold options cannot be combined with a second options argument.',
+        );
+      }
+      threshold.validate();
+      return threshold;
     }
     final thresholdValue = switch (threshold) {
       true => 128,
+      false => 0,
       final int value when value >= 0 && value <= 255 => value,
       _ => throw const OperationValidationException(
         'Threshold must be an integer between 0 and 255.',
       ),
     };
-    if (grayscale is! bool) {
-      throw const OperationValidationException(
+    final grayscale = switch (options) {
+      final bool value => value,
+      final ThresholdOptions value => value.grayscale,
+      _ => throw const OperationValidationException(
         'Threshold grayscale option must be a boolean.',
-      );
-    }
+      ),
+    };
     return ThresholdOptions(threshold: thresholdValue, grayscale: grayscale);
   }
 

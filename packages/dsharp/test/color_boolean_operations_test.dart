@@ -33,11 +33,21 @@ void main() {
       final thresholdTrue = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(true),
       );
-      final thresholdDisabled = await pixels(
+      final thresholdFalse = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(false),
       );
       final colorThreshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20, false),
+      );
+      final thresholdOptions = await pixels(
+        ImagePipeline.fromRawPixels(
+          raw,
+        ).threshold(const ThresholdOptions(threshold: 20, grayscale: false)),
+      );
+      final thresholdObjectOptions = await pixels(
+        ImagePipeline.fromRawPixels(
+          raw,
+        ).threshold(20, const ThresholdOptions(grayscale: false)),
       );
       final gamma = await pixels(
         ImagePipeline.fromRawPixels(
@@ -67,12 +77,14 @@ void main() {
       );
       expect(firstBytes(threshold), <int>[0, 0, 0, 77]);
       expect(firstBytes(thresholdTrue), <int>[0, 0, 0, 77]);
-      expect(firstBytes(thresholdDisabled), <int>[10, 20, 30, 77]);
+      expect(firstBytes(thresholdFalse), <int>[255, 255, 255, 77]);
       expect(
         ImagePipeline.fromRawPixels(raw).threshold(false).operations,
-        isEmpty,
+        <String>['threshold'],
       );
       expect(firstBytes(colorThreshold), <int>[0, 255, 255, 77]);
+      expect(firstBytes(thresholdOptions), <int>[0, 255, 255, 77]);
+      expect(firstBytes(thresholdObjectOptions), <int>[0, 255, 255, 77]);
       expect(firstBytes(gamma), <int>[128, 128, 128, 77]);
       expect(firstBytes(gammaOut), <int>[161, 161, 161, 77]);
       expect(
@@ -85,6 +97,12 @@ void main() {
       );
       expect(
         () => ImagePipeline.fromRawPixels(raw).threshold(20, 'false'),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(
+          raw,
+        ).threshold(const ThresholdOptions(threshold: 20), false),
         throwsA(isA<OperationValidationException>()),
       );
       expect(
