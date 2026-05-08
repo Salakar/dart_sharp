@@ -88,6 +88,35 @@ List<int> _lossyLumaBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaHorizontalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaHorizontalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaBlock(
   Uint8List rgba, {
   required int width,
@@ -131,6 +160,55 @@ int _lossyLumaBlock(
       quality,
     ),
   ).y;
+}
+
+int _lossyLumaHorizontalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final xStart = mbX * 16 + blockX * 4;
+  final yStart = mbY * 16 + blockY * 4;
+  if (xStart >= width || yStart >= height) {
+    return 0;
+  }
+  var left = 0;
+  var right = 0;
+  var leftPixels = 0;
+  var rightPixels = 0;
+  final xEnd = xStart + 4 < width ? xStart + 4 : width;
+  final yEnd = yStart + 4 < height ? yStart + 4 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      final luma = _rgbToVp8Yuv(
+        _quantizeLossyColor(
+          _Rgb(rgba[offset], rgba[offset + 1], rgba[offset + 2]),
+          quality,
+        ),
+      ).y;
+      if (x - xStart < 2) {
+        left += luma;
+        leftPixels += 1;
+      } else {
+        right += luma;
+        rightPixels += 1;
+      }
+      offset += 4;
+    }
+  }
+  if (leftPixels == 0 || rightPixels == 0) {
+    return 0;
+  }
+  final leftAverage = (left + leftPixels ~/ 2) ~/ leftPixels;
+  final rightAverage = (right + rightPixels ~/ 2) ~/ rightPixels;
+  return _clampDctCoefficient(((leftAverage - rightAverage) * 3) ~/ 4);
 }
 
 List<_Vp8Yuv> _lossyChromaBlocks(
@@ -288,6 +366,16 @@ int _quantizeLossySample(int value, int step) {
 }
 
 int _clampByte(int value) => value < 0 ? 0 : (value > 255 ? 255 : value);
+
+int _clampDctCoefficient(int value) {
+  if (value < -2048) {
+    return -2048;
+  }
+  if (value > 2048) {
+    return 2048;
+  }
+  return value;
+}
 
 final class _Rgb {
   const _Rgb(this.red, this.green, this.blue);

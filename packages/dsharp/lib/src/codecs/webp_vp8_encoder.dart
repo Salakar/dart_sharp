@@ -83,10 +83,17 @@ Uint8List _encodeVp8SolidFromRgba(
     quality: quality,
     macroblockColors: colors,
   );
+  final lumaAcBlocks = _lossyLumaHorizontalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
     lumaBlocks: lumaBlocks,
+    lumaAcBlocks: lumaAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -161,6 +168,7 @@ Uint8List _encodeVp8SolidPayload({
   required int width,
   required int height,
   required List<int> lumaBlocks,
+  required List<int> lumaAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -197,14 +205,16 @@ Uint8List _encodeVp8SolidPayload({
     contexts.resetLeft();
     for (var mbX = 0; mbX < mbCols; mbX += 1) {
       for (var block = 0; block < 16; block += 1) {
-        final target = lumaBlocks[(mbY * mbCols + mbX) * 16 + block];
-        _writeLumaDc(
+        final blockOffset = (mbY * mbCols + mbX) * 16 + block;
+        final target = lumaBlocks[blockOffset];
+        _writeLumaDct(
           coeffs,
           contexts,
           mbX,
           block,
           (target - _predictedSubblockDc(lumaBlocks, mbCols, mbX, mbY, block)) *
               2,
+          lumaAcBlocks[blockOffset],
         );
       }
       final predictedU = _predictedChromaDc(
@@ -258,24 +268,28 @@ Uint8List _encodeVp8SolidPayload({
   return writer.toBytes();
 }
 
-void _writeLumaDc(
+void _writeLumaDct(
   _Vp8BoolWriter out,
   _Vp8TokenContexts contexts,
   int mbX,
   int block,
-  int coefficient,
+  int dcCoefficient,
+  int acCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
-  if (coefficient == 0) {
-    out.prob(probs.probabilityAt(0, context, _dctEobNode), false);
-    contexts.setHasCoefficients(mbX, block, false);
-    return;
-  }
-  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
+  _writeDctTokens(out, <int>[dcCoefficient, acCoefficient], context, (
+    coefficientIndex,
+    context,
+    node,
+  ) {
     return probs.probabilityAt(coefficientIndex, context, node);
   });
-  contexts.setHasCoefficients(mbX, block, true);
+  contexts.setHasCoefficients(
+    mbX,
+    block,
+    dcCoefficient != 0 || acCoefficient != 0,
+  );
 }
 
 void _writeChromaDc(
@@ -313,6 +327,49 @@ void _writeDctToken(
   out.bit(coefficient.isNegative);
   final nextContext = magnitude == 1 ? 1 : 2;
   out.prob(probabilityAt(1, nextContext, _dctEobNode), false);
+}
+
+void _writeDctTokens(
+  _Vp8BoolWriter out,
+  List<int> coefficients,
+  int initialContext,
+  int Function(int coefficientIndex, int context, int node) probabilityAt,
+) {
+  final lastNonZero = coefficients.lastIndexWhere((coefficient) {
+    return coefficient != 0;
+  });
+  var context = initialContext;
+  if (lastNonZero < 0) {
+    out.prob(probabilityAt(0, context, _dctEobNode), false);
+    return;
+  }
+  var previousWasZero = false;
+  for (var index = 0; index <= lastNonZero; index += 1) {
+    int currentProbability(int node) {
+      return probabilityAt(index, context, node);
+    }
+
+    if (!previousWasZero) {
+      out.prob(currentProbability(_dctEobNode), true);
+    }
+    final coefficient = coefficients[index];
+    if (coefficient == 0) {
+      out.prob(currentProbability(_dctZeroNode), false);
+      context = 0;
+      previousWasZero = true;
+      continue;
+    }
+    final magnitude = coefficient.abs();
+    out.prob(currentProbability(_dctZeroNode), true);
+    _writeDctMagnitude(out, magnitude, currentProbability);
+    out.bit(coefficient.isNegative);
+    context = magnitude == 1 ? 1 : 2;
+    previousWasZero = false;
+  }
+  final nextIndex = lastNonZero + 1;
+  if (nextIndex < 16) {
+    out.prob(probabilityAt(nextIndex, context, _dctEobNode), false);
+  }
 }
 
 void _writeDctMagnitude(
