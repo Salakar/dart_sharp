@@ -42,7 +42,7 @@ JpegState _parse(Uint8List bytes) {
       _readSos(state, bytes.sublist(offset + 2, offset + length));
       state.scan = JpegScan(
         components: state.scan!.components,
-        entropy: _entropyBytes(bytes, offset + length),
+        entropySegments: _entropySegments(bytes, offset + length),
       );
       break;
     }
@@ -54,6 +54,8 @@ JpegState _parse(Uint8List bytes) {
       _readDht(state, data);
     } else if (marker == 0xc0) {
       _readSof0(state, data);
+    } else if (marker == 0xdd) {
+      state.restartInterval = readUint16Be(data, 0);
     } else if (marker >= 0xc1 && marker <= 0xcf) {
       throw const UnsupportedCodecException(
         'Only baseline sequential JPEG is supported.',
@@ -138,20 +140,31 @@ void _readSos(JpegState state, Uint8List data) {
       ..acTable = tables & 0x0f;
     components.add(component);
   }
-  state.scan = JpegScan(components: components, entropy: Uint8List(0));
+  state.scan = JpegScan(
+    components: components,
+    entropySegments: const <Uint8List>[],
+  );
 }
 
-Uint8List _entropyBytes(Uint8List bytes, int offset) {
-  final out = <int>[];
+List<Uint8List> _entropySegments(Uint8List bytes, int offset) {
+  final segments = <Uint8List>[];
+  var out = <int>[];
   var i = offset;
   while (i < bytes.length) {
     final value = bytes[i++];
     if (value == 0xff) {
-      final next = bytes[i++];
+      if (i >= bytes.length) {
+        break;
+      }
+      var next = bytes[i++];
+      while (next == 0xff && i < bytes.length) {
+        next = bytes[i++];
+      }
       if (next == 0x00) {
         out.add(0xff);
       } else if (next >= 0xd0 && next <= 0xd7) {
-        continue;
+        segments.add(Uint8List.fromList(out));
+        out = <int>[];
       } else {
         break;
       }
@@ -159,7 +172,10 @@ Uint8List _entropyBytes(Uint8List bytes, int offset) {
       out.add(value);
     }
   }
-  return Uint8List.fromList(out);
+  if (out.isNotEmpty || segments.isEmpty) {
+    segments.add(Uint8List.fromList(out));
+  }
+  return segments;
 }
 
 void _decodeScan(JpegState state) {
@@ -177,10 +193,19 @@ void _decodeScan(JpegState state) {
       ..height = (state.height * component.v + maxV - 1) ~/ maxV
       ..samples = Uint8List(component.width * component.height);
   }
-  final reader = JpegBitReader(state.scan!.entropy);
+  final scan = state.scan!;
+  var segmentIndex = 0;
+  var reader = _scanReader(state, segmentIndex);
+  var restartMcu = 0;
   for (var my = 0; my < mcuRows; my += 1) {
     for (var mx = 0; mx < mcuCols; mx += 1) {
-      for (final component in state.scan!.components) {
+      if (state.restartInterval > 0 && restartMcu == state.restartInterval) {
+        _resetPredictors(state);
+        segmentIndex += 1;
+        reader = _scanReader(state, segmentIndex);
+        restartMcu = 0;
+      }
+      for (final component in scan.components) {
         for (var vy = 0; vy < component.v; vy += 1) {
           for (var hx = 0; hx < component.h; hx += 1) {
             _decodeBlock(
@@ -193,7 +218,41 @@ void _decodeScan(JpegState state) {
           }
         }
       }
+      if (state.restartInterval > 0) {
+        restartMcu += 1;
+      }
     }
+  }
+}
+
+JpegBitReader _scanReader(JpegState state, int segmentIndex) {
+  final segments = state.scan!.entropySegments;
+  if (state.restartInterval == 0) {
+    return JpegBitReader(_concatSegments(segments));
+  }
+  if (segmentIndex >= segments.length) {
+    throw const InvalidImageException('Missing JPEG restart segment.');
+  }
+  return JpegBitReader(segments[segmentIndex]);
+}
+
+Uint8List _concatSegments(List<Uint8List> segments) {
+  if (segments.length == 1) {
+    return segments.single;
+  }
+  final length = segments.fold<int>(0, (sum, item) => sum + item.length);
+  final out = Uint8List(length);
+  var offset = 0;
+  for (final segment in segments) {
+    out.setAll(offset, segment);
+    offset += segment.length;
+  }
+  return out;
+}
+
+void _resetPredictors(JpegState state) {
+  for (final component in state.components) {
+    component.predictor = 0;
   }
 }
 

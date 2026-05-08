@@ -33,13 +33,37 @@ void main() {
       return;
     }
 
-    final image = await ImagePipeline.fromBytes(
-      await fixture.readAsBytes(),
-    ).toPixelImage();
+    final bytes = await fixture.readAsBytes();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
 
     expect(image.width, 320);
     expect(image.height, 240);
-    expect(image.firstFrameBytes().length, 320 * 240 * 4);
+    expect(rgba.length, 320 * 240 * 4);
+    expect(rgba.sublist(0, 4), <int>[66, 62, 63, 255]);
+    expect(rgba.sublist(319 * 4, 320 * 4), <int>[42, 40, 41, 255]);
+    expect(rgba.sublist(76799 * 4, 76800 * 4), <int>[17, 15, 16, 255]);
+  });
+
+  test('optional upstream restart JPEG fixture decodes pixels', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/Landscape_9.jpg');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final bytes = await fixture.readAsBytes();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+    final rgba = image.firstFrameBytes();
+
+    expect(_jpegMarkerCount(bytes, 0xdd), greaterThan(0));
+    expect(_jpegRestartMarkerCount(bytes), greaterThan(0));
+    expect(image.width, 480);
+    expect(image.height, 369);
+    expect(rgba.length, 480 * 369 * 4);
+    expect(rgba.sublist(0, 4), <int>[125, 172, 200, 255]);
+    expect(rgba.sublist(479 * 4, 480 * 4), <int>[119, 168, 198, 255]);
+    expect(rgba.sublist(177119 * 4, 177120 * 4), <int>[40, 91, 108, 255]);
   });
 
   test('optional upstream WebP fixture exposes metadata', () async {
@@ -211,4 +235,22 @@ void main() {
     expect(image.height, 772);
     expect(image.firstFrameBytes().length, 1024 * 772 * 4);
   });
+}
+
+int _jpegMarkerCount(List<int> bytes, int marker) {
+  var count = 0;
+  for (var i = 0; i + 1 < bytes.length; i += 1) {
+    if (bytes[i] == 0xff && bytes[i + 1] == marker) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+int _jpegRestartMarkerCount(List<int> bytes) {
+  var count = 0;
+  for (var marker = 0xd0; marker <= 0xd7; marker += 1) {
+    count += _jpegMarkerCount(bytes, marker);
+  }
+  return count;
 }

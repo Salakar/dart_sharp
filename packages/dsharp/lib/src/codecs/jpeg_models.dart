@@ -46,13 +46,13 @@ final class JpegComponent {
 /// Parsed JPEG scan data.
 final class JpegScan {
   /// Creates scan data.
-  JpegScan({required this.components, required this.entropy});
+  JpegScan({required this.components, required this.entropySegments});
 
   /// Scan components in entropy order.
   final List<JpegComponent> components;
 
-  /// De-stuffed entropy bytes.
-  final Uint8List entropy;
+  /// De-stuffed entropy byte segments, split at restart markers.
+  final List<Uint8List> entropySegments;
 }
 
 /// JPEG parser state.
@@ -74,6 +74,9 @@ final class JpegState {
 
   /// AC Huffman tables.
   final Map<int, JpegHuffmanTree> acTrees = <int, JpegHuffmanTree>{};
+
+  /// Number of MCUs between restart markers, or zero when disabled.
+  int restartInterval = 0;
 
   /// Scan payload.
   JpegScan? scan;
