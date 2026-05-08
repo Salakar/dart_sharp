@@ -21,8 +21,8 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   compositing, tiling, frame-aware joins, EXIF auto-orient, encoded header
   metadata reads, and stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
-  `toImageBytesResult`, format-specific chain methods, cancellation, timeout,
-  and VM-only `writeToFile`.
+  `toImageBytesResult`, format-specific chain methods, WebP animation
+  loop/delay controls, cancellation, timeout, and VM-only `writeToFile`.
 
 Unsupported native-only or advanced formats such as AVIF, HEIF, JP2, JXL, PDF,
 OpenSlide, Magick, camera raw, FITS, Radiance HDR, and SVG rasterization fail

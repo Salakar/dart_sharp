@@ -55,8 +55,9 @@ final class WebpImageCodec implements ImageCodec {
         'Lossy WebP encoding is not implemented in pure Dart yet.',
       );
     }
-    final raw = image.firstFrame.pixels;
-    final bytes = encodeWebpLossless(image);
+    final outputImage = _applyAnimationOptions(image, webpOptions);
+    final raw = outputImage.firstFrame.pixels;
+    final bytes = encodeWebpLossless(outputImage);
     return EncodedImage(
       bytes: bytes,
       info: OutputInfo(
@@ -65,15 +66,34 @@ final class WebpImageCodec implements ImageCodec {
         width: raw.width,
         height: raw.height,
         channels: 4,
-        frames: image.frames.length,
-        loopCount: image.loopCount,
+        frames: outputImage.frames.length,
+        loopCount: outputImage.loopCount,
         frameDelays: <Duration>[
-          for (final frame in image.frames)
+          for (final frame in outputImage.frames)
             if (frame.delay != null) frame.delay!,
         ],
       ),
     );
   }
+}
+
+PixelImage _applyAnimationOptions(
+  PixelImage image,
+  WebpEncoderOptions options,
+) {
+  if (options.loopCount == null && options.frameDelay == null) {
+    return image;
+  }
+  return PixelImage(
+    frames: <ImageFrame>[
+      for (final frame in image.frames)
+        ImageFrame(
+          pixels: frame.pixels,
+          delay: options.frameDelay ?? frame.delay,
+        ),
+    ],
+    loopCount: options.loopCount ?? image.loopCount,
+  );
 }
 
 bool _containsWebpChunk(Uint8List bytes, String target) {

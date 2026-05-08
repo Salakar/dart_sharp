@@ -89,13 +89,17 @@ OutputInfo _outputInfo(OutputInfo info, PixelImage image) {
     cropOffsetTop: info.cropOffsetTop,
     trimOffsetLeft: info.trimOffsetLeft,
     trimOffsetTop: info.trimOffsetTop,
-    frames: image.frames.length,
+    frames: info.frames == 1 && image.frames.length != 1
+        ? image.frames.length
+        : info.frames,
     pageHeight: image.firstFrame.pixels.pageHeight,
-    loopCount: image.loopCount,
-    frameDelays: <Duration>[
-      for (final frame in image.frames)
-        if (frame.delay != null) frame.delay!,
-    ],
+    loopCount: info.loopCount ?? image.loopCount,
+    frameDelays: info.frameDelays.isNotEmpty
+        ? info.frameDelays
+        : <Duration>[
+            for (final frame in image.frames)
+              if (frame.delay != null) frame.delay!,
+          ],
     textAutofitDpi: info.textAutofitDpi,
   );
 }

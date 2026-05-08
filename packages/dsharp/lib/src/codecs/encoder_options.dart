@@ -182,6 +182,8 @@ final class WebpEncoderOptions extends EncoderOptions {
     this.quality = 80,
     this.lossless = true,
     this.effort = 4,
+    this.loopCount,
+    this.frameDelay,
     super.force,
   });
 
@@ -194,6 +196,12 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Encoder effort from 0 to 6.
   final int effort;
 
+  /// Optional animation loop count, where 0 means infinite looping.
+  final int? loopCount;
+
+  /// Optional display delay to apply to every encoded animation frame.
+  final Duration? frameDelay;
+
   @override
   ImageFormat get format => ImageFormat.webp;
 
@@ -202,6 +210,19 @@ final class WebpEncoderOptions extends EncoderOptions {
     _quality(quality);
     if (effort < 0 || effort > 6) {
       throw const OperationValidationException('WebP effort must be 0..6.');
+    }
+    final loop = loopCount;
+    if (loop != null && (loop < 0 || loop > 0xffff)) {
+      throw const OperationValidationException(
+        'WebP loop count must be 0..65535.',
+      );
+    }
+    final delay = frameDelay;
+    if (delay != null &&
+        (delay.isNegative || delay.inMilliseconds > 0xffffff)) {
+      throw const OperationValidationException(
+        'WebP frame delay must be 0..16777215 ms.',
+      );
     }
   }
 }
