@@ -95,6 +95,26 @@ void main() {
     );
   });
 
+  test('png encoder progressive option writes Adam7 interlace', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var y = 0; y < 9; y += 1)
+          for (var x = 0; x < 9; x += 1) ...[x * 28, y * 28, (x + y) * 14, 255],
+      ]),
+      width: 9,
+      height: 9,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(progressive: true)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_pngInterlace(encoded), 1);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('jpeg codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
@@ -359,11 +379,20 @@ void main() {
     final encoded = await ImagePipeline.fromRawPixels(
       raw,
     ).png(const PngEncoderOptions(palette: true)).toBytes();
+    final interlaced = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(palette: true, progressive: true)).toBytes();
     final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+    final interlacedDecoded = await ImagePipeline.fromBytes(
+      interlaced,
+    ).toPixelImage();
 
     expect(_pngColorType(encoded), 3);
     expect(_pngHasChunk(encoded, 'PLTE'), isTrue);
     expect(decoded.firstFrameBytes(), raw.bytes);
+    expect(_pngColorType(interlaced), 3);
+    expect(_pngInterlace(interlaced), 1);
+    expect(interlacedDecoded.firstFrameBytes(), raw.bytes);
   });
 
   test('tiff codec encodes decodable bytes', () async {
@@ -478,6 +507,8 @@ List<int> _jpegSofSampling(Uint8List bytes) {
 }
 
 int _pngColorType(Uint8List bytes) => bytes[25];
+
+int _pngInterlace(Uint8List bytes) => bytes[28];
 
 bool _pngHasChunk(Uint8List bytes, String type) {
   var offset = 8;

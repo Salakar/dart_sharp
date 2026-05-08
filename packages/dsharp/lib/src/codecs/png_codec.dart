@@ -43,6 +43,7 @@ final class PngImageCodec implements ImageCodec {
     var height = 0;
     var bitDepth = 0;
     var colorType = 0;
+    var interlace = 0;
     List<int>? palette;
     List<int>? transparency;
     while (offset + 12 <= bytes.length) {
@@ -60,9 +61,10 @@ final class PngImageCodec implements ImageCodec {
         height = readUint32Be(data, 4);
         bitDepth = data[8];
         colorType = data[9];
-        if (data[10] != 0 || data[11] != 0 || data[12] != 0) {
+        interlace = data[12];
+        if (data[10] != 0 || data[11] != 0 || interlace > 1) {
           throw const UnsupportedCodecException(
-            'Only standard non-interlaced PNG images are supported.',
+            'Only standard PNG compression, filtering, and interlace are supported.',
           );
         }
       } else if (type == 'PLTE') {
@@ -80,14 +82,23 @@ final class PngImageCodec implements ImageCodec {
       throw const UnsupportedCodecException('Only 8-bit PNG images supported.');
     }
     final inflated = zlibDecode(Uint8List.fromList(idat));
-    final rgba = _decodeScanlines(
-      inflated,
-      width,
-      height,
-      colorType,
-      palette,
-      transparency,
-    );
+    final rgba = interlace == 1
+        ? _decodeAdam7(
+            inflated,
+            width,
+            height,
+            colorType,
+            palette,
+            transparency,
+          )
+        : _decodeScanlines(
+            inflated,
+            width,
+            height,
+            colorType,
+            palette,
+            transparency,
+          );
     return PixelImage.fromRawPixels(
       RawPixels(
         bytes: rgba,
@@ -103,11 +114,6 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
-    if (pngOptions.progressive) {
-      throw const UnsupportedCodecException(
-        'Progressive PNG encoding is not implemented yet.',
-      );
-    }
     if (pngOptions.bitDepth != 8) {
       throw const UnsupportedCodecException(
         'PNG encoding currently supports 8-bit output only.',
@@ -118,15 +124,18 @@ final class PngImageCodec implements ImageCodec {
     if (pngOptions.palette) {
       return _encodePalettePng(raw.width, raw.height, rgba, pngOptions);
     }
-    final scanlines = ByteWriter();
-    final rowLength = raw.width * 4;
-    for (var y = 0; y < raw.height; y += 1) {
-      scanlines.writeByte(0);
-      scanlines.writeBytes(rgba.sublist(y * rowLength, (y + 1) * rowLength));
-    }
     final writer = ByteWriter()..writeBytes(_signature);
-    _writeChunk(writer, 'IHDR', _ihdr(raw.width, raw.height));
-    final data = scanlines.toBytes();
+    _writeChunk(
+      writer,
+      'IHDR',
+      _ihdr(raw.width, raw.height, interlace: pngOptions.progressive ? 1 : 0),
+    );
+    final data = _rgbaScanlines(
+      raw.width,
+      raw.height,
+      rgba,
+      interlaced: pngOptions.progressive,
+    );
     _writeChunk(
       writer,
       'IDAT',
@@ -165,19 +174,23 @@ EncodedImage _encodePalettePng(
   PngEncoderOptions options,
 ) {
   final palette = GifPalette.fromRgba(rgba);
-  final scanlines = ByteWriter();
-  for (var y = 0; y < height; y += 1) {
-    scanlines.writeByte(0);
-    scanlines.writeBytes(palette.indices.sublist(y * width, (y + 1) * width));
-  }
   final writer = ByteWriter()..writeBytes(PngImageCodec._signature);
-  _writeChunk(writer, 'IHDR', _ihdr(width, height, colorType: 3));
+  _writeChunk(
+    writer,
+    'IHDR',
+    _ihdr(width, height, colorType: 3, interlace: options.progressive ? 1 : 0),
+  );
   _writeChunk(writer, 'PLTE', _pngPaletteBytes(palette));
   final transparency = _pngTransparency(palette);
   if (transparency != null) {
     _writeChunk(writer, 'tRNS', transparency);
   }
-  final data = scanlines.toBytes();
+  final data = _indexedScanlines(
+    width,
+    height,
+    palette.indices,
+    interlaced: options.progressive,
+  );
   _writeChunk(
     writer,
     'IDAT',
@@ -235,6 +248,56 @@ Uint8List _decodeScanlines(
   return output;
 }
 
+Uint8List _decodeAdam7(
+  Uint8List inflated,
+  int width,
+  int height,
+  int colorType,
+  List<int>? palette,
+  List<int>? transparency,
+) {
+  final channels = _pngChannels(colorType);
+  if (channels == 0) {
+    throw const UnsupportedCodecException('Unsupported PNG colour type.');
+  }
+  final output = Uint8List(width * height * 4);
+  var sourceOffset = 0;
+  for (final pass in _adam7Passes) {
+    final passWidth = _passSize(width, pass.start, pass.step);
+    final passHeight = _passSize(height, pass.yStart, pass.yStep);
+    if (passWidth == 0 || passHeight == 0) {
+      continue;
+    }
+    final rowLength = passWidth * channels;
+    var previous = Uint8List(rowLength);
+    for (var rowIndex = 0; rowIndex < passHeight; rowIndex += 1) {
+      final filter = inflated[sourceOffset++];
+      final row = Uint8List.fromList(
+        inflated.sublist(sourceOffset, sourceOffset + rowLength),
+      );
+      _unfilter(row, previous, channels, filter);
+      final y = pass.yStart + rowIndex * pass.yStep;
+      for (var col = 0; col < passWidth; col += 1) {
+        final x = pass.start + col * pass.step;
+        _writeRgbaPixel(
+          output,
+          x,
+          y,
+          width,
+          colorType,
+          row,
+          col,
+          palette,
+          transparency,
+        );
+      }
+      previous = row;
+      sourceOffset += rowLength;
+    }
+  }
+  return output;
+}
+
 void _unfilter(Uint8List row, Uint8List previous, int bpp, int filter) {
   for (var i = 0; i < row.length; i += 1) {
     final left = i >= bpp ? row[i - bpp] : 0;
@@ -261,41 +324,76 @@ void _writeRgbaRow(
   List<int>? transparency,
 ) {
   for (var x = 0; x < width; x += 1) {
-    final target = (y * width + x) * 4;
-    final source = switch (colorType) {
-      0 || 3 => x,
-      2 => x * 3,
-      4 => x * 2,
-      _ => x * 4,
-    };
-    if (colorType == 0) {
-      output[target] = row[source];
-      output[target + 1] = row[source];
-      output[target + 2] = row[source];
-      output[target + 3] = 255;
-    } else if (colorType == 3) {
-      final index = row[source];
-      final paletteOffset = index * 3;
-      if (palette == null || paletteOffset + 2 >= palette.length) {
-        throw const InvalidImageException('Invalid PNG palette index.');
-      }
-      output[target] = palette[paletteOffset];
-      output[target + 1] = palette[paletteOffset + 1];
-      output[target + 2] = palette[paletteOffset + 2];
-      output[target + 3] = index < (transparency?.length ?? 0)
-          ? transparency![index]
-          : 255;
-    } else {
-      output[target] = row[source];
-      output[target + 1] = row[source + 1];
-      output[target + 2] = colorType == 4 ? row[source] : row[source + 2];
-      output[target + 3] = switch (colorType) {
-        4 => row[source + 1],
-        6 => row[source + 3],
-        _ => 255,
-      };
-    }
+    _writeRgbaPixel(
+      output,
+      x,
+      y,
+      width,
+      colorType,
+      row,
+      x,
+      palette,
+      transparency,
+    );
   }
+}
+
+void _writeRgbaPixel(
+  Uint8List output,
+  int x,
+  int y,
+  int width,
+  int colorType,
+  Uint8List row,
+  int column,
+  List<int>? palette,
+  List<int>? transparency,
+) {
+  final target = (y * width + x) * 4;
+  final source = switch (colorType) {
+    0 || 3 => column,
+    2 => column * 3,
+    4 => column * 2,
+    _ => column * 4,
+  };
+  if (colorType == 0) {
+    output[target] = row[source];
+    output[target + 1] = row[source];
+    output[target + 2] = row[source];
+    output[target + 3] = 255;
+  } else if (colorType == 3) {
+    final index = row[source];
+    final paletteOffset = index * 3;
+    if (palette == null || paletteOffset + 2 >= palette.length) {
+      throw const InvalidImageException('Invalid PNG palette index.');
+    }
+    output[target] = palette[paletteOffset];
+    output[target + 1] = palette[paletteOffset + 1];
+    output[target + 2] = palette[paletteOffset + 2];
+    output[target + 3] = index < (transparency?.length ?? 0)
+        ? transparency![index]
+        : 255;
+  } else {
+    output[target] = row[source];
+    output[target + 1] = row[source + 1];
+    output[target + 2] = colorType == 4 ? row[source] : row[source + 2];
+    output[target + 3] = switch (colorType) {
+      4 => row[source + 1],
+      6 => row[source + 3],
+      _ => 255,
+    };
+  }
+}
+
+int _pngChannels(int colorType) {
+  return switch (colorType) {
+    0 => 1,
+    2 => 3,
+    3 => 1,
+    4 => 2,
+    6 => 4,
+    _ => 0,
+  };
 }
 
 int _paeth(int left, int up, int upLeft) {
@@ -309,7 +407,73 @@ int _paeth(int left, int up, int upLeft) {
   return pb <= pc ? up : upLeft;
 }
 
-Uint8List _ihdr(int width, int height, {int colorType = 6}) {
+Uint8List _rgbaScanlines(
+  int width,
+  int height,
+  Uint8List rgba, {
+  required bool interlaced,
+}) {
+  final scanlines = ByteWriter();
+  if (!interlaced) {
+    final rowLength = width * 4;
+    for (var y = 0; y < height; y += 1) {
+      scanlines.writeByte(0);
+      scanlines.writeBytes(rgba.sublist(y * rowLength, (y + 1) * rowLength));
+    }
+    return scanlines.toBytes();
+  }
+  for (final pass in _adam7Passes) {
+    final passWidth = _passSize(width, pass.start, pass.step);
+    final passHeight = _passSize(height, pass.yStart, pass.yStep);
+    if (passWidth == 0 || passHeight == 0) {
+      continue;
+    }
+    for (var row = 0; row < passHeight; row += 1) {
+      final y = pass.yStart + row * pass.yStep;
+      scanlines.writeByte(0);
+      for (var col = 0; col < passWidth; col += 1) {
+        final x = pass.start + col * pass.step;
+        final source = (y * width + x) * 4;
+        scanlines.writeBytes(rgba.sublist(source, source + 4));
+      }
+    }
+  }
+  return scanlines.toBytes();
+}
+
+Uint8List _indexedScanlines(
+  int width,
+  int height,
+  List<int> indices, {
+  required bool interlaced,
+}) {
+  final scanlines = ByteWriter();
+  if (!interlaced) {
+    for (var y = 0; y < height; y += 1) {
+      scanlines.writeByte(0);
+      scanlines.writeBytes(indices.sublist(y * width, (y + 1) * width));
+    }
+    return scanlines.toBytes();
+  }
+  for (final pass in _adam7Passes) {
+    final passWidth = _passSize(width, pass.start, pass.step);
+    final passHeight = _passSize(height, pass.yStart, pass.yStep);
+    if (passWidth == 0 || passHeight == 0) {
+      continue;
+    }
+    for (var row = 0; row < passHeight; row += 1) {
+      final y = pass.yStart + row * pass.yStep;
+      scanlines.writeByte(0);
+      for (var col = 0; col < passWidth; col += 1) {
+        final x = pass.start + col * pass.step;
+        scanlines.writeByte(indices[y * width + x]);
+      }
+    }
+  }
+  return scanlines.toBytes();
+}
+
+Uint8List _ihdr(int width, int height, {int colorType = 6, int interlace = 0}) {
   return (ByteWriter()
         ..writeUint32Be(width)
         ..writeUint32Be(height)
@@ -317,8 +481,27 @@ Uint8List _ihdr(int width, int height, {int colorType = 6}) {
         ..writeByte(colorType)
         ..writeByte(0)
         ..writeByte(0)
-        ..writeByte(0))
+        ..writeByte(interlace))
       .toBytes();
+}
+
+typedef _Adam7Pass = ({int start, int yStart, int step, int yStep});
+
+const _adam7Passes = <_Adam7Pass>[
+  (start: 0, yStart: 0, step: 8, yStep: 8),
+  (start: 4, yStart: 0, step: 8, yStep: 8),
+  (start: 0, yStart: 4, step: 4, yStep: 8),
+  (start: 2, yStart: 0, step: 4, yStep: 4),
+  (start: 0, yStart: 2, step: 2, yStep: 4),
+  (start: 1, yStart: 0, step: 2, yStep: 2),
+  (start: 0, yStart: 1, step: 1, yStep: 2),
+];
+
+int _passSize(int size, int start, int step) {
+  if (size <= start) {
+    return 0;
+  }
+  return (size - start + step - 1) ~/ step;
 }
 
 Uint8List _pngPaletteBytes(GifPalette palette) {
