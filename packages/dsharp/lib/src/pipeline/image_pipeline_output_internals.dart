@@ -72,14 +72,16 @@ void _validateMetadataWrites(ImagePipeline pipeline) {
     return;
   }
   throw const UnsupportedCodecException(
-    'Only explicit or kept XMP and kept EXIF metadata writes are implemented.',
+    'Only explicit or kept XMP, kept EXIF, and kept ICC metadata writes are implemented.',
   );
 }
 
 bool _isSupportedMetadataWrite(MetadataWriteOptions writes) {
-  return !writes.keepIcc &&
-      !writes.withMetadata &&
-      (writes.xmp != null || writes.keepXmp || writes.keepExif);
+  return !writes.withMetadata &&
+      (writes.xmp != null ||
+          writes.keepXmp ||
+          writes.keepExif ||
+          writes.keepIcc);
 }
 
 EncodedImage _applyMetadataWrites(
@@ -92,11 +94,15 @@ EncodedImage _applyMetadataWrites(
   }
   final xmp = writes.xmp ?? (writes.keepXmp ? _sourceXmp(pipeline) : null);
   final exif = writes.keepExif ? _sourceExif(pipeline) : null;
-  if (xmp == null && exif == null) {
+  final icc = writes.keepIcc ? _sourceIcc(pipeline) : null;
+  if (xmp == null && exif == null && icc == null) {
     return encoded;
   }
   var bytes = encoded.bytes;
   if (encoded.info.format == ImageFormat.png) {
+    if (icc != null) {
+      bytes = _writePngIcc(bytes, icc);
+    }
     if (exif != null) {
       bytes = _writePngExif(bytes, exif);
     }
@@ -109,6 +115,9 @@ EncodedImage _applyMetadataWrites(
     );
   }
   if (encoded.info.format == ImageFormat.webp) {
+    if (icc != null) {
+      bytes = _writeWebpIcc(bytes, icc);
+    }
     if (exif != null) {
       bytes = _writeWebpExif(bytes, exif);
     }
@@ -121,6 +130,9 @@ EncodedImage _applyMetadataWrites(
     );
   }
   if (encoded.info.format == ImageFormat.jpeg) {
+    if (icc != null) {
+      bytes = _writeJpegIcc(bytes, icc);
+    }
     if (exif != null) {
       bytes = _writeJpegExif(bytes, exif);
     }
@@ -301,7 +313,12 @@ Uint8List _writeWebpXmp(Uint8List bytes, XmpMetadata xmp) {
       _writeWebpChunk(
         content,
         'VP8X',
-        _webpVp8xPayload(info, exif: info.hasExif, xmp: true),
+        _webpVp8xPayload(
+          info,
+          profile: info.hasProfile,
+          exif: info.hasExif,
+          xmp: true,
+        ),
       );
       _writeWebpChunk(
         content,
@@ -334,7 +351,12 @@ Uint8List _writeWebpXmp(Uint8List bytes, XmpMetadata xmp) {
     _writeWebpChunk(
       content,
       'VP8X',
-      _webpVp8xPayload(info, exif: info.hasExif, xmp: true),
+      _webpVp8xPayload(
+        info,
+        profile: info.hasProfile,
+        exif: info.hasExif,
+        xmp: true,
+      ),
     );
     _writeWebpChunk(
       content,
@@ -384,11 +406,12 @@ XmpMetadata? _readWebpXmp(Uint8List bytes) {
 
 Uint8List _webpVp8xPayload(
   WebpImageInfo info, {
+  required bool profile,
   required bool exif,
   required bool xmp,
 }) {
   final flags =
-      (info.hasProfile ? 0x20 : 0) |
+      (profile ? 0x20 : 0) |
       (info.hasAlpha ? 0x10 : 0) |
       (exif ? 0x08 : 0) |
       (xmp ? 0x04 : 0) |

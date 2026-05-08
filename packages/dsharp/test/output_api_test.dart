@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:dsharp/dsharp.dart';
 import 'package:dsharp/src/codecs/binary_io.dart';
+import 'package:dsharp/src/codecs/deflate_codec.dart';
 import 'package:test/test.dart';
 
 import 'pipeline_test_helpers.dart';
@@ -208,6 +209,50 @@ void main() {
     expect(pngMetadata.orientation, 6);
   });
 
+  test('keeps ICC profiles across supported encoded outputs', () async {
+    final profile = Uint8List.fromList(<int>[1, 3, 3, 7, 9, 11]);
+    final jpegSource = _withJpegIcc(
+      await ImagePipeline.fromRawPixels(raw()).jpeg().toBytes(),
+      profile,
+    );
+    final pngSource = _withPngIcc(
+      await ImagePipeline.fromRawPixels(raw()).png().toBytes(),
+      profile,
+    );
+    final webpSource = _withWebpIcc(
+      await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+      profile,
+      width: 1,
+      height: 1,
+    );
+
+    final keptWebp = await ImagePipeline.fromBytes(
+      jpegSource,
+    ).keepIccProfile().webp().toBytes();
+    final keptJpeg = await ImagePipeline.fromBytes(
+      pngSource,
+    ).keepIccProfile().jpeg().toBytes();
+    final keptPng = await ImagePipeline.fromBytes(
+      webpSource,
+    ).keepIccProfile().png().toBytes();
+
+    expect(
+      (await ImagePipeline.fromBytes(keptWebp).metadata()).hasProfile,
+      isTrue,
+    );
+    expect(
+      (await ImagePipeline.fromBytes(keptJpeg).metadata()).hasProfile,
+      isTrue,
+    );
+    expect(
+      (await ImagePipeline.fromBytes(keptPng).metadata()).hasProfile,
+      isTrue,
+    );
+    expect(_webpChunk(keptWebp, 'ICCP'), profile);
+    expect(_jpegIccProfile(keptJpeg), profile);
+    expect(_pngIccProfile(keptPng), profile);
+  });
+
   test('unsupported output format and metadata writes fail clearly', () async {
     expect(
       ImagePipeline.fromRawPixels(
@@ -239,6 +284,14 @@ void main() {
       ImagePipeline.fromBytes(jpegWithExif).keepExif().gif().toBytes(),
       throwsA(isA<UnsupportedCodecException>()),
     );
+    final jpegWithIcc = _withJpegIcc(
+      await ImagePipeline.fromRawPixels(raw()).jpeg().toBytes(),
+      Uint8List.fromList(<int>[1, 2, 3]),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(jpegWithIcc).keepIccProfile().gif().toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
   });
 
   test('cancellation token aborts cooperatively', () {
@@ -263,6 +316,21 @@ Uint8List _withJpegExif(Uint8List jpeg) {
   return writer.toBytes();
 }
 
+Uint8List _withJpegIcc(Uint8List jpeg, Uint8List profile) {
+  final writer = ByteWriter()
+    ..writeByte(0xff)
+    ..writeByte(0xd8);
+  _jpegSegment(writer, 0xe2, <int>[
+    ...'ICC_PROFILE'.codeUnits,
+    0,
+    1,
+    1,
+    ...profile,
+  ]);
+  writer.writeBytes(jpeg.sublist(2));
+  return writer.toBytes();
+}
+
 Uint8List _withPngExif(Uint8List png) {
   final writer = ByteWriter()..writeBytes(png.sublist(0, 8));
   var offset = 8;
@@ -275,6 +343,35 @@ Uint8List _withPngExif(Uint8List png) {
     final chunkEnd = dataEnd + 4;
     if (type == 'IDAT' && !inserted) {
       _pngChunk(writer, 'eXIf', _exifTiffOrientation(6));
+      inserted = true;
+    }
+    writer.writeBytes(png.sublist(offset, chunkEnd));
+    offset = chunkEnd;
+  }
+  return writer.toBytes();
+}
+
+Uint8List _withPngIcc(Uint8List png, Uint8List profile) {
+  final writer = ByteWriter()..writeBytes(png.sublist(0, 8));
+  var offset = 8;
+  var inserted = false;
+  while (offset + 12 <= png.length) {
+    final length = readUint32Be(png, offset);
+    final type = String.fromCharCodes(png.sublist(offset + 4, offset + 8));
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + length;
+    final chunkEnd = dataEnd + 4;
+    if (type == 'IDAT' && !inserted) {
+      _pngChunk(
+        writer,
+        'iCCP',
+        Uint8List.fromList(<int>[
+          ...'test'.codeUnits,
+          0,
+          0,
+          ...zlibEncodeStored(profile),
+        ]),
+      );
       inserted = true;
     }
     writer.writeBytes(png.sublist(offset, chunkEnd));
@@ -305,6 +402,84 @@ Uint8List _withWebpExif(
     ..writeUint32Le(content.length)
     ..writeBytes(content.toBytes());
   return writer.toBytes();
+}
+
+Uint8List _withWebpIcc(
+  Uint8List webp,
+  Uint8List profile, {
+  required int width,
+  required int height,
+}) {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x20)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, width - 1);
+  _writeUint24Le(content, height - 1);
+  _riffChunk(content, 'ICCP', profile);
+  _riffChunk(content, 'VP8L', _webpChunk(webp, 'VP8L'));
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List? _jpegIccProfile(Uint8List jpeg) {
+  var offset = 2;
+  while (offset + 4 <= jpeg.length) {
+    if (jpeg[offset] != 0xff) {
+      return null;
+    }
+    while (offset < jpeg.length && jpeg[offset] == 0xff) {
+      offset += 1;
+    }
+    if (offset >= jpeg.length) {
+      return null;
+    }
+    final marker = jpeg[offset];
+    offset += 1;
+    if (marker == 0xda || marker == 0xd9) {
+      return null;
+    }
+    final length = readUint16Be(jpeg, offset);
+    final end = offset + length;
+    final data = jpeg.sublist(offset + 2, end);
+    if (marker == 0xe2 &&
+        data.length >= 14 &&
+        String.fromCharCodes(data.sublist(0, 11)) == 'ICC_PROFILE') {
+      return data.sublist(14);
+    }
+    offset = end;
+  }
+  return null;
+}
+
+Uint8List? _pngIccProfile(Uint8List png) {
+  var offset = 8;
+  while (offset + 12 <= png.length) {
+    final length = readUint32Be(png, offset);
+    final type = String.fromCharCodes(png.sublist(offset + 4, offset + 8));
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + length;
+    final data = png.sublist(dataStart, dataEnd);
+    if (type == 'iCCP') {
+      var method = 0;
+      while (method < data.length && data[method] != 0) {
+        method += 1;
+      }
+      if (method + 1 >= data.length || data[method + 1] != 0) {
+        return null;
+      }
+      return zlibDecode(data.sublist(method + 2));
+    }
+    offset = dataEnd + 4;
+  }
+  return null;
 }
 
 Uint8List _webpChunk(Uint8List bytes, String target) {

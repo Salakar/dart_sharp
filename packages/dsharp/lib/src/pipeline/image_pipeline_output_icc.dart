@@ -1,18 +1,18 @@
 part of 'image_pipeline.dart';
 
-Uint8List? _sourceExif(ImagePipeline pipeline) {
+Uint8List? _sourceIcc(ImagePipeline pipeline) {
   if (pipeline.source case BytesImageSource(:final bytes)) {
     return switch (sniffImageFormat(bytes)) {
-      ImageFormat.jpeg => _readJpegExif(bytes),
-      ImageFormat.png => _readPngExif(bytes),
-      ImageFormat.webp => _readWebpExif(bytes),
+      ImageFormat.jpeg => _readJpegIcc(bytes),
+      ImageFormat.png => _readPngIcc(bytes),
+      ImageFormat.webp => _readWebpIcc(bytes),
       _ => null,
     };
   }
   return null;
 }
 
-Uint8List _writePngExif(Uint8List bytes, Uint8List exif) {
+Uint8List _writePngIcc(Uint8List bytes, Uint8List icc) {
   if (bytes.length < 33 || !_hasPngSignature(bytes)) {
     throw const InvalidImageException('Invalid PNG signature.');
   }
@@ -28,12 +28,12 @@ Uint8List _writePngExif(Uint8List bytes, Uint8List exif) {
       throw const InvalidImageException('Truncated PNG chunk.');
     }
     final chunkEnd = dataEnd + 4;
-    if (type == 'eXIf') {
+    if (type == 'iCCP') {
       offset = chunkEnd;
       continue;
     }
     if ((type == 'IDAT' || type == 'IEND') && !inserted) {
-      _writePngChunk(writer, 'eXIf', exif);
+      _writePngChunk(writer, 'iCCP', _pngIccData(icc));
       inserted = true;
     }
     writer.writeBytes(bytes.sublist(offset, chunkEnd));
@@ -48,7 +48,16 @@ Uint8List _writePngExif(Uint8List bytes, Uint8List exif) {
   return writer.toBytes();
 }
 
-Uint8List? _readPngExif(Uint8List bytes) {
+Uint8List _pngIccData(Uint8List icc) {
+  return Uint8List.fromList(<int>[
+    ...ascii.encode('ICC'),
+    0,
+    0,
+    ...zlibEncodeStored(icc),
+  ]);
+}
+
+Uint8List? _readPngIcc(Uint8List bytes) {
   if (bytes.length < 33 || !_hasPngSignature(bytes)) {
     return null;
   }
@@ -61,21 +70,32 @@ Uint8List? _readPngExif(Uint8List bytes) {
     if (dataEnd + 4 > bytes.length) {
       return null;
     }
-    if (type == 'eXIf') {
-      return bytes.sublist(dataStart, dataEnd);
+    final data = bytes.sublist(dataStart, dataEnd);
+    if (type == 'iCCP') {
+      final methodOffset = _skipNullTerminated(data, 0);
+      if (methodOffset < 0 ||
+          methodOffset >= data.length ||
+          data[methodOffset] != 0) {
+        return null;
+      }
+      try {
+        return zlibDecode(data.sublist(methodOffset + 1));
+      } on ImageProcessingException {
+        return null;
+      }
     }
     offset = dataEnd + 4;
   }
   return null;
 }
 
-Uint8List _writeWebpExif(Uint8List bytes, Uint8List exif) {
+Uint8List _writeWebpIcc(Uint8List bytes, Uint8List icc) {
   final info = readWebpInfo(bytes);
   final riffEnd = _webpRiffEndForWrite(bytes);
   final content = ByteWriter()..writeAscii('WEBP');
   var offset = 12;
   var hasVp8x = false;
-  var wroteExif = false;
+  var wroteIcc = false;
   while (offset + 8 <= riffEnd) {
     final type = ascii.decode(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
@@ -91,23 +111,23 @@ Uint8List _writeWebpExif(Uint8List bytes, Uint8List exif) {
         'VP8X',
         _webpVp8xPayload(
           info,
-          profile: info.hasProfile,
-          exif: true,
+          profile: true,
+          exif: info.hasExif,
           xmp: info.hasXmp,
         ),
       );
-      _writeWebpChunk(content, 'EXIF', exif);
-      wroteExif = true;
+      _writeWebpChunk(content, 'ICCP', icc);
+      wroteIcc = true;
       hasVp8x = true;
     }
     if (type == 'VP8X') {
       hasVp8x = true;
       final vp8x = Uint8List.fromList(data);
-      vp8x[0] |= 0x08;
+      vp8x[0] |= 0x20;
       _writeWebpChunk(content, 'VP8X', vp8x);
-      _writeWebpChunk(content, 'EXIF', exif);
-      wroteExif = true;
-    } else if (type != 'EXIF') {
+      _writeWebpChunk(content, 'ICCP', icc);
+      wroteIcc = true;
+    } else if (type != 'ICCP') {
       _writeWebpChunk(content, type, data);
     }
     offset = end + (length.isOdd ? 1 : 0);
@@ -115,18 +135,18 @@ Uint8List _writeWebpExif(Uint8List bytes, Uint8List exif) {
   if (offset != riffEnd) {
     throw const InvalidImageException('Truncated WebP chunk.');
   }
-  if (!wroteExif) {
+  if (!wroteIcc) {
     _writeWebpChunk(
       content,
       'VP8X',
       _webpVp8xPayload(
         info,
-        profile: info.hasProfile,
-        exif: true,
+        profile: true,
+        exif: info.hasExif,
         xmp: info.hasXmp,
       ),
     );
-    _writeWebpChunk(content, 'EXIF', exif);
+    _writeWebpChunk(content, 'ICCP', icc);
   }
   final writer = ByteWriter()
     ..writeAscii('RIFF')
@@ -135,7 +155,7 @@ Uint8List _writeWebpExif(Uint8List bytes, Uint8List exif) {
   return writer.toBytes();
 }
 
-Uint8List? _readWebpExif(Uint8List bytes) {
+Uint8List? _readWebpIcc(Uint8List bytes) {
   final riffEnd = _webpRiffEndForWrite(bytes);
   var offset = 12;
   while (offset + 8 <= riffEnd) {
@@ -146,22 +166,22 @@ Uint8List? _readWebpExif(Uint8List bytes) {
     if (end > riffEnd) {
       return null;
     }
-    if (type == 'EXIF') {
-      return _stripExifHeader(bytes.sublist(start, end));
+    if (type == 'ICCP') {
+      return bytes.sublist(start, end);
     }
     offset = end + (length.isOdd ? 1 : 0);
   }
   return null;
 }
 
-Uint8List _writeJpegExif(Uint8List bytes, Uint8List exif) {
+Uint8List _writeJpegIcc(Uint8List bytes, Uint8List icc) {
   if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
     throw const InvalidImageException('Invalid JPEG signature.');
   }
   final writer = ByteWriter()
     ..writeByte(0xff)
     ..writeByte(0xd8);
-  _writeJpegExifSegment(writer, exif);
+  _writeJpegIccSegments(writer, icc);
   var offset = 2;
   while (offset < bytes.length) {
     if (bytes[offset] != 0xff) {
@@ -193,7 +213,7 @@ Uint8List _writeJpegExif(Uint8List bytes, Uint8List exif) {
       throw const InvalidImageException('Invalid JPEG marker length.');
     }
     final data = bytes.sublist(offset + 2, segmentEnd);
-    if (marker != 0xe1 || !_isJpegExifData(data)) {
+    if (marker != 0xe2 || !_isJpegIccData(data)) {
       writer.writeBytes(bytes.sublist(markerStart, segmentEnd));
     }
     offset = segmentEnd;
@@ -201,29 +221,36 @@ Uint8List _writeJpegExif(Uint8List bytes, Uint8List exif) {
   return writer.toBytes();
 }
 
-void _writeJpegExifSegment(ByteWriter writer, Uint8List exif) {
-  final payload = Uint8List.fromList(<int>[
-    ...ascii.encode('Exif'),
-    0,
-    0,
-    ..._stripExifHeader(exif),
-  ]);
-  if (payload.length + 2 > 0xffff) {
-    throw const OperationValidationException(
-      'JPEG EXIF metadata is too large.',
-    );
+void _writeJpegIccSegments(ByteWriter writer, Uint8List icc) {
+  const maxChunk = 65519;
+  final count = icc.isEmpty ? 1 : (icc.length + maxChunk - 1) ~/ maxChunk;
+  if (count > 255) {
+    throw const OperationValidationException('JPEG ICC profile is too large.');
   }
-  writer
-    ..writeByte(0xff)
-    ..writeByte(0xe1)
-    ..writeUint16Be(payload.length + 2)
-    ..writeBytes(payload);
+  for (var i = 0; i < count; i += 1) {
+    final start = i * maxChunk;
+    final end = start + maxChunk > icc.length ? icc.length : start + maxChunk;
+    final payload = Uint8List.fromList(<int>[
+      ...ascii.encode('ICC_PROFILE'),
+      0,
+      i + 1,
+      count,
+      ...icc.sublist(start, end),
+    ]);
+    writer
+      ..writeByte(0xff)
+      ..writeByte(0xe2)
+      ..writeUint16Be(payload.length + 2)
+      ..writeBytes(payload);
+  }
 }
 
-Uint8List? _readJpegExif(Uint8List bytes) {
+Uint8List? _readJpegIcc(Uint8List bytes) {
   if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
     return null;
   }
+  final chunks = <int, Uint8List>{};
+  int? expectedCount;
   var offset = 2;
   while (offset < bytes.length) {
     if (bytes[offset] != 0xff) {
@@ -238,7 +265,7 @@ Uint8List? _readJpegExif(Uint8List bytes) {
     final marker = bytes[offset];
     offset += 1;
     if (marker == 0xda || marker == 0xd9) {
-      return null;
+      break;
     }
     if (_jpegStandaloneMarker(marker)) {
       continue;
@@ -252,33 +279,45 @@ Uint8List? _readJpegExif(Uint8List bytes) {
       return null;
     }
     final data = bytes.sublist(offset + 2, segmentEnd);
-    if (marker == 0xe1 && _isJpegExifData(data)) {
-      return _stripExifHeader(data);
+    if (marker == 0xe2 && _isJpegIccData(data)) {
+      final sequence = data[12];
+      final count = data[13];
+      if (sequence == 0 ||
+          count == 0 ||
+          sequence > count ||
+          chunks.containsKey(sequence) ||
+          expectedCount != null && expectedCount != count) {
+        return null;
+      }
+      expectedCount = count;
+      chunks[sequence] = data.sublist(14);
     }
     offset = segmentEnd;
   }
-  return null;
-}
-
-Uint8List _stripExifHeader(Uint8List data) {
-  if (data.length >= 6 &&
-      data[0] == 0x45 &&
-      data[1] == 0x78 &&
-      data[2] == 0x69 &&
-      data[3] == 0x66 &&
-      data[4] == 0 &&
-      data[5] == 0) {
-    return data.sublist(6);
+  final count = expectedCount;
+  if (count == null || chunks.length != count) {
+    return null;
   }
-  return data;
+  final writer = ByteWriter();
+  for (var i = 1; i <= count; i += 1) {
+    final chunk = chunks[i];
+    if (chunk == null) {
+      return null;
+    }
+    writer.writeBytes(chunk);
+  }
+  return writer.toBytes();
 }
 
-bool _isJpegExifData(Uint8List data) {
-  return data.length > 6 &&
-      data[0] == 0x45 &&
-      data[1] == 0x78 &&
-      data[2] == 0x69 &&
-      data[3] == 0x66 &&
-      data[4] == 0 &&
-      data[5] == 0;
+bool _isJpegIccData(Uint8List data) {
+  const header = 'ICC_PROFILE';
+  if (data.length < header.length + 3 || data[header.length] != 0) {
+    return false;
+  }
+  for (var i = 0; i < header.length; i += 1) {
+    if (data[i] != header.codeUnitAt(i)) {
+      return false;
+    }
+  }
+  return true;
 }

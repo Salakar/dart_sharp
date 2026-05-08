@@ -5,6 +5,7 @@ import '../api/capabilities.dart';
 import '../api/exceptions.dart';
 import '../codecs/binary_io.dart';
 import '../codecs/codec_registry.dart';
+import '../codecs/deflate_codec.dart';
 import '../codecs/encoder_options.dart';
 import '../codecs/format_sniffer.dart';
 import '../codecs/image_format.dart';
@@ -45,6 +46,7 @@ part 'image_pipeline_geometry.dart';
 part 'image_pipeline_metadata.dart';
 part 'image_pipeline_output.dart';
 part 'image_pipeline_output_exif.dart';
+part 'image_pipeline_output_icc.dart';
 part 'image_pipeline_output_internals.dart';
 part 'image_pipeline_transform.dart';
 
