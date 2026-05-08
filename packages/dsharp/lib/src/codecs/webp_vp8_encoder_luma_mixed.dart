@@ -32,6 +32,8 @@ List<List<int>> _lossyLumaAcBlocks(
     build(_lossyLumaSecondHorizontalSecondVerticalAcBlocks),
     build(_lossyLumaThirdHorizontalVerticalAcBlocks),
     build(_lossyLumaThirdHorizontalSecondVerticalAcBlocks),
+    build(_lossyLumaSecondHorizontalThirdVerticalAcBlocks),
+    build(_lossyLumaThirdHorizontalThirdVerticalAcBlocks),
   ];
 }
 
@@ -209,6 +211,64 @@ List<int> _lossyLumaThirdHorizontalSecondVerticalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaSecondHorizontalThirdVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaSecondHorizontalThirdVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
+List<int> _lossyLumaThirdHorizontalThirdVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaThirdHorizontalThirdVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaSecondHorizontalVerticalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -354,6 +414,55 @@ int _lossyLumaThirdHorizontalSecondVerticalAcBlock(
     positive: (localX, localY) {
       final isOuterRow = localY == 0 || localY == 3;
       return localX.isEven == isOuterRow;
+    },
+    scale: 2,
+  );
+}
+
+int _lossyLumaSecondHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyLumaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (localX, localY) {
+      final isOuterColumn = localX == 0 || localX == 3;
+      return isOuterColumn == localY.isEven;
+    },
+    scale: 2,
+  );
+}
+
+int _lossyLumaThirdHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyLumaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (localX, localY) {
+      return localX.isEven == localY.isEven;
     },
     scale: 2,
   );
