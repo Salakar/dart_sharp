@@ -210,6 +210,38 @@ void main() {
     ]);
   });
 
+  test('decodes 16-bit grayscale TIFF samples', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 3,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 1,
+        bitsPerSample: const <int>[16],
+        strip: Uint8List.fromList(<int>[0x00, 0x00, 0x80, 0x80, 0xff, 0xff]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), _rgbaGray(<int>[0, 128, 255]));
+  });
+
+  test('decodes 16-bit RGB TIFF samples', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 1,
+        height: 1,
+        samples: 3,
+        compression: 1,
+        photometric: 2,
+        bitsPerSample: const <int>[16, 16, 16],
+        strip: Uint8List.fromList(<int>[0x34, 0x12, 0x80, 0x80, 0xff, 0xff]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[18, 128, 255, 255]);
+  });
+
   test('encodes TIFF PackBits compression', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -256,6 +288,23 @@ void main() {
           photometric: 1,
           bitsPerSample: const <int>[1],
           strip: Uint8List.fromList(<int>[0xff]),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects truncated 16-bit TIFF samples', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 1,
+          height: 1,
+          samples: 1,
+          compression: 1,
+          photometric: 1,
+          bitsPerSample: const <int>[16],
+          strip: Uint8List.fromList(<int>[0x00]),
         ),
       ).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
