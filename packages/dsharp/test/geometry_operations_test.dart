@@ -69,6 +69,34 @@ void main() {
     expect(image.firstFrameBytes(), orderedEquals(raw2x2().bytes));
   });
 
+  test('resize accepts sharp-style positional arguments', () async {
+    final widthOnly = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).resize(1).toPixelImage();
+    final heightOnly = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).resize(null, 1).toPixelImage();
+    final explicit = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).resize(1, 2, const ResizeOptions(fit: ResizeFit.fill)).toPixelImage();
+    final optionsPriority = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).resize(1, 1, const ResizeOptions(width: 2, height: 2)).toPixelImage();
+
+    expect(widthOnly.width, 1);
+    expect(widthOnly.height, 1);
+    expect(heightOnly.width, 1);
+    expect(heightOnly.height, 1);
+    expect(explicit.width, 1);
+    expect(explicit.height, 2);
+    expect(optionsPriority.width, 2);
+    expect(optionsPriority.height, 2);
+    expect(
+      () => ImagePipeline.fromRawPixels(raw2x2()).resize('1'),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
   test('extract operation crops a region', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2())
         .extract(const Region(left: 1, top: 1, width: 1, height: 1))
