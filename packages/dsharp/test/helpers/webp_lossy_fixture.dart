@@ -210,11 +210,17 @@ Uint8List animatedVp8Webp({
   required int width,
   required int height,
   List<int>? alpha,
+  bool unsupportedColorSpace = false,
 }) {
   if (alpha != null && alpha.length != width * height) {
     throw ArgumentError.value(alpha.length, 'alpha.length');
   }
-  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final vp8 = _solidVp8Payload(
+    width: width,
+    height: height,
+    yMode: 0,
+    unsupportedColorSpace: unsupportedColorSpace,
+  );
   final chunks = _ByteWriter()
     ..ascii('VP8X')
     ..u32(10)

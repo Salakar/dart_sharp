@@ -117,6 +117,23 @@ void main() {
     ]);
   });
 
+  test('rejects unsupported VP8 color spaces in animation frames', () async {
+    final bytes = animatedVp8Webp(
+      width: 1,
+      height: 1,
+      unsupportedColorSpace: true,
+    );
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.frames, 1);
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('applies ALPH chunks to animated VP8 frame payloads', () async {
     final bytes = animatedVp8Webp(width: 2, height: 1, alpha: <int>[0, 255]);
 
