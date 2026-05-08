@@ -77,12 +77,16 @@ final class GifImageCodec implements ImageCodec {
 
   @override
   EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
+    final gifOptions = options is GifEncoderOptions
+        ? options
+        : const GifEncoderOptions();
     final raw = image.firstFrame.pixels;
     final frameRgba = <Uint8List>[
       for (final frame in image.frames) rawToRgba(frame.pixels),
     ];
     final palette = GifPalette.fromRgba(
       Uint8List.fromList(<int>[for (final rgba in frameRgba) ...rgba]),
+      maxColors: gifOptions.colors,
     );
     final minCodeSize = _minCodeSize(palette.size);
     final writer = ByteWriter()

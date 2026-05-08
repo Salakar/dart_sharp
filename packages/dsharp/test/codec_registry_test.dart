@@ -200,6 +200,44 @@ void main() {
     expect(decoded.frames[1].pixels.bytes, <int>[0, 0, 255, 255]);
   });
 
+  test('gif encoder colors option limits palette size', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        255,
+        0,
+        0,
+        255,
+        0,
+        255,
+        0,
+        255,
+        0,
+        0,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+      ]),
+      width: 4,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).gif(const GifEncoderOptions(colors: 2)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+    final rgba = decoded.firstFrameBytes();
+    final colors = <String>{
+      for (var i = 0; i < rgba.length; i += 4)
+        '${rgba[i]},${rgba[i + 1]},${rgba[i + 2]},${rgba[i + 3]}',
+    };
+
+    expect(colors.length, lessThanOrEqualTo(2));
+  });
+
   test('tiff codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(

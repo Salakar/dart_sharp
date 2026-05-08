@@ -14,38 +14,52 @@ final class GifPalette {
   );
 
   /// Builds a palette from RGBA pixels.
-  factory GifPalette.fromRgba(Uint8List rgba) {
+  factory GifPalette.fromRgba(Uint8List rgba, {int maxColors = 256}) {
+    if (maxColors < 2 || maxColors > 256) {
+      throw const OperationValidationException('GIF colors must be 2..256.');
+    }
+    final hasTransparent = _hasTransparentPixels(rgba);
+    final opaqueLimit = hasTransparent ? maxColors - 1 : maxColors;
     final colors = <int, int>{};
+    final palette = <int>[];
     final indices = <int>[];
-    int? transparent;
+    final transparent = hasTransparent ? 0 : null;
     for (var offset = 0; offset < rgba.length; offset += 4) {
       final alpha = rgba[offset + 3];
-      final color = alpha < 128
-          ? 0
-          : (rgba[offset] << 16) | (rgba[offset + 1] << 8) | rgba[offset + 2];
-      colors.putIfAbsent(color, () => colors.length);
-      final index = colors[color]!;
       if (alpha < 128) {
-        transparent = index;
+        indices.add(transparent!);
+        continue;
       }
+      final color =
+          (rgba[offset] << 16) | (rgba[offset + 1] << 8) | rgba[offset + 2];
+      final cached = colors[color];
+      if (cached != null) {
+        indices.add(cached);
+        continue;
+      }
+      final index = palette.length < opaqueLimit
+          ? _addColor(colors, palette, color, hasTransparent)
+          : _nearestColorIndex(color, palette, hasTransparent);
+      colors[color] = index;
       indices.add(index);
-    }
-    if (colors.length > 256) {
-      throw const UnsupportedCodecException('GIF palette exceeds 256 colours.');
     }
     var tableSize = 2;
     var tablePower = 1;
-    while (tableSize < colors.length) {
+    final usedColors = palette.length + (hasTransparent ? 1 : 0);
+    while (tableSize < usedColors) {
       tableSize <<= 1;
       tablePower += 1;
     }
     final bytes = Uint8List(tableSize * 3);
-    for (final entry in colors.entries) {
-      bytes[entry.value * 3] = (entry.key >> 16) & 0xff;
-      bytes[entry.value * 3 + 1] = (entry.key >> 8) & 0xff;
-      bytes[entry.value * 3 + 2] = entry.key & 0xff;
+    final base = hasTransparent ? 1 : 0;
+    for (var i = 0; i < palette.length; i += 1) {
+      final color = palette[i];
+      final offset = (base + i) * 3;
+      bytes[offset] = (color >> 16) & 0xff;
+      bytes[offset + 1] = (color >> 8) & 0xff;
+      bytes[offset + 2] = color & 0xff;
     }
-    return GifPalette(bytes, indices, colors.length, tablePower, transparent);
+    return GifPalette(bytes, indices, usedColors, tablePower, transparent);
   }
 
   /// Palette bytes padded to a power-of-two GIF table.
@@ -63,3 +77,43 @@ final class GifPalette {
   /// Transparent palette index, if any.
   final int? transparentIndex;
 }
+
+bool _hasTransparentPixels(Uint8List rgba) {
+  for (var offset = 3; offset < rgba.length; offset += 4) {
+    if (rgba[offset] < 128) {
+      return true;
+    }
+  }
+  return false;
+}
+
+int _addColor(
+  Map<int, int> colors,
+  List<int> palette,
+  int color,
+  bool hasTransparent,
+) {
+  final index = palette.length + (hasTransparent ? 1 : 0);
+  palette.add(color);
+  colors[color] = index;
+  return index;
+}
+
+int _nearestColorIndex(int color, List<int> palette, bool hasTransparent) {
+  var bestIndex = 0;
+  var bestDistance = 1 << 62;
+  for (var i = 0; i < palette.length; i += 1) {
+    final candidate = palette[i];
+    final distance =
+        _square(((color >> 16) & 0xff) - ((candidate >> 16) & 0xff)) +
+        _square(((color >> 8) & 0xff) - ((candidate >> 8) & 0xff)) +
+        _square((color & 0xff) - (candidate & 0xff));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+  return bestIndex + (hasTransparent ? 1 : 0);
+}
+
+int _square(int value) => value * value;
