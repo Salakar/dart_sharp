@@ -119,6 +119,13 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaSecondHorizontalVerticalAcBlocks =
+      _lossyLumaSecondHorizontalVerticalAcBlocks(
+        rgba,
+        width: width,
+        height: height,
+        quality: quality,
+      );
   final lumaThirdVerticalAcBlocks = _lossyLumaThirdVerticalAcBlocks(
     rgba,
     width: width,
@@ -135,6 +142,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
     lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
     lumaThirdHorizontalAcBlocks: lumaThirdHorizontalAcBlocks,
+    lumaSecondHorizontalVerticalAcBlocks: lumaSecondHorizontalVerticalAcBlocks,
     lumaThirdVerticalAcBlocks: lumaThirdVerticalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
@@ -216,6 +224,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaDiagonalAcBlocks,
   required List<int> lumaSecondHorizontalAcBlocks,
   required List<int> lumaThirdHorizontalAcBlocks,
+  required List<int> lumaSecondHorizontalVerticalAcBlocks,
   required List<int> lumaThirdVerticalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
@@ -268,6 +277,7 @@ Uint8List _encodeVp8SolidPayload({
           lumaDiagonalAcBlocks[blockOffset],
           lumaSecondHorizontalAcBlocks[blockOffset],
           lumaThirdHorizontalAcBlocks[blockOffset],
+          lumaSecondHorizontalVerticalAcBlocks[blockOffset],
           lumaThirdVerticalAcBlocks[blockOffset],
         );
       }
@@ -334,6 +344,7 @@ void _writeLumaDct(
   int diagonalAcCoefficient,
   int secondHorizontalAcCoefficient,
   int thirdHorizontalAcCoefficient,
+  int secondHorizontalVerticalAcCoefficient,
   int thirdVerticalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
@@ -348,7 +359,7 @@ void _writeLumaDct(
       diagonalAcCoefficient,
       secondHorizontalAcCoefficient,
       thirdHorizontalAcCoefficient,
-      0,
+      secondHorizontalVerticalAcCoefficient,
       0,
       thirdVerticalAcCoefficient,
     ],
@@ -367,6 +378,7 @@ void _writeLumaDct(
         diagonalAcCoefficient != 0 ||
         secondHorizontalAcCoefficient != 0 ||
         thirdHorizontalAcCoefficient != 0 ||
+        secondHorizontalVerticalAcCoefficient != 0 ||
         thirdVerticalAcCoefficient != 0,
   );
 }

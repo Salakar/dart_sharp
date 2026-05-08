@@ -203,6 +203,35 @@ List<int> _lossyLumaThirdVerticalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaSecondHorizontalVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaSecondHorizontalVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaHorizontalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -423,6 +452,48 @@ int _lossyLumaThirdHorizontalAcBlock(
   final evenAverage = (even + evenPixels ~/ 2) ~/ evenPixels;
   final oddAverage = (odd + oddPixels ~/ 2) ~/ oddPixels;
   return _clampDctCoefficient(evenAverage - oddAverage);
+}
+
+int _lossyLumaSecondHorizontalVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final xStart = mbX * 16 + blockX * 4;
+  final yStart = mbY * 16 + blockY * 4;
+  if (xStart + 3 >= width || yStart + 3 >= height) {
+    return 0;
+  }
+  var positive = 0;
+  var negative = 0;
+  for (var y = yStart; y < yStart + 4; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xStart + 4; x += 1) {
+      final luma = _rgbToVp8Yuv(
+        _quantizeLossyColor(
+          _Rgb(rgba[offset], rgba[offset + 1], rgba[offset + 2]),
+          quality,
+        ),
+      ).y;
+      final isTop = y - yStart < 2;
+      final isOuterColumn = x == xStart || x == xStart + 3;
+      if (isTop == isOuterColumn) {
+        positive += luma;
+      } else {
+        negative += luma;
+      }
+      offset += 4;
+    }
+  }
+  final positiveAverage = (positive + 4) ~/ 8;
+  final negativeAverage = (negative + 4) ~/ 8;
+  return _clampDctCoefficient(positiveAverage - negativeAverage);
 }
 
 int _lossyLumaThirdVerticalAcBlock(
