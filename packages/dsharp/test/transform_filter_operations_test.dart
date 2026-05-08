@@ -207,6 +207,16 @@ void main() {
     final blurDisabled = await pixels(
       ImagePipeline.fromRawPixels(raw).blur(false),
     );
+    final blurSigma = await pixels(ImagePipeline.fromRawPixels(raw).blur(1));
+    final blurOptions = await pixels(
+      ImagePipeline.fromRawPixels(raw).blur(
+        const BlurOptions(
+          sigma: 1,
+          precision: BlurPrecision.approximate,
+          minAmplitude: 0.01,
+        ),
+      ),
+    );
     final sharpenDisabled = await pixels(
       ImagePipeline.fromRawPixels(edge).sharpen(false),
     );
@@ -234,6 +244,9 @@ void main() {
     expect(firstBytes(blurred)[4], 28);
     expect(firstBytes(blurDisabled), raw.bytes);
     expect(ImagePipeline.fromRawPixels(raw).blur(false).operations, isEmpty);
+    expect(firstBytes(blurSigma)[4], lessThan(255));
+    expect(firstBytes(blurSigma)[0], greaterThan(0));
+    expect(firstBytes(blurOptions)[4], lessThan(255));
     expect(firstBytes(sharpenDisabled), edge.bytes);
     expect(
       ImagePipeline.fromRawPixels(edge).sharpen(false).operations,
@@ -264,6 +277,21 @@ void main() {
       () => ImagePipeline.fromRawPixels(raw).erode(0),
       throwsA(isA<OperationValidationException>()),
     );
+    for (final build in <ImagePipeline Function()>[
+      () => ImagePipeline.fromRawPixels(raw).blur(0.1),
+      () => ImagePipeline.fromRawPixels(raw).blur(1001),
+      () => ImagePipeline.fromRawPixels(raw).blur('wide'),
+      () =>
+          ImagePipeline.fromRawPixels(raw).blur(const BlurOptions(sigma: 0.2)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).blur(const BlurOptions(sigma: 1, minAmplitude: 0)),
+      () => ImagePipeline.fromRawPixels(
+        raw,
+      ).blur(const BlurOptions(sigma: 1, minAmplitude: 1.01)),
+    ]) {
+      expect(build, throwsA(isA<OperationValidationException>()));
+    }
     for (final build in <ImagePipeline Function()>[
       () => ImagePipeline.fromRawPixels(raw).sharpen(-1.5),
       () => ImagePipeline.fromRawPixels(raw).sharpen(1, -1),

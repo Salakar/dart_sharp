@@ -11,13 +11,33 @@ import 'pixel_helpers.dart';
 /// Applies a box blur.
 final class BlurOperation implements PipelineOperation {
   /// Creates a blur operation.
-  const BlurOperation();
+  const BlurOperation([this.options]);
+
+  /// Sigma-based options, or null for mild blur.
+  final BlurOptions? options;
 
   @override
   String get name => 'blur';
 
   @override
-  PixelImage apply(PixelImage image) => mapFrames(image, _blur);
+  PixelImage apply(PixelImage image) {
+    final options = this.options;
+    if (options != null) {
+      options.validate();
+      return mapFrames(
+        image,
+        (raw) => sameSizeRaw(
+          raw,
+          _gaussianBlur(
+            raw,
+            _gaussianKernel(options.sigma.toDouble(), options.minAmplitude),
+          ),
+          raw.channels,
+        ),
+      );
+    }
+    return mapFrames(image, _blur);
+  }
 }
 
 /// Applies a median filter.
@@ -216,8 +236,12 @@ Uint8List _gaussianBlur(RawPixels raw, List<double> kernel) {
   return output;
 }
 
-List<double> _gaussianKernel(double sigma) {
-  final radius = max(1, (sigma * 3).ceil());
+List<double> _gaussianKernel(double sigma, [num minAmplitude = 0.2]) {
+  final amplitude = minAmplitude.toDouble().clamp(0.001, 1.0);
+  final radius = max(
+    1,
+    min(64, sqrt(-2 * sigma * sigma * log(amplitude)).ceil()),
+  );
   final values = <double>[];
   var total = 0.0;
   for (var i = -radius; i <= radius; i += 1) {

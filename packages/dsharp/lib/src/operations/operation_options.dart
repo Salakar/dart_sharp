@@ -13,6 +13,18 @@ enum BooleanOperator {
   eor,
 }
 
+/// Blur precision hint.
+enum BlurPrecision {
+  /// Integer precision.
+  integer,
+
+  /// Floating-point precision.
+  float,
+
+  /// Approximate precision.
+  approximate,
+}
+
 /// Named channel selector.
 enum ImageChannel {
   /// Red channel.
@@ -143,6 +155,31 @@ final class SharpenOptions {
     _validateRange('Sharpen x1', x1, 0, 1000000);
     _validateRange('Sharpen y2', y2, 0, 1000000);
     _validateRange('Sharpen y3', y3, 0, 1000000);
+  }
+}
+
+/// Options for sigma-based Gaussian blur.
+final class BlurOptions {
+  /// Creates blur options.
+  const BlurOptions({
+    required this.sigma,
+    this.precision = BlurPrecision.integer,
+    this.minAmplitude = 0.2,
+  });
+
+  /// Gaussian mask sigma.
+  final num sigma;
+
+  /// Precision hint.
+  final BlurPrecision precision;
+
+  /// Minimum amplitude used to size the Gaussian mask.
+  final num minAmplitude;
+
+  /// Validates blur options.
+  void validate() {
+    _validateRange('Blur sigma', sigma, 0.3, 1000);
+    _validateRange('Blur minAmplitude', minAmplitude, 0.001, 1);
   }
 }
 
