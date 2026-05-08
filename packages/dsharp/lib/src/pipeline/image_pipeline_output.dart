@@ -47,9 +47,54 @@ extension ImagePipelineOutput on ImagePipeline {
     return toFormat(ImageFormat.webp, options: options);
   }
 
+  /// Selects unsupported JPEG 2000 output.
+  ImagePipeline jp2([
+    UnsupportedEncoderOptions options = const UnsupportedEncoderOptions(
+      format: ImageFormat.jp2,
+    ),
+  ]) {
+    return toFormat(ImageFormat.jp2, options: options);
+  }
+
+  /// Selects unsupported AVIF output.
+  ImagePipeline avif([
+    UnsupportedEncoderOptions options = const UnsupportedEncoderOptions(
+      format: ImageFormat.avif,
+    ),
+  ]) {
+    return toFormat(ImageFormat.avif, options: options);
+  }
+
+  /// Selects unsupported HEIF output.
+  ImagePipeline heif([
+    UnsupportedEncoderOptions options = const UnsupportedEncoderOptions(
+      format: ImageFormat.heif,
+    ),
+  ]) {
+    return toFormat(ImageFormat.heif, options: options);
+  }
+
+  /// Selects unsupported JPEG XL output.
+  ImagePipeline jxl([
+    UnsupportedEncoderOptions options = const UnsupportedEncoderOptions(
+      format: ImageFormat.jxl,
+    ),
+  ]) {
+    return toFormat(ImageFormat.jxl, options: options);
+  }
+
   /// Selects raw output.
   ImagePipeline raw([RawEncoderOptions options = const RawEncoderOptions()]) {
     return toFormat(ImageFormat.raw, options: options);
+  }
+
+  /// Selects unsupported deep zoom tile output.
+  ImagePipeline tile([
+    UnsupportedEncoderOptions options = const UnsupportedEncoderOptions(
+      format: ImageFormat.deepZoom,
+    ),
+  ]) {
+    return toFormat(ImageFormat.deepZoom, options: options);
   }
 
   /// Adds a cooperative cancellation token.

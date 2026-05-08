@@ -120,6 +120,29 @@ void main() {
     expect(kept.info.format, ImageFormat.png);
   });
 
+  test('unsupported sharp output chain methods fail clearly', () async {
+    final pipeline = ImagePipeline.fromRawPixels(raw());
+
+    for (final build in <ImagePipeline Function()>[
+      () => pipeline.jp2(),
+      () => pipeline.avif(),
+      () => pipeline.heif(),
+      () => pipeline.jxl(),
+      () => pipeline.tile(),
+    ]) {
+      await expectLater(
+        build().toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
+    expect(
+      () => pipeline.avif(
+        const UnsupportedEncoderOptions(format: ImageFormat.jp2),
+      ),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
   test('writes explicit XMP metadata to JPEG, PNG, and WebP output', () async {
     final xmp = XmpMetadata.parse('<xmp><title>Test</title></xmp>');
     final jpeg = await ImagePipeline.fromRawPixels(
