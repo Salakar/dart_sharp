@@ -1,0 +1,145 @@
+import 'dart:typed_data';
+
+import 'package:dsharp/dsharp.dart';
+import 'package:dsharp/src/codecs/binary_io.dart';
+import 'package:dsharp/src/codecs/gif_lzw.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('composites partial GIF frames on retained canvas', () async {
+    final image = await ImagePipeline.fromBytes(
+      _gif(<_GifFrame>[
+        const _GifFrame(width: 2, height: 1, indices: <int>[1, 1]),
+        const _GifFrame(left: 1, width: 1, height: 1, indices: <int>[2]),
+      ]),
+    ).toPixelImage();
+
+    expect(image.frames[0].pixels.bytes, _rgba(<int>[1, 1]));
+    expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 2]));
+  });
+
+  test('clears GIF disposal-background frame bounds', () async {
+    final image = await ImagePipeline.fromBytes(
+      _gif(<_GifFrame>[
+        const _GifFrame(width: 2, height: 1, indices: <int>[1, 1]),
+        const _GifFrame(
+          left: 1,
+          width: 1,
+          height: 1,
+          indices: <int>[2],
+          disposalMethod: 2,
+        ),
+        const _GifFrame(width: 1, height: 1, indices: <int>[3]),
+      ]),
+    ).toPixelImage();
+
+    expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 2]));
+    expect(image.frames[2].pixels.bytes, _rgba(<int>[3, 0]));
+  });
+
+  test('restores previous canvas for GIF disposal-previous frames', () async {
+    final image = await ImagePipeline.fromBytes(
+      _gif(<_GifFrame>[
+        const _GifFrame(width: 2, height: 1, indices: <int>[1, 1]),
+        const _GifFrame(
+          left: 1,
+          width: 1,
+          height: 1,
+          indices: <int>[2],
+          disposalMethod: 3,
+        ),
+        const _GifFrame(width: 1, height: 1, indices: <int>[3]),
+      ]),
+    ).toPixelImage();
+
+    expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 2]));
+    expect(image.frames[2].pixels.bytes, _rgba(<int>[3, 1]));
+  });
+
+  test('leaves GIF transparent pixels unchanged', () async {
+    final image = await ImagePipeline.fromBytes(
+      _gif(<_GifFrame>[
+        const _GifFrame(width: 2, height: 1, indices: <int>[1, 1]),
+        const _GifFrame(
+          width: 2,
+          height: 1,
+          indices: <int>[0, 2],
+          transparentIndex: 0,
+        ),
+      ]),
+    ).toPixelImage();
+
+    expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 2]));
+  });
+}
+
+final class _GifFrame {
+  const _GifFrame({
+    this.left = 0,
+    required this.width,
+    required this.height,
+    required this.indices,
+    this.transparentIndex,
+    this.disposalMethod = 1,
+  });
+
+  final int left;
+  final int width;
+  final int height;
+  final List<int> indices;
+  final int? transparentIndex;
+  final int disposalMethod;
+}
+
+Uint8List _gif(List<_GifFrame> frames) {
+  final writer = ByteWriter()
+    ..writeAscii('GIF89a')
+    ..writeUint16Le(2)
+    ..writeUint16Le(1)
+    ..writeByte(0xf1)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeBytes(const <int>[0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 255, 0]);
+  for (final frame in frames) {
+    _writeGraphicControl(writer, frame);
+    final lzw = gifLzwEncode(frame.indices, 2);
+    writer
+      ..writeByte(0x2c)
+      ..writeUint16Le(frame.left)
+      ..writeUint16Le(0)
+      ..writeUint16Le(frame.width)
+      ..writeUint16Le(frame.height)
+      ..writeByte(0)
+      ..writeByte(2)
+      ..writeByte(lzw.length)
+      ..writeBytes(lzw)
+      ..writeByte(0);
+  }
+  writer.writeByte(0x3b);
+  return writer.toBytes();
+}
+
+void _writeGraphicControl(ByteWriter writer, _GifFrame frame) {
+  writer
+    ..writeByte(0x21)
+    ..writeByte(0xf9)
+    ..writeByte(4)
+    ..writeByte(
+      (frame.disposalMethod << 2) | (frame.transparentIndex == null ? 0 : 1),
+    )
+    ..writeUint16Le(1)
+    ..writeByte(frame.transparentIndex ?? 0)
+    ..writeByte(0);
+}
+
+List<int> _rgba(List<int> indices) {
+  return <int>[
+    for (final index in indices)
+      ...switch (index) {
+        0 => <int>[0, 0, 0, 0],
+        1 => <int>[255, 0, 0, 255],
+        2 => <int>[0, 0, 255, 255],
+        _ => <int>[0, 255, 0, 255],
+      },
+  ];
+}

@@ -37,8 +37,10 @@ final class GifImageCodec implements ImageCodec {
       offset += size;
     }
     final frames = <ImageFrame>[];
+    final canvas = Uint8List(width * height * 4);
     var delay = Duration.zero;
     int? transparentIndex;
+    var disposalMethod = 0;
     var loopCount = 1;
     while (offset < bytes.length) {
       final marker = bytes[offset++];
@@ -50,8 +52,12 @@ final class GifImageCodec implements ImageCodec {
         offset = result.offset;
         delay = result.delay ?? delay;
         transparentIndex = result.transparentIndex ?? transparentIndex;
+        disposalMethod = result.disposalMethod ?? disposalMethod;
         loopCount = result.loopCount ?? loopCount;
       } else if (marker == 0x2c) {
+        final previousCanvas = disposalMethod == 3
+            ? Uint8List.fromList(canvas)
+            : null;
         final image = _readImage(
           bytes,
           offset,
@@ -60,11 +66,20 @@ final class GifImageCodec implements ImageCodec {
           globalPalette,
           transparentIndex,
           delay,
+          canvas,
         );
         offset = image.offset;
         frames.add(image.frame);
+        _disposeGifFrame(
+          canvas,
+          image.bounds,
+          screenWidth: width,
+          disposalMethod: disposalMethod,
+          previousCanvas: previousCanvas,
+        );
         delay = Duration.zero;
         transparentIndex = null;
+        disposalMethod = 0;
       } else {
         throw const InvalidImageException('Invalid GIF block marker.');
       }
@@ -189,7 +204,13 @@ Duration? _combinedDelay(Duration? a, Duration? b) {
   return a + b;
 }
 
-({int offset, Duration? delay, int? transparentIndex, int? loopCount})
+({
+  int offset,
+  Duration? delay,
+  int? transparentIndex,
+  int? disposalMethod,
+  int? loopCount,
+})
 _readExtension(Uint8List bytes, int offset, int loopCount) {
   final label = bytes[offset++];
   if (label == 0xf9) {
@@ -197,11 +218,13 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
     final packed = bytes[offset];
     final delay = Duration(milliseconds: readUint16Le(bytes, offset + 1) * 10);
     final transparent = (packed & 1) != 0 ? bytes[offset + 3] : null;
+    final disposalMethod = (packed >> 2) & 0x07;
     offset += blockSize + 1;
     return (
       offset: offset,
       delay: delay,
       transparentIndex: transparent,
+      disposalMethod: disposalMethod,
       loopCount: null,
     );
   }
@@ -218,11 +241,12 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
     offset: offset,
     delay: null,
     transparentIndex: null,
+    disposalMethod: null,
     loopCount: parsedLoop ?? loopCount,
   );
 }
 
-({int offset, ImageFrame frame}) _readImage(
+({int offset, ImageFrame frame, _GifBounds bounds}) _readImage(
   Uint8List bytes,
   int offset,
   int screenWidth,
@@ -230,6 +254,7 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   List<int>? globalPalette,
   int? transparentIndex,
   Duration delay,
+  Uint8List canvas,
 ) {
   final left = readUint16Le(bytes, offset);
   final top = readUint16Le(bytes, offset + 2);
@@ -247,27 +272,33 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   if (palette == null) {
     throw const InvalidImageException('GIF image has no palette.');
   }
+  if (left + width > screenWidth || top + height > screenHeight) {
+    throw const InvalidImageException('GIF frame exceeds logical screen.');
+  }
   final minCodeSize = bytes[offset++];
   final blocks = _readSubBlocks(bytes, offset);
   final indices = gifLzwDecode(blocks.bytes, minCodeSize, width * height);
-  final canvas = Uint8List(screenWidth * screenHeight * 4);
   var indexOffset = 0;
   for (final row in _gifRows(height, interlaced: interlaced)) {
     for (var col = 0; col < width; col += 1) {
       final index = indices[indexOffset++];
+      if (index == transparentIndex) {
+        continue;
+      }
       final paletteOffset = index * 3;
       final target = ((top + row) * screenWidth + left + col) * 4;
       canvas[target] = palette[paletteOffset];
       canvas[target + 1] = palette[paletteOffset + 1];
       canvas[target + 2] = palette[paletteOffset + 2];
-      canvas[target + 3] = index == transparentIndex ? 0 : 255;
+      canvas[target + 3] = 255;
     }
   }
   return (
     offset: blocks.offset,
+    bounds: _GifBounds(left, top, width, height),
     frame: ImageFrame(
       pixels: RawPixels(
-        bytes: canvas,
+        bytes: Uint8List.fromList(canvas),
         width: screenWidth,
         height: screenHeight,
         channels: ChannelCount.four,
@@ -275,6 +306,32 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
       delay: delay == Duration.zero ? null : delay,
     ),
   );
+}
+
+final class _GifBounds {
+  const _GifBounds(this.left, this.top, this.width, this.height);
+
+  final int left;
+  final int top;
+  final int width;
+  final int height;
+}
+
+void _disposeGifFrame(
+  Uint8List canvas,
+  _GifBounds bounds, {
+  required int screenWidth,
+  required int disposalMethod,
+  required Uint8List? previousCanvas,
+}) {
+  if (disposalMethod == 2) {
+    for (var y = 0; y < bounds.height; y += 1) {
+      final start = ((bounds.top + y) * screenWidth + bounds.left) * 4;
+      canvas.fillRange(start, start + bounds.width * 4, 0);
+    }
+  } else if (disposalMethod == 3 && previousCanvas != null) {
+    canvas.setAll(0, previousCanvas);
+  }
 }
 
 ({Uint8List bytes, int offset}) _readSubBlocks(Uint8List bytes, int offset) {
