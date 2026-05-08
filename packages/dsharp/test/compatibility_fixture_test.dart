@@ -114,6 +114,52 @@ void main() {
     ], tolerance: 6);
   });
 
+  test('optional upstream Group 3 fax TIFF fixture decodes pixels', () async {
+    final fixture = File('../../sharp_clone/test/fixtures/G31D.TIF');
+    if (!fixture.existsSync()) {
+      markTestSkipped('sharp_clone fixtures are not present.');
+      return;
+    }
+
+    final image = await ImagePipeline.fromBytes(
+      await fixture.readAsBytes(),
+    ).toPixelImage();
+
+    expect(image.width, 2464);
+    expect(image.height, 3248);
+    expect(image.firstFrameBytes().sublist(0, 4), <int>[255, 255, 255, 255]);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 110, 118, <int>[
+      0,
+      0,
+      0,
+      255,
+    ], tolerance: 0);
+  });
+
+  test(
+    'optional upstream multi-page Group 3 TIFF decodes first page',
+    () async {
+      final fixture = File('../../sharp_clone/test/fixtures/G31D_MULTI.TIF');
+      if (!fixture.existsSync()) {
+        markTestSkipped('sharp_clone fixtures are not present.');
+        return;
+      }
+
+      final image = await ImagePipeline.fromBytes(
+        await fixture.readAsBytes(),
+      ).toPixelImage();
+
+      expect(image.width, 2464);
+      expect(image.height, 3248);
+      _expectPixelNear(image.firstFrameBytes(), image.width, 110, 118, <int>[
+        0,
+        0,
+        0,
+        255,
+      ], tolerance: 0);
+    },
+  );
+
   test('optional upstream JPEG-compressed CMYK TIFF fixture decodes', () async {
     final fixture = File(
       '../../sharp_clone/test/fixtures/fogra-0-100-100-0.tif',

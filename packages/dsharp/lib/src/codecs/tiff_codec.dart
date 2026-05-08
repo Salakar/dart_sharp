@@ -15,6 +15,7 @@ import 'output.dart';
 
 part 'tiff_samples.dart';
 part 'tiff_color.dart';
+part 'tiff_fax.dart';
 part 'tiff_jpeg.dart';
 
 /// First-party baseline TIFF codec for chunky, grayscale, and palette images.
@@ -49,12 +50,14 @@ final class TiffImageCodec implements ImageCodec {
         _decodeJpegCompressedTiff(bytes, tags, width, height),
       );
     }
-    final source = _decodeTiffStrips(
-      bytes,
-      tags.values(273),
-      tags.values(279),
-      compression,
-    );
+    final source = compression == 3
+        ? _decodeGroup3FaxTiff(bytes, tags, width, height)
+        : _decodeTiffStrips(
+            bytes,
+            tags.values(273),
+            tags.values(279),
+            compression,
+          );
     if (predictor == 2) {
       if (photometric == 3) {
         throw const UnsupportedCodecException(

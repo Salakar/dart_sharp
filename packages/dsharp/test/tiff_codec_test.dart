@@ -135,6 +135,28 @@ void main() {
     );
   });
 
+  test('decodes Group 3 one-dimensional fax TIFF rows', () async {
+    for (final fillOrder in <int>[1, 2]) {
+      final image = await ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 8,
+          height: 2,
+          samples: 1,
+          compression: 3,
+          photometric: 0,
+          bitsPerSample: const <int>[1],
+          fillOrder: fillOrder,
+          strip: _group3FaxStrip(fillOrder: fillOrder),
+        ),
+      ).toPixelImage();
+
+      expect(image.firstFrameBytes(), <int>[
+        ..._rgbaGray(<int>[255, 255, 0, 0, 0, 255, 255, 255]),
+        ..._rgbaGray(<int>[0, 0, 0, 0, 0, 0, 0, 0]),
+      ]);
+    }
+  });
+
   test('decodes 2-bit grayscale TIFF rows', () async {
     final image = await ImagePipeline.fromBytes(
       _littleEndianTiff(
@@ -391,6 +413,24 @@ void main() {
     );
   });
 
+  test('rejects unsupported two-dimensional Group 3 TIFF coding', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 8,
+          height: 1,
+          samples: 1,
+          compression: 3,
+          photometric: 0,
+          bitsPerSample: const <int>[1],
+          group3Options: 1,
+          strip: _group3FaxStrip(),
+        ),
+      ).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('rejects truncated paletted TIFF color maps', () async {
     await expectLater(
       ImagePipeline.fromBytes(
@@ -449,6 +489,8 @@ Uint8List _littleEndianTiff({
   List<Uint8List>? strips,
   int? predictor,
   int? rowsPerStrip,
+  int? fillOrder,
+  int? group3Options,
   List<int>? colorMap,
 }) {
   final stripList = strips ?? <Uint8List>[strip!];
@@ -481,7 +523,11 @@ Uint8List _littleEndianTiff({
   }
 
   final entryCount =
-      10 + (predictor == null ? 0 : 1) + (colorMap == null ? 0 : 1);
+      10 +
+      (predictor == null ? 0 : 1) +
+      (fillOrder == null ? 0 : 1) +
+      (group3Options == null ? 0 : 1) +
+      (colorMap == null ? 0 : 1);
   const ifdOffset = 8;
   final extraOffset = ifdOffset + 2 + entryCount * 12 + 4;
   var dataOffset = extraOffset;
@@ -536,6 +582,12 @@ Uint8List _littleEndianTiff({
     stripList.length == 1 ? stripList.single.length : stripByteCountsOffset,
   );
   entry(284, 3, 1, 1);
+  if (fillOrder != null) {
+    entry(266, 3, 1, fillOrder);
+  }
+  if (group3Options != null) {
+    entry(292, 4, 1, group3Options);
+  }
   if (predictor != null) {
     entry(317, 3, 1, predictor);
   }
@@ -610,6 +662,25 @@ Uint8List _lzwEncodeTiff(List<int> values) {
   }
   writer.write(257, codeWidth);
   return writer.finish();
+}
+
+Uint8List _group3FaxStrip({int fillOrder = 1}) {
+  const eol = '000000000001';
+  const row0 = '0111101000';
+  const row1 = '00110101000101';
+  return _bitsToBytes('$eol$row0$eol$row1$eol', lsbFirst: fillOrder == 2);
+}
+
+Uint8List _bitsToBytes(String bits, {required bool lsbFirst}) {
+  final out = Uint8List((bits.length + 7) >> 3);
+  for (var i = 0; i < bits.length; i += 1) {
+    if (bits.codeUnitAt(i) != 0x31) {
+      continue;
+    }
+    final bit = lsbFirst ? i & 7 : 7 - (i & 7);
+    out[i >> 3] |= 1 << bit;
+  }
+  return out;
 }
 
 final class _MsbCodeWriter {
