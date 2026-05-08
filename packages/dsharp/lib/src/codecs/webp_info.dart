@@ -112,6 +112,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   var hasXmp = false;
   var loopCount = 1;
   var hasAnimationHeader = false;
+  var imageChunkCount = 0;
   final frames = <WebpFrameInfo>[];
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
@@ -123,8 +124,16 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     }
     final data = bytes.sublist(start, end);
     if (type == 'VP8 ') {
+      imageChunkCount += 1;
+      if (imageChunkCount > 1) {
+        throw const InvalidImageException('WebP has multiple image chunks.');
+      }
       info ??= _vp8Info(data);
     } else if (type == 'VP8L') {
+      imageChunkCount += 1;
+      if (imageChunkCount > 1) {
+        throw const InvalidImageException('WebP has multiple image chunks.');
+      }
       info ??= _vp8lInfo(data);
     } else if (type == 'VP8X') {
       info = _vp8xInfo(data);
@@ -153,6 +162,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   }
   final parsed = info;
   if (parsed == null) {
+    throw const InvalidImageException('WebP has no decodable image chunk.');
+  }
+  if (parsed.compression == WebpCompression.extended &&
+      !parsed.isAnimated &&
+      imageChunkCount != 1) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
   }
   if (parsed.isAnimated) {
