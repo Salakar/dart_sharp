@@ -129,19 +129,21 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
-    if (!pngOptions.palette && !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
+    if (!pngOptions.usesPalette &&
+        !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
       throw const UnsupportedCodecException(
         'PNG grayscale encoding supports bit depths 1, 2, 4, and 8.',
       );
     }
-    if (pngOptions.palette && !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
+    if (pngOptions.usesPalette &&
+        !_supportsPaletteBitDepth(pngOptions.paletteBitDepth)) {
       throw const UnsupportedCodecException(
         'PNG palette encoding supports bit depths 1, 2, 4, and 8.',
       );
     }
     final raw = image.firstFrame.pixels;
     final rgba = rawToRgba(raw);
-    if (pngOptions.palette) {
+    if (pngOptions.usesPalette) {
       return _encodePalettePng(raw.width, raw.height, rgba, pngOptions);
     }
     if (pngOptions.bitDepth < 8) {
@@ -196,7 +198,8 @@ EncodedImage _encodePalettePng(
   Uint8List rgba,
   PngEncoderOptions options,
 ) {
-  final palette = GifPalette.fromRgba(rgba, maxColors: 1 << options.bitDepth);
+  final bitDepth = options.paletteBitDepth;
+  final palette = GifPalette.fromRgba(rgba, maxColors: 1 << bitDepth);
   final writer = ByteWriter()..writeBytes(PngImageCodec._signature);
   _writeChunk(
     writer,
@@ -204,7 +207,7 @@ EncodedImage _encodePalettePng(
     _ihdr(
       width,
       height,
-      bitDepth: options.bitDepth,
+      bitDepth: bitDepth,
       colorType: 3,
       interlace: options.progressive ? 1 : 0,
     ),
@@ -218,7 +221,7 @@ EncodedImage _encodePalettePng(
     width,
     height,
     palette.indices,
-    bitDepth: options.bitDepth,
+    bitDepth: bitDepth,
     interlaced: options.progressive,
   );
   _writeChunk(

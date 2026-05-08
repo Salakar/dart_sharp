@@ -57,8 +57,10 @@ final class PngEncoderOptions extends EncoderOptions {
     this.progressive = false,
     this.palette = false,
     this.bitDepth = 8,
+    int? colors,
+    int? colours,
     super.force,
-  });
+  }) : colors = colors ?? colours;
 
   /// Zlib compression level from 0 to 9.
   final int compressionLevel;
@@ -72,6 +74,20 @@ final class PngEncoderOptions extends EncoderOptions {
   /// Bit depth.
   final int bitDepth;
 
+  /// Optional maximum palette entry count.
+  final int? colors;
+
+  /// Whether this output should use a palette.
+  bool get usesPalette => palette || colors != null;
+
+  /// Palette bit depth derived from [colors] when provided.
+  int get paletteBitDepth {
+    final colorCount = colors;
+    return colorCount == null
+        ? bitDepth
+        : _bitDepthForPaletteColors(colorCount);
+  }
+
   @override
   ImageFormat get format => ImageFormat.png;
 
@@ -83,6 +99,10 @@ final class PngEncoderOptions extends EncoderOptions {
       );
     }
     _bitDepth(bitDepth);
+    final colorCount = colors;
+    if (colorCount != null && (colorCount < 2 || colorCount > 256)) {
+      throw const OperationValidationException('PNG colors must be 2..256.');
+    }
   }
 }
 
@@ -367,4 +387,17 @@ void _bitDepth(int bitDepth) {
       'Bit depth must be one of 1, 2, 4, 8, or 16.',
     );
   }
+}
+
+int _bitDepthForPaletteColors(int colors) {
+  if (colors <= 2) {
+    return 1;
+  }
+  if (colors <= 4) {
+    return 2;
+  }
+  if (colors <= 16) {
+    return 4;
+  }
+  return 8;
 }
