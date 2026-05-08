@@ -117,6 +117,35 @@ List<int> _lossyLumaHorizontalAcBlocks(
   return blocks;
 }
 
+List<int> _lossyLumaVerticalAcBlocks(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+}) {
+  final mbCols = (width + 15) >> 4;
+  final mbRows = (height + 15) >> 4;
+  final blocks = <int>[];
+  for (var mbY = 0; mbY < mbRows; mbY += 1) {
+    for (var mbX = 0; mbX < mbCols; mbX += 1) {
+      for (var block = 0; block < 16; block += 1) {
+        blocks.add(
+          _lossyLumaVerticalAcBlock(
+            rgba,
+            width: width,
+            height: height,
+            quality: quality,
+            mbX: mbX,
+            mbY: mbY,
+            block: block,
+          ),
+        );
+      }
+    }
+  }
+  return blocks;
+}
+
 int _lossyLumaBlock(
   Uint8List rgba, {
   required int width,
@@ -209,6 +238,55 @@ int _lossyLumaHorizontalAcBlock(
   final leftAverage = (left + leftPixels ~/ 2) ~/ leftPixels;
   final rightAverage = (right + rightPixels ~/ 2) ~/ rightPixels;
   return _clampDctCoefficient(((leftAverage - rightAverage) * 3) ~/ 4);
+}
+
+int _lossyLumaVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  final blockX = block & 3;
+  final blockY = block >> 2;
+  final xStart = mbX * 16 + blockX * 4;
+  final yStart = mbY * 16 + blockY * 4;
+  if (xStart >= width || yStart >= height) {
+    return 0;
+  }
+  var top = 0;
+  var bottom = 0;
+  var topPixels = 0;
+  var bottomPixels = 0;
+  final xEnd = xStart + 4 < width ? xStart + 4 : width;
+  final yEnd = yStart + 4 < height ? yStart + 4 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      final luma = _rgbToVp8Yuv(
+        _quantizeLossyColor(
+          _Rgb(rgba[offset], rgba[offset + 1], rgba[offset + 2]),
+          quality,
+        ),
+      ).y;
+      if (y - yStart < 2) {
+        top += luma;
+        topPixels += 1;
+      } else {
+        bottom += luma;
+        bottomPixels += 1;
+      }
+      offset += 4;
+    }
+  }
+  if (topPixels == 0 || bottomPixels == 0) {
+    return 0;
+  }
+  final topAverage = (top + topPixels ~/ 2) ~/ topPixels;
+  final bottomAverage = (bottom + bottomPixels ~/ 2) ~/ bottomPixels;
+  return _clampDctCoefficient(((topAverage - bottomAverage) * 3) ~/ 4);
 }
 
 List<_Vp8Yuv> _lossyChromaBlocks(

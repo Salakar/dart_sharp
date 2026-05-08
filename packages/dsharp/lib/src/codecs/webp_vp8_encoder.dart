@@ -89,11 +89,18 @@ Uint8List _encodeVp8SolidFromRgba(
     height: height,
     quality: quality,
   );
+  final lumaVerticalAcBlocks = _lossyLumaVerticalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
     lumaBlocks: lumaBlocks,
     lumaAcBlocks: lumaAcBlocks,
+    lumaVerticalAcBlocks: lumaVerticalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -169,6 +176,7 @@ Uint8List _encodeVp8SolidPayload({
   required int height,
   required List<int> lumaBlocks,
   required List<int> lumaAcBlocks,
+  required List<int> lumaVerticalAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -215,6 +223,7 @@ Uint8List _encodeVp8SolidPayload({
           (target - _predictedSubblockDc(lumaBlocks, mbCols, mbX, mbY, block)) *
               2,
           lumaAcBlocks[blockOffset],
+          lumaVerticalAcBlocks[blockOffset],
         );
       }
       final predictedU = _predictedChromaDc(
@@ -275,20 +284,22 @@ void _writeLumaDct(
   int block,
   int dcCoefficient,
   int acCoefficient,
+  int verticalAcCoefficient,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
-  _writeDctTokens(out, <int>[dcCoefficient, acCoefficient], context, (
-    coefficientIndex,
+  _writeDctTokens(
+    out,
+    <int>[dcCoefficient, acCoefficient, verticalAcCoefficient],
     context,
-    node,
-  ) {
-    return probs.probabilityAt(coefficientIndex, context, node);
-  });
+    (coefficientIndex, context, node) {
+      return probs.probabilityAt(coefficientIndex, context, node);
+    },
+  );
   contexts.setHasCoefficients(
     mbX,
     block,
-    dcCoefficient != 0 || acCoefficient != 0,
+    dcCoefficient != 0 || acCoefficient != 0 || verticalAcCoefficient != 0,
   );
 }
 
