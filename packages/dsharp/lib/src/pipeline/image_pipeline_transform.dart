@@ -12,9 +12,9 @@ extension ImagePipelineTransform on ImagePipeline {
     return flop ? _append(const FlopOperation()) : this;
   }
 
-  /// Rotates by a multiple of 90 degrees.
-  ImagePipeline rotate(int degrees) {
-    return _append(RotateOperation(degrees));
+  /// Rotates by [degrees], or auto-orients when no angle is provided.
+  ImagePipeline rotate([int? degrees]) {
+    return degrees == null ? autoOrient() : _append(RotateOperation(degrees));
   }
 
   /// Adds a metadata-driven auto-orient hook.

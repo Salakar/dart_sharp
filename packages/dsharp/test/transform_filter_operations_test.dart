@@ -68,9 +68,13 @@ void main() {
     () async {
       final pipeline = ImagePipeline.fromRawPixels(raw2x2()).autoOrient();
       final image = await pixels(pipeline);
+      final rotateWithoutAngle = ImagePipeline.fromRawPixels(raw2x2()).rotate();
+      final rotatedImage = await pixels(rotateWithoutAngle);
 
       expect(pipeline.operations, <String>['autoOrient']);
       expect(redBytes(image), <int>[1, 2, 3, 4]);
+      expect(rotateWithoutAngle.operations, <String>['autoOrient']);
+      expect(redBytes(rotatedImage), <int>[1, 2, 3, 4]);
     },
   );
 
