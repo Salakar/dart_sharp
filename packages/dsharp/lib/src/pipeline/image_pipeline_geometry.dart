@@ -25,8 +25,11 @@ extension ImagePipelineGeometry on ImagePipeline {
   }
 
   /// Adds an extend operation.
-  ImagePipeline extend(ExtendOptions options) {
-    return _append(ExtendOperation(options));
+  ///
+  /// Accepts [ExtendOptions], [Insets], or a sharp-style integer applied to all
+  /// edges.
+  ImagePipeline extend(Object extend) {
+    return _append(ExtendOperation(_resolveExtendOptions(extend)));
   }
 
   /// Adds a trim operation.
@@ -82,4 +85,19 @@ int? _resizeDimension(Object? value, String name) {
     return value;
   }
   throw OperationValidationException('Resize $name must be an integer.');
+}
+
+ExtendOptions _resolveExtendOptions(Object extend) {
+  if (extend is ExtendOptions) {
+    return extend;
+  }
+  if (extend is Insets) {
+    return ExtendOptions(insets: extend);
+  }
+  if (extend is int) {
+    return ExtendOptions(insets: Insets.all(extend));
+  }
+  throw const OperationValidationException(
+    'Extend expects an integer, Insets, or ExtendOptions.',
+  );
 }

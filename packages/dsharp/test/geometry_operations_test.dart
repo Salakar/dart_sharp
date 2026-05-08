@@ -122,6 +122,24 @@ void main() {
     expect(image.firstFrameBytes().take(4), <int>[9, 0, 0, 255]);
   });
 
+  test('extend accepts sharp-style all-edge integer', () async {
+    final image = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).extend(1).toPixelImage();
+    final insetImage = await ImagePipeline.fromRawPixels(
+      raw2x2(),
+    ).extend(const Insets(left: 1)).toPixelImage();
+
+    expect(image.width, 4);
+    expect(image.height, 4);
+    expect(image.firstFrameBytes().take(4), <int>[0, 0, 0, 255]);
+    expect(insetImage.width, 3);
+    expect(
+      () => ImagePipeline.fromRawPixels(raw2x2()).extend('1'),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
   test('extend operation supports edge copy mode', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2())
         .extend(
