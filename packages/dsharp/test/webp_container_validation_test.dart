@@ -205,6 +205,33 @@ void main() {
     }
   });
 
+  test('rejects VP8X metadata flag and chunk mismatches', () async {
+    for (final (flag, type) in <(int, String)>[
+      (0x20, 'ICCP'),
+      (0x08, 'EXIF'),
+      (0x04, 'XMP '),
+    ]) {
+      final flagWithoutChunk = extendedSolidVp8Webp(width: 1, height: 1);
+      flagWithoutChunk[20] |= flag;
+      final chunkWithoutFlag = _appendChunk(
+        extendedSolidVp8Webp(width: 1, height: 1),
+        type,
+        <int>[1],
+      );
+
+      for (final bytes in <Uint8List>[flagWithoutChunk, chunkWithoutFlag]) {
+        await expectLater(
+          ImagePipeline.fromBytes(bytes).metadata(),
+          throwsA(isA<InvalidImageException>()),
+        );
+        await expectLater(
+          ImagePipeline.fromBytes(bytes).toPixelImage(),
+          throwsA(isA<InvalidImageException>()),
+        );
+      }
+    }
+  });
+
   test('rejects animation frames before ANIM header', () async {
     final ordered = animatedVp8Webp(width: 1, height: 1);
     final reordered = Uint8List.fromList(<int>[

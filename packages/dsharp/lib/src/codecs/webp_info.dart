@@ -213,6 +213,14 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     throw const InvalidImageException('WebP metadata chunks require VP8X.');
   }
   if (parsed.compression == WebpCompression.extended &&
+      (parsed.hasProfile != hasProfileChunk ||
+          parsed.hasExif != hasExifChunk ||
+          parsed.hasXmp != hasXmpChunk)) {
+    throw const InvalidImageException(
+      'WebP metadata flags do not match chunks.',
+    );
+  }
+  if (parsed.compression == WebpCompression.extended &&
       !parsed.isAnimated &&
       imageChunkCount != 1) {
     throw const InvalidImageException('WebP has no decodable image chunk.');
