@@ -257,6 +257,53 @@ Uint8List animatedVp8lWebpWithDuplicateImageChunk() {
       .finish();
 }
 
+/// Builds an invalid animation frame with trailing partial chunk bytes.
+Uint8List animatedVp8lWebpWithTrailingFrameBytes() {
+  final frame = _vp8lPayload(
+    width: 1,
+    height: 1,
+    red: 12,
+    green: 34,
+    blue: 56,
+    alpha: 255,
+  );
+  final framePayload = _ByteWriter()
+    ..u24(0)
+    ..u24(0)
+    ..u24(0)
+    ..u24(0)
+    ..u24(10)
+    ..byte(2);
+  _writeChunk(framePayload, 'VP8L', frame);
+  framePayload.byte(0xff);
+
+  final chunks = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x02)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(0)
+    ..u24(0);
+  _writeChunk(
+    chunks,
+    'ANIM',
+    (_ByteWriter()
+          ..u32(0)
+          ..u16(1))
+        .finish(),
+  );
+  _writeChunk(chunks, 'ANMF', framePayload.finish());
+  final payload = chunks.finish();
+  return (_ByteWriter()
+        ..ascii('RIFF')
+        ..u32(4 + payload.length)
+        ..ascii('WEBP')
+        ..bytes(payload))
+      .finish();
+}
+
 Uint8List _invalidAnimatedVp8lWebp({
   required int vp8xFlags,
   required bool includeAnim,

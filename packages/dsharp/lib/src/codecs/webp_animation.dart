@@ -166,6 +166,9 @@ _AnimationFrame _readFrame(Uint8List data) {
     }
     offset = end + (length.isOdd ? 1 : 0);
   }
+  if (offset != data.length) {
+    throw const InvalidImageException('Truncated WebP animation frame.');
+  }
   if ((vp8l == null) == (vp8 == null)) {
     throw const InvalidImageException(
       'WebP animation frame has no image data.',

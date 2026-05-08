@@ -327,6 +327,9 @@ WebpFrameInfo _frameInfo(Uint8List data) {
     }
     offset = dataEnd + (length.isOdd ? 1 : 0);
   }
+  if (offset != bytes.length) {
+    throw const InvalidImageException('Truncated WebP animation frame.');
+  }
   return (hasAlpha: hasAlpha, hasVp8l: hasVp8l, hasVp8: hasVp8);
 }
 
