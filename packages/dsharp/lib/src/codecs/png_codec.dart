@@ -160,6 +160,7 @@ final class PngImageCodec implements ImageCodec {
       raw.height,
       rgba,
       interlaced: pngOptions.progressive,
+      adaptiveFiltering: pngOptions.adaptiveFiltering,
     );
     _writeChunk(
       writer,
@@ -223,6 +224,7 @@ EncodedImage _encodePalettePng(
     palette.indices,
     bitDepth: bitDepth,
     interlaced: options.progressive,
+    adaptiveFiltering: options.adaptiveFiltering,
   );
   _writeChunk(
     writer,
@@ -269,6 +271,7 @@ EncodedImage _encodeGrayscalePng(
     rgba,
     bitDepth: options.bitDepth,
     interlaced: options.progressive,
+    adaptiveFiltering: options.adaptiveFiltering,
   );
   _writeChunk(
     writer,
@@ -404,18 +407,83 @@ void _unfilter(Uint8List row, Uint8List previous, int bpp, int filter) {
   }
 }
 
+void _writeFilteredRow(
+  ByteWriter writer,
+  Uint8List row,
+  Uint8List previous,
+  int bpp, {
+  required bool adaptiveFiltering,
+}) {
+  if (!adaptiveFiltering) {
+    writer
+      ..writeByte(0)
+      ..writeBytes(row);
+    return;
+  }
+  var bestFilter = 0;
+  var bestRow = row;
+  var bestScore = _filterScore(row);
+  for (var filter = 1; filter <= 4; filter += 1) {
+    final candidate = _filteredRow(row, previous, bpp, filter);
+    final score = _filterScore(candidate);
+    if (score < bestScore) {
+      bestFilter = filter;
+      bestRow = candidate;
+      bestScore = score;
+    }
+  }
+  writer
+    ..writeByte(bestFilter)
+    ..writeBytes(bestRow);
+}
+
+Uint8List _filteredRow(Uint8List row, Uint8List previous, int bpp, int filter) {
+  final output = Uint8List(row.length);
+  for (var i = 0; i < row.length; i += 1) {
+    final left = i >= bpp ? row[i - bpp] : 0;
+    final up = previous[i];
+    final upLeft = i >= bpp ? previous[i - bpp] : 0;
+    final predictor = switch (filter) {
+      1 => left,
+      2 => up,
+      3 => (left + up) >> 1,
+      4 => _paeth(left, up, upLeft),
+      _ => 0,
+    };
+    output[i] = (row[i] - predictor) & 0xff;
+  }
+  return output;
+}
+
+int _filterScore(Uint8List row) {
+  var score = 0;
+  for (final byte in row) {
+    score += byte < 128 ? byte : 256 - byte;
+  }
+  return score;
+}
+
 Uint8List _rgbaScanlines(
   int width,
   int height,
   Uint8List rgba, {
   required bool interlaced,
+  required bool adaptiveFiltering,
 }) {
   final scanlines = ByteWriter();
   if (!interlaced) {
     final rowLength = width * 4;
+    var previous = Uint8List(rowLength);
     for (var y = 0; y < height; y += 1) {
-      scanlines.writeByte(0);
-      scanlines.writeBytes(rgba.sublist(y * rowLength, (y + 1) * rowLength));
+      final row = rgba.sublist(y * rowLength, (y + 1) * rowLength);
+      _writeFilteredRow(
+        scanlines,
+        row,
+        previous,
+        4,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = row;
     }
     return scanlines.toBytes();
   }
@@ -425,14 +493,23 @@ Uint8List _rgbaScanlines(
     if (passWidth == 0 || passHeight == 0) {
       continue;
     }
+    var previous = Uint8List(passWidth * 4);
     for (var row = 0; row < passHeight; row += 1) {
       final y = pass.yStart + row * pass.yStep;
-      scanlines.writeByte(0);
+      final rowBytes = Uint8List(passWidth * 4);
       for (var col = 0; col < passWidth; col += 1) {
         final x = pass.start + col * pass.step;
         final source = (y * width + x) * 4;
-        scanlines.writeBytes(rgba.sublist(source, source + 4));
+        rowBytes.setRange(col * 4, col * 4 + 4, rgba, source);
       }
+      _writeFilteredRow(
+        scanlines,
+        rowBytes,
+        previous,
+        4,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = rowBytes;
     }
   }
   return scanlines.toBytes();
@@ -444,12 +521,22 @@ Uint8List _indexedScanlines(
   List<int> indices, {
   required int bitDepth,
   required bool interlaced,
+  required bool adaptiveFiltering,
 }) {
   final scanlines = ByteWriter();
+  final bpp = _filterBytesPerPixel(1, bitDepth);
   if (!interlaced) {
+    var previous = Uint8List(_scanlineBytes(width, 1, bitDepth));
     for (var y = 0; y < height; y += 1) {
-      scanlines.writeByte(0);
-      _writeIndexedRow(scanlines, indices, y * width, width, bitDepth);
+      final row = _indexedRowBytes(indices, y * width, width, bitDepth);
+      _writeFilteredRow(
+        scanlines,
+        row,
+        previous,
+        bpp,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = row;
     }
     return scanlines.toBytes();
   }
@@ -459,14 +546,22 @@ Uint8List _indexedScanlines(
     if (passWidth == 0 || passHeight == 0) {
       continue;
     }
+    var previous = Uint8List(_scanlineBytes(passWidth, 1, bitDepth));
     for (var row = 0; row < passHeight; row += 1) {
       final y = pass.yStart + row * pass.yStep;
-      scanlines.writeByte(0);
       final rowIndices = <int>[
         for (var col = 0; col < passWidth; col += 1)
           indices[y * width + pass.start + col * pass.step],
       ];
-      _writeIndexedRow(scanlines, rowIndices, 0, passWidth, bitDepth);
+      final rowBytes = _indexedRowBytes(rowIndices, 0, passWidth, bitDepth);
+      _writeFilteredRow(
+        scanlines,
+        rowBytes,
+        previous,
+        bpp,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = rowBytes;
     }
   }
   return scanlines.toBytes();
@@ -478,16 +573,26 @@ Uint8List _grayscaleScanlines(
   Uint8List rgba, {
   required int bitDepth,
   required bool interlaced,
+  required bool adaptiveFiltering,
 }) {
   final scanlines = ByteWriter();
+  final bpp = _filterBytesPerPixel(1, bitDepth);
   if (!interlaced) {
+    var previous = Uint8List(_scanlineBytes(width, 1, bitDepth));
     for (var y = 0; y < height; y += 1) {
-      scanlines.writeByte(0);
       final samples = <int>[
         for (var x = 0; x < width; x += 1)
           _grayscaleSample(rgba, y * width + x, bitDepth),
       ];
-      _writeIndexedRow(scanlines, samples, 0, width, bitDepth);
+      final row = _indexedRowBytes(samples, 0, width, bitDepth);
+      _writeFilteredRow(
+        scanlines,
+        row,
+        previous,
+        bpp,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = row;
     }
     return scanlines.toBytes();
   }
@@ -497,15 +602,23 @@ Uint8List _grayscaleScanlines(
     if (passWidth == 0 || passHeight == 0) {
       continue;
     }
+    var previous = Uint8List(_scanlineBytes(passWidth, 1, bitDepth));
     for (var row = 0; row < passHeight; row += 1) {
       final y = pass.yStart + row * pass.yStep;
       final rowBase = y * width + pass.start;
-      scanlines.writeByte(0);
       final samples = <int>[
         for (var col = 0; col < passWidth; col += 1)
           _grayscaleSample(rgba, rowBase + col * pass.step, bitDepth),
       ];
-      _writeIndexedRow(scanlines, samples, 0, passWidth, bitDepth);
+      final rowBytes = _indexedRowBytes(samples, 0, passWidth, bitDepth);
+      _writeFilteredRow(
+        scanlines,
+        rowBytes,
+        previous,
+        bpp,
+        adaptiveFiltering: adaptiveFiltering,
+      );
+      previous = rowBytes;
     }
   }
   return scanlines.toBytes();
@@ -520,6 +633,17 @@ int _grayscaleSample(Uint8List rgba, int pixel, int bitDepth) {
       (rgba[offset] * 299 + rgba[offset + 1] * 587 + rgba[offset + 2] * 114) ~/
       1000;
   return (gray * ((1 << bitDepth) - 1) + 127) ~/ 255;
+}
+
+Uint8List _indexedRowBytes(
+  List<int> indices,
+  int offset,
+  int width,
+  int bitDepth,
+) {
+  final writer = ByteWriter();
+  _writeIndexedRow(writer, indices, offset, width, bitDepth);
+  return writer.toBytes();
 }
 
 void _writeIndexedRow(

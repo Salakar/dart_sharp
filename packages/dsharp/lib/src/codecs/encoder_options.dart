@@ -61,6 +61,7 @@ final class PngEncoderOptions extends EncoderOptions {
   const PngEncoderOptions({
     this.compressionLevel = 6,
     this.progressive = false,
+    this.adaptiveFiltering = false,
     this.palette = false,
     this.bitDepth = 8,
     int? colors,
@@ -73,6 +74,9 @@ final class PngEncoderOptions extends EncoderOptions {
 
   /// Whether to use interlace/progressive output.
   final bool progressive;
+
+  /// Whether to adaptively select the best PNG row filter.
+  final bool adaptiveFiltering;
 
   /// Whether to quantize to a palette.
   final bool palette;

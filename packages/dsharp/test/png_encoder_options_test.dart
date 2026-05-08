@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:dsharp/dsharp.dart';
+import 'package:dsharp/src/codecs/binary_io.dart';
+import 'package:dsharp/src/codecs/deflate_codec.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -34,6 +36,28 @@ void main() {
       );
     }
   });
+
+  test(
+    'PNG adaptiveFiltering writes filtered rows that decode correctly',
+    () async {
+      final raw = _solidRowsRaw();
+      final unfiltered = await ImagePipeline.fromRawPixels(
+        raw,
+      ).png(const PngEncoderOptions()).toBytes();
+      final filtered = await ImagePipeline.fromRawPixels(
+        raw,
+      ).png(const PngEncoderOptions(adaptiveFiltering: true)).toBytes();
+
+      expect(_pngFilters(unfiltered), everyElement(0));
+      expect(_pngFilters(filtered), containsAll(<int>[1, 2]));
+      expect(
+        (await ImagePipeline.fromBytes(
+          filtered,
+        ).toPixelImage()).firstFrameBytes(),
+        raw.bytes,
+      );
+    },
+  );
 }
 
 RawPixels _paletteRaw() {
@@ -62,6 +86,53 @@ RawPixels _paletteRaw() {
   );
 }
 
+RawPixels _solidRowsRaw() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[
+      for (var i = 0; i < 16; i += 1) ...<int>[100, 110, 120, 255],
+    ]),
+    width: 8,
+    height: 2,
+    channels: ChannelCount.four,
+  );
+}
+
 int _pngBitDepth(Uint8List bytes) => bytes[24];
 
 int _pngColorType(Uint8List bytes) => bytes[25];
+
+List<int> _pngFilters(Uint8List bytes) {
+  final width = readUint32Be(bytes, 16);
+  final height = readUint32Be(bytes, 20);
+  final bitDepth = _pngBitDepth(bytes);
+  final colorType = _pngColorType(bytes);
+  expect(bitDepth, 8);
+  expect(colorType, 6);
+  final inflated = zlibDecode(_pngIdat(bytes));
+  final rowLength = width * 4;
+  final filters = <int>[];
+  var offset = 0;
+  for (var y = 0; y < height; y += 1) {
+    filters.add(inflated[offset]);
+    offset += rowLength + 1;
+  }
+  return filters;
+}
+
+Uint8List _pngIdat(Uint8List bytes) {
+  final idat = <int>[];
+  var offset = 8;
+  while (offset + 12 <= bytes.length) {
+    final length = readUint32Be(bytes, offset);
+    final type = String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
+    final start = offset + 8;
+    final end = start + length;
+    if (type == 'IDAT') {
+      idat.addAll(bytes.sublist(start, end));
+    } else if (type == 'IEND') {
+      break;
+    }
+    offset = end + 4;
+  }
+  return Uint8List.fromList(idat);
+}
