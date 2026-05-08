@@ -68,19 +68,18 @@ ImageFormat _resolveOutputFormat(
 
 void _validateMetadataWrites(ImagePipeline pipeline) {
   final writes = pipeline._metadataWrites;
-  if (!writes.isRequested || _isPngXmpOnlyWrite(writes)) {
+  if (!writes.isRequested || _isSupportedXmpWrite(writes)) {
     return;
   }
   throw const UnsupportedCodecException(
-    'Only explicit XMP metadata writes are implemented for PNG output.',
+    'Only explicit or kept XMP metadata writes are implemented.',
   );
 }
 
-bool _isPngXmpOnlyWrite(MetadataWriteOptions writes) {
-  return writes.xmp != null &&
+bool _isSupportedXmpWrite(MetadataWriteOptions writes) {
+  return (writes.xmp != null || writes.keepXmp) &&
       !writes.keepExif &&
       !writes.keepIcc &&
-      !writes.keepXmp &&
       !writes.withMetadata;
 }
 
@@ -92,34 +91,46 @@ EncodedImage _applyMetadataWrites(
   if (!writes.isRequested) {
     return encoded;
   }
-  final xmp = writes.xmp;
-  if (xmp != null && encoded.info.format == ImageFormat.png) {
+  final xmp = writes.xmp ?? (writes.keepXmp ? _sourceXmp(pipeline) : null);
+  if (xmp == null) {
+    return encoded;
+  }
+  if (encoded.info.format == ImageFormat.png) {
     final bytes = _writePngXmp(encoded.bytes, xmp);
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
-  if (xmp != null && encoded.info.format == ImageFormat.webp) {
+  if (encoded.info.format == ImageFormat.webp) {
     final bytes = _writeWebpXmp(encoded.bytes, xmp);
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
-  if (xmp != null && encoded.info.format == ImageFormat.jpeg) {
+  if (encoded.info.format == ImageFormat.jpeg) {
     final bytes = _writeJpegXmp(encoded.bytes, xmp);
     return EncodedImage(
       bytes: bytes,
       info: _copyOutputInfoWithSize(encoded.info, bytes.length),
     );
   }
-  if (xmp != null) {
-    throw const UnsupportedCodecException(
-      'XMP metadata writing is only implemented for JPEG, PNG, and WebP output.',
-    );
+  throw const UnsupportedCodecException(
+    'XMP metadata writing is only implemented for JPEG, PNG, and WebP output.',
+  );
+}
+
+XmpMetadata? _sourceXmp(ImagePipeline pipeline) {
+  if (pipeline.source case BytesImageSource(:final bytes)) {
+    return switch (sniffImageFormat(bytes)) {
+      ImageFormat.jpeg => _readJpegXmp(bytes),
+      ImageFormat.png => _readPngXmp(bytes),
+      ImageFormat.webp => _readWebpXmp(bytes),
+      _ => null,
+    };
   }
-  return encoded;
+  return null;
 }
 
 Uint8List _writePngXmp(Uint8List bytes, XmpMetadata xmp) {
@@ -182,16 +193,67 @@ Uint8List _pngXmpData(XmpMetadata xmp) {
 }
 
 bool _isPngXmpData(Uint8List data) {
+  return _pngXmpTextOffset(data) != null;
+}
+
+XmpMetadata? _readPngXmp(Uint8List bytes) {
+  if (bytes.length < 33 || !_hasPngSignature(bytes)) {
+    return null;
+  }
+  var offset = 8;
+  while (offset + 12 <= bytes.length) {
+    final length = readUint32Be(bytes, offset);
+    final type = ascii.decode(bytes.sublist(offset + 4, offset + 8));
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + length;
+    if (dataEnd + 4 > bytes.length) {
+      return null;
+    }
+    final data = bytes.sublist(dataStart, dataEnd);
+    if (type == 'iTXt') {
+      final textOffset = _pngXmpTextOffset(data);
+      if (textOffset != null) {
+        return XmpMetadata(utf8.decode(data.sublist(textOffset)));
+      }
+    }
+    offset = dataEnd + 4;
+  }
+  return null;
+}
+
+int? _pngXmpTextOffset(Uint8List data) {
   const keyword = 'XML:com.adobe.xmp';
   if (data.length <= keyword.length || data[keyword.length] != 0) {
-    return false;
+    return null;
   }
   for (var i = 0; i < keyword.length; i += 1) {
     if (data[i] != keyword.codeUnitAt(i)) {
-      return false;
+      return null;
     }
   }
-  return true;
+  var offset = keyword.length + 1;
+  if (offset + 2 > data.length) {
+    return null;
+  }
+  final compressionFlag = data[offset];
+  final compressionMethod = data[offset + 1];
+  offset += 2;
+  if (compressionFlag != 0 || compressionMethod != 0) {
+    return null;
+  }
+  offset = _skipNullTerminated(data, offset);
+  if (offset < 0) {
+    return null;
+  }
+  offset = _skipNullTerminated(data, offset);
+  return offset < 0 ? null : offset;
+}
+
+int _skipNullTerminated(Uint8List data, int offset) {
+  while (offset < data.length && data[offset] != 0) {
+    offset += 1;
+  }
+  return offset >= data.length ? -1 : offset + 1;
 }
 
 void _writePngChunk(ByteWriter writer, String type, Uint8List data) {
@@ -275,6 +337,25 @@ int _webpRiffEndForWrite(Uint8List bytes) {
     throw const InvalidImageException('Truncated WebP RIFF payload.');
   }
   return end;
+}
+
+XmpMetadata? _readWebpXmp(Uint8List bytes) {
+  final riffEnd = _webpRiffEndForWrite(bytes);
+  var offset = 12;
+  while (offset + 8 <= riffEnd) {
+    final type = ascii.decode(bytes.sublist(offset, offset + 4));
+    final length = readUint32Le(bytes, offset + 4);
+    final start = offset + 8;
+    final end = start + length;
+    if (end > riffEnd) {
+      return null;
+    }
+    if (type == 'XMP ') {
+      return XmpMetadata(utf8.decode(bytes.sublist(start, end)));
+    }
+    offset = end + (length.isOdd ? 1 : 0);
+  }
+  return null;
 }
 
 Uint8List _webpVp8xPayload(WebpImageInfo info, {required bool xmp}) {
@@ -392,6 +473,47 @@ bool _isJpegXmpData(Uint8List data) {
 
 bool _jpegStandaloneMarker(int marker) {
   return marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7);
+}
+
+XmpMetadata? _readJpegXmp(Uint8List bytes) {
+  if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
+    return null;
+  }
+  var offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset] != 0xff) {
+      return null;
+    }
+    while (offset < bytes.length && bytes[offset] == 0xff) {
+      offset += 1;
+    }
+    if (offset >= bytes.length) {
+      return null;
+    }
+    final marker = bytes[offset];
+    offset += 1;
+    if (marker == 0xda || marker == 0xd9) {
+      return null;
+    }
+    if (_jpegStandaloneMarker(marker)) {
+      continue;
+    }
+    if (offset + 2 > bytes.length) {
+      return null;
+    }
+    final length = readUint16Be(bytes, offset);
+    final segmentEnd = offset + length;
+    if (length < 2 || segmentEnd > bytes.length) {
+      return null;
+    }
+    final data = bytes.sublist(offset + 2, segmentEnd);
+    if (marker == 0xe1 && _isJpegXmpData(data)) {
+      const header = 'http://ns.adobe.com/xap/1.0/';
+      return XmpMetadata(utf8.decode(data.sublist(header.length + 1)));
+    }
+    offset = segmentEnd;
+  }
+  return null;
 }
 
 OutputInfo _copyOutputInfoWithSize(OutputInfo info, int size) {

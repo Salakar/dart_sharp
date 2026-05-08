@@ -22,7 +22,7 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   metadata reads, and stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
   `toImageBytesResult`, format-specific chain methods, WebP animation loop and
-  per-frame delay controls, explicit JPEG/PNG/WebP XMP metadata writes,
+  per-frame delay controls, explicit/kept JPEG/PNG/WebP XMP metadata writes,
   cancellation, timeout, and VM-only `writeToFile`.
 
 Unsupported native-only or advanced formats such as AVIF, HEIF, JP2, JXL, PDF,
