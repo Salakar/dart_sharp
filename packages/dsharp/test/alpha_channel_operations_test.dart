@@ -15,7 +15,7 @@ void main() {
     );
 
     expect(firstBytes(gray), <int>[9, 9, 9, 255]);
-    expect(firstBytes(rgb), <int>[1, 2, 3, 128]);
+    expect(firstBytes(rgb), <int>[1, 2, 3, 127]);
     expect(
       () => ImagePipeline.fromRawPixels(
         rawRgb(1, 1, <int>[1, 2, 3]),
@@ -32,6 +32,12 @@ void main() {
       () => ImagePipeline.fromRawPixels(
         rawRgb(1, 1, <int>[1, 2, 3]),
       ).ensureAlpha(double.nan),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      () => ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).ensureAlpha('fail'),
       throwsA(isA<OperationValidationException>()),
     );
   });
