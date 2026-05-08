@@ -86,6 +86,57 @@ void main() {
     ]);
   });
 
+  test('decodes 1-bit grayscale TIFF rows', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 8,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 1,
+        bitsPerSample: const <int>[1],
+        strip: Uint8List.fromList(<int>[0xb2]),
+      ),
+    ).toPixelImage();
+
+    expect(
+      image.firstFrameBytes(),
+      _rgbaGray(<int>[255, 0, 255, 255, 0, 0, 255, 0]),
+    );
+  });
+
+  test('decodes 2-bit grayscale TIFF rows', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 4,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 1,
+        bitsPerSample: const <int>[2],
+        strip: Uint8List.fromList(<int>[0x1b]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), _rgbaGray(<int>[0, 85, 170, 255]));
+  });
+
+  test('decodes 4-bit white-is-zero grayscale TIFF rows', () async {
+    final image = await ImagePipeline.fromBytes(
+      _littleEndianTiff(
+        width: 2,
+        height: 1,
+        samples: 1,
+        compression: 1,
+        photometric: 0,
+        bitsPerSample: const <int>[4],
+        strip: Uint8List.fromList(<int>[0x0f]),
+      ),
+    ).toPixelImage();
+
+    expect(image.firstFrameBytes(), _rgbaGray(<int>[255, 0]));
+  });
+
   test('encodes TIFF PackBits compression', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -117,6 +168,23 @@ void main() {
     );
     await expectLater(
       ImagePipeline.fromBytes(_packBitsTiff(strip: <int>[255])).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects truncated low-bit grayscale TIFF rows', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _littleEndianTiff(
+          width: 9,
+          height: 1,
+          samples: 1,
+          compression: 1,
+          photometric: 1,
+          bitsPerSample: const <int>[1],
+          strip: Uint8List.fromList(<int>[0xff]),
+        ),
+      ).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
     );
   });
@@ -297,4 +365,10 @@ int _tiffShortTagValue(Uint8List bytes, int tag) {
     }
   }
   throw StateError('TIFF tag $tag not found.');
+}
+
+List<int> _rgbaGray(List<int> values) {
+  return <int>[
+    for (final value in values) ...<int>[value, value, value, 255],
+  ];
 }

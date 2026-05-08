@@ -11,7 +11,7 @@ import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
 
-/// First-party baseline TIFF codec for uncompressed 8-bit chunky images.
+/// First-party baseline TIFF codec for chunky and low-bit grayscale images.
 final class TiffImageCodec implements ImageCodec {
   /// Creates a TIFF codec.
   const TiffImageCodec();
@@ -36,6 +36,7 @@ final class TiffImageCodec implements ImageCodec {
     final compression = tags.value(259);
     final photometric = tags.value(262);
     final samples = tags.value(277, fallback: 1);
+    final bitsPerSample = tags.values(258, fallback: const <int>[8]);
     final predictor = tags.value(317, fallback: 1);
     if (photometric == 3) {
       throw const UnsupportedCodecException(
@@ -49,16 +50,25 @@ final class TiffImageCodec implements ImageCodec {
       compression,
     );
     if (predictor == 2) {
+      if (!_allTiffBitsPerSample(bitsPerSample, 8)) {
+        throw const UnsupportedCodecException(
+          'TIFF horizontal predictor requires 8-bit samples.',
+        );
+      }
       _undoHorizontalPredictor(source, width, height, samples);
     } else if (predictor != 1) {
       throw const UnsupportedCodecException(
         'Only TIFF predictors 1 and 2 are supported.',
       );
     }
-    if (source.length < width * height * samples) {
-      throw const InvalidImageException('Truncated TIFF pixel data.');
-    }
-    final rgba = _toRgba(source, width, height, samples, photometric);
+    final normalized = _normalizeTiffSamples(
+      source,
+      width,
+      height,
+      samples,
+      bitsPerSample,
+    );
+    final rgba = _toRgba(normalized, width, height, samples, photometric);
     return PixelImage.fromRawPixels(
       RawPixels(
         bytes: Uint8List.fromList(rgba),
@@ -156,6 +166,69 @@ final class TiffImageCodec implements ImageCodec {
       ),
     );
   }
+}
+
+Uint8List _normalizeTiffSamples(
+  Uint8List source,
+  int width,
+  int height,
+  int samples,
+  List<int> bitsPerSample,
+) {
+  if (bitsPerSample.length != 1 && bitsPerSample.length != samples) {
+    throw const UnsupportedCodecException(
+      'Unsupported TIFF bits-per-sample layout.',
+    );
+  }
+  final bitDepth = bitsPerSample.first;
+  if (samples == 1 && (bitDepth == 1 || bitDepth == 2 || bitDepth == 4)) {
+    return _unpackLowBitGrayscale(source, width, height, bitDepth);
+  }
+  if (!_allTiffBitsPerSample(bitsPerSample, 8)) {
+    throw const UnsupportedCodecException(
+      'Only 1/2/4-bit grayscale and 8-bit TIFF samples are supported.',
+    );
+  }
+  final expected = width * height * samples;
+  if (source.length < expected) {
+    throw const InvalidImageException('Truncated TIFF pixel data.');
+  }
+  return source;
+}
+
+bool _allTiffBitsPerSample(List<int> bitsPerSample, int value) {
+  for (final bits in bitsPerSample) {
+    if (bits != value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Uint8List _unpackLowBitGrayscale(
+  Uint8List source,
+  int width,
+  int height,
+  int bitDepth,
+) {
+  final rowBytes = (width * bitDepth + 7) >> 3;
+  if (source.length < rowBytes * height) {
+    throw const InvalidImageException('Truncated TIFF pixel data.');
+  }
+  final maxSample = (1 << bitDepth) - 1;
+  final mask = maxSample;
+  final output = Uint8List(width * height);
+  for (var y = 0; y < height; y += 1) {
+    final row = y * rowBytes;
+    for (var x = 0; x < width; x += 1) {
+      final bitOffset = x * bitDepth;
+      final byte = source[row + (bitOffset >> 3)];
+      final shift = 8 - bitDepth - (bitOffset & 7);
+      final sample = (byte >> shift) & mask;
+      output[y * width + x] = (sample * 255) ~/ maxSample;
+    }
+  }
+  return output;
 }
 
 final class _Ifd {
