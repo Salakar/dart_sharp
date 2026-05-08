@@ -83,6 +83,12 @@ Uint8List _encodeVp8SolidFromRgba(
     quality: quality,
     macroblockColors: colors,
   );
+  final chromaHorizontalAcBlocks = _lossyChromaHorizontalAcBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+  );
   final lumaAcBlocks = _lossyLumaAcBlocks(
     rgba,
     width: width,
@@ -95,6 +101,7 @@ Uint8List _encodeVp8SolidFromRgba(
     lumaBlocks: lumaBlocks,
     lumaAcBlocks: lumaAcBlocks,
     chromaBlocks: chromaBlocks,
+    chromaHorizontalAcBlocks: chromaHorizontalAcBlocks,
   );
 }
 
@@ -170,6 +177,7 @@ Uint8List _encodeVp8SolidPayload({
   required List<int> lumaBlocks,
   required List<List<int>> lumaAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
+  required List<_Vp8ChromaAc> chromaHorizontalAcBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -231,24 +239,22 @@ Uint8List _encodeVp8SolidPayload({
         (c) => c.v,
       );
       for (var block = 0; block < 4; block += 1) {
-        final chroma = chromaBlocks[(mbY * mbCols + mbX) * 4 + block];
-        _writeChromaDc(
-          coeffs,
-          contexts,
-          mbX,
-          16 + block,
+        final blockOffset = (mbY * mbCols + mbX) * 4 + block;
+        final chroma = chromaBlocks[blockOffset];
+        final chromaAc = chromaHorizontalAcBlocks[blockOffset];
+        _writeChromaDct(coeffs, contexts, mbX, 16 + block, <int>[
           (chroma.u - predictedU) * 2,
-        );
+          chromaAc.u,
+        ]);
       }
       for (var block = 0; block < 4; block += 1) {
-        final chroma = chromaBlocks[(mbY * mbCols + mbX) * 4 + block];
-        _writeChromaDc(
-          coeffs,
-          contexts,
-          mbX,
-          20 + block,
+        final blockOffset = (mbY * mbCols + mbX) * 4 + block;
+        final chroma = chromaBlocks[blockOffset];
+        final chromaAc = chromaHorizontalAcBlocks[blockOffset];
+        _writeChromaDct(coeffs, contexts, mbX, 20 + block, <int>[
           (chroma.v - predictedV) * 2,
-        );
+          chromaAc.v,
+        ]);
       }
     }
   }
@@ -290,41 +296,27 @@ void _writeLumaDct(
   );
 }
 
-void _writeChromaDc(
+void _writeChromaDct(
   _Vp8BoolWriter out,
   _Vp8TokenContexts contexts,
   int mbX,
   int block,
-  int coefficient,
+  List<int> coefficients,
 ) {
   final context = contexts.contextFor(mbX, block);
   final probs = _Vp8ChromaProbs.defaults();
-  if (coefficient == 0) {
-    out.prob(probs.probabilityAt(0, context, _dctEobNode), false);
-    contexts.setHasCoefficients(mbX, block, false);
-    return;
-  }
-  _writeDctToken(out, coefficient, context, (coefficientIndex, context, node) {
+  _writeDctTokens(out, coefficients, context, (
+    coefficientIndex,
+    context,
+    node,
+  ) {
     return probs.probabilityAt(coefficientIndex, context, node);
   });
-  contexts.setHasCoefficients(mbX, block, true);
-}
-
-void _writeDctToken(
-  _Vp8BoolWriter out,
-  int coefficient,
-  int initialContext,
-  int Function(int coefficientIndex, int context, int node) probabilityAt,
-) {
-  final magnitude = coefficient.abs();
-  int currentProbability(int node) => probabilityAt(0, initialContext, node);
-  out
-    ..prob(currentProbability(_dctEobNode), true)
-    ..prob(currentProbability(_dctZeroNode), true);
-  _writeDctMagnitude(out, magnitude, currentProbability);
-  out.bit(coefficient.isNegative);
-  final nextContext = magnitude == 1 ? 1 : 2;
-  out.prob(probabilityAt(1, nextContext, _dctEobNode), false);
+  contexts.setHasCoefficients(
+    mbX,
+    block,
+    coefficients.any((coefficient) => coefficient != 0),
+  );
 }
 
 void _writeDctTokens(
