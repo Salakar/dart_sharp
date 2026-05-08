@@ -264,19 +264,34 @@ WebpFrameInfo _frameInfo(Uint8List data) {
     throw const InvalidImageException('Invalid WebP animation frame header.');
   }
   final flags = data[15];
+  final payload = _framePayloadInfo(data, start: 16);
+  if (payload.hasVp8l == payload.hasVp8) {
+    throw const InvalidImageException(
+      'WebP animation frame has no image data.',
+    );
+  }
+  if (payload.hasVp8l && payload.hasAlpha) {
+    throw const InvalidImageException('WebP VP8L animation frame has ALPH.');
+  }
   return WebpFrameInfo(
     x: _uint24Le(data, 0) * 2,
     y: _uint24Le(data, 3) * 2,
     width: _uint24Le(data, 6) + 1,
     height: _uint24Le(data, 9) + 1,
     duration: Duration(milliseconds: _uint24Le(data, 12)),
-    hasAlpha: _containsChunk(data, 'ALPH', start: 16),
+    hasAlpha: payload.hasAlpha,
     blend: (flags & 0x02) == 0,
   );
 }
 
-bool _containsChunk(Uint8List bytes, String name, {required int start}) {
+({bool hasAlpha, bool hasVp8l, bool hasVp8}) _framePayloadInfo(
+  Uint8List bytes, {
+  required int start,
+}) {
   var offset = start;
+  var hasAlpha = false;
+  var hasVp8l = false;
+  var hasVp8 = false;
   while (offset + 8 <= bytes.length) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
@@ -285,12 +300,16 @@ bool _containsChunk(Uint8List bytes, String name, {required int start}) {
     if (dataEnd > bytes.length) {
       throw const InvalidImageException('Truncated WebP animation frame.');
     }
-    if (type == name) {
-      return true;
+    if (type == 'ALPH') {
+      hasAlpha = true;
+    } else if (type == 'VP8L') {
+      hasVp8l = true;
+    } else if (type == 'VP8 ') {
+      hasVp8 = true;
     }
     offset = dataEnd + (length.isOdd ? 1 : 0);
   }
-  return false;
+  return (hasAlpha: hasAlpha, hasVp8l: hasVp8l, hasVp8: hasVp8);
 }
 
 int _uint24Le(Uint8List bytes, int offset) {

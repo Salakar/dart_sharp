@@ -136,6 +136,19 @@ void main() {
     ]);
   });
 
+  test('rejects VP8L animation frames with ALPH chunks', () async {
+    final bytes = animatedVp8lWebpWithAlphaChunk();
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects animated WebP missing ANIM header', () async {
     final bytes = animatedVp8lWebpWithoutAnimHeader();
 
