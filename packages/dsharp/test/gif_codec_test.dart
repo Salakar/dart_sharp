@@ -158,6 +158,55 @@ void main() {
       throwsA(isA<OperationValidationException>()),
     );
   });
+
+  test('rejects malformed GIF containers with typed errors', () async {
+    final cases = <Uint8List>[
+      _gifHeader(globalColorTable: true),
+      _gifWithTruncatedGraphicControlExtension(),
+      _gifWithTruncatedImageDescriptor(),
+      _gifWithTruncatedImageDataBlock(),
+    ];
+
+    for (final bytes in cases) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
+  test('rejects malformed GIF metadata color tables', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_gifHeader(globalColorTable: true)).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(_gifWithTruncatedLocalColorTable()).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects GIF palette indices outside the active color table', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_gifWithPaletteIndices(<int>[2])).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects invalid GIF LZW code streams', () {
+    expect(
+      () => gifLzwDecode(Uint8List.fromList(<int>[0x06]), 2, 1),
+      throwsA(isA<InvalidImageException>()),
+    );
+    expect(
+      () => gifLzwDecode(_lzwCodes(<int>[4, 0, 7], 3), 2, 2),
+      throwsA(isA<InvalidImageException>()),
+    );
+    expect(
+      () => gifLzwDecode(Uint8List.fromList(<int>[0]), 1, 1),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
 }
 
 PixelImage _animation({int? loopCount}) {
@@ -197,6 +246,115 @@ RawPixels _twoColorRaw() {
 int _gifGlobalColorCount(Uint8List bytes) {
   final packed = bytes[10];
   return 1 << ((packed & 0x07) + 1);
+}
+
+Uint8List _gifHeader({bool globalColorTable = false}) {
+  final writer = ByteWriter()
+    ..writeAscii('GIF89a')
+    ..writeUint16Le(1)
+    ..writeUint16Le(1)
+    ..writeByte(globalColorTable ? 0x80 : 0)
+    ..writeByte(0)
+    ..writeByte(0);
+  return writer.toBytes();
+}
+
+ByteWriter _gifWithTwoColorTable() {
+  return ByteWriter()
+    ..writeAscii('GIF89a')
+    ..writeUint16Le(1)
+    ..writeUint16Le(1)
+    ..writeByte(0x80)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeBytes(const <int>[0, 0, 0, 255, 255, 255]);
+}
+
+Uint8List _gifWithTruncatedGraphicControlExtension() {
+  final writer = _gifWithTwoColorTable()
+    ..writeByte(0x21)
+    ..writeByte(0xf9)
+    ..writeByte(4)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  return writer.toBytes();
+}
+
+Uint8List _gifWithTruncatedImageDescriptor() {
+  final writer = _gifWithTwoColorTable()
+    ..writeByte(0x2c)
+    ..writeByte(0);
+  return writer.toBytes();
+}
+
+Uint8List _gifWithTruncatedImageDataBlock() {
+  final writer = _gifWithTwoColorTable();
+  _writeImageDescriptor(writer, localPacked: 0);
+  writer
+    ..writeByte(2)
+    ..writeByte(2)
+    ..writeByte(0);
+  return writer.toBytes();
+}
+
+Uint8List _gifWithTruncatedLocalColorTable() {
+  final writer = ByteWriter()
+    ..writeAscii('GIF89a')
+    ..writeUint16Le(1)
+    ..writeUint16Le(1)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeImageDescriptor(writer, localPacked: 0x80);
+  writer.writeBytes(const <int>[0, 0, 0]);
+  return writer.toBytes();
+}
+
+Uint8List _gifWithPaletteIndices(List<int> indices) {
+  final lzw = gifLzwEncode(indices, 2);
+  final writer = _gifWithTwoColorTable();
+  _writeImageDescriptor(writer, localPacked: 0);
+  writer
+    ..writeByte(2)
+    ..writeByte(lzw.length)
+    ..writeBytes(lzw)
+    ..writeByte(0)
+    ..writeByte(0x3b);
+  return writer.toBytes();
+}
+
+void _writeImageDescriptor(ByteWriter writer, {required int localPacked}) {
+  writer
+    ..writeByte(0x2c)
+    ..writeUint16Le(0)
+    ..writeUint16Le(0)
+    ..writeUint16Le(1)
+    ..writeUint16Le(1)
+    ..writeByte(localPacked);
+}
+
+Uint8List _lzwCodes(List<int> codes, int codeSize) {
+  final bytes = <int>[];
+  var current = 0;
+  var bits = 0;
+  for (final code in codes) {
+    var value = code;
+    for (var bit = 0; bit < codeSize; bit += 1) {
+      current |= (value & 1) << bits;
+      value >>= 1;
+      bits += 1;
+      if (bits == 8) {
+        bytes.add(current);
+        current = 0;
+        bits = 0;
+      }
+    }
+  }
+  if (bits > 0) {
+    bytes.add(current);
+  }
+  return Uint8List.fromList(bytes);
 }
 
 final class _GifFrame {

@@ -17,6 +17,9 @@ Uint8List gifLzwEncode(List<int> indices, int minimumCodeSize) {
 
 /// Decodes GIF LZW image data into palette indices.
 List<int> gifLzwDecode(Uint8List data, int minimumCodeSize, int expected) {
+  if (minimumCodeSize < 2 || minimumCodeSize > 8) {
+    throw const InvalidImageException('Invalid GIF LZW minimum code size.');
+  }
   final reader = _BitReader(data);
   final clear = 1 << minimumCodeSize;
   final end = clear + 1;
@@ -37,9 +40,14 @@ List<int> gifLzwDecode(Uint8List data, int minimumCodeSize, int expected) {
     if (code == end) {
       break;
     }
-    final entry = code < dictionary.length && dictionary[code].isNotEmpty
-        ? dictionary[code]
-        : <int>[...previous, previous.first];
+    final List<int> entry;
+    if (code < dictionary.length && dictionary[code].isNotEmpty) {
+      entry = dictionary[code];
+    } else if (code == nextCode && previous.isNotEmpty) {
+      entry = <int>[...previous, previous.first];
+    } else {
+      throw const InvalidImageException('Invalid GIF LZW code.');
+    }
     output.addAll(entry);
     if (previous.isNotEmpty) {
       dictionary.add(<int>[...previous, entry.first]);

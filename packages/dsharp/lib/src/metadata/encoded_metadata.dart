@@ -242,7 +242,11 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
   final packed = bytes[10];
   var offset = 13;
   if ((packed & 0x80) != 0) {
-    offset += 3 * (1 << ((packed & 0x07) + 1));
+    final size = 3 * (1 << ((packed & 0x07) + 1));
+    if (offset + size > bytes.length) {
+      throw const InvalidImageException('Truncated GIF global color table.');
+    }
+    offset += size;
   }
   var frames = 0;
   var hasAlpha = false;
@@ -266,7 +270,11 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
       pendingDelay = Duration.zero;
       offset += 9;
       if ((imagePacked & 0x80) != 0) {
-        offset += 3 * (1 << ((imagePacked & 0x07) + 1));
+        final tableSize = 3 * (1 << ((imagePacked & 0x07) + 1));
+        if (offset + tableSize > bytes.length) {
+          throw const InvalidImageException('Truncated GIF local color table.');
+        }
+        offset += tableSize;
       }
       if (offset >= bytes.length) {
         throw const InvalidImageException('Truncated GIF image data.');

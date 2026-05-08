@@ -33,6 +33,9 @@ final class GifImageCodec implements ImageCodec {
     List<int>? globalPalette;
     if ((packed & 0x80) != 0) {
       final size = 3 * (1 << ((packed & 0x07) + 1));
+      if (offset + size > bytes.length) {
+        throw const InvalidImageException('Truncated GIF global color table.');
+      }
       globalPalette = bytes.sublist(offset, offset + size);
       offset += size;
     }
@@ -246,9 +249,32 @@ Duration? _combinedDelay(Duration? a, Duration? b) {
   int? loopCount,
 })
 _readExtension(Uint8List bytes, int offset, int loopCount) {
+  if (offset >= bytes.length) {
+    throw const InvalidImageException('Truncated GIF extension.');
+  }
   final label = bytes[offset++];
   if (label == 0xf9) {
+    if (offset >= bytes.length) {
+      throw const InvalidImageException(
+        'Truncated GIF graphic control extension.',
+      );
+    }
     final blockSize = bytes[offset++];
+    if (blockSize != 4) {
+      throw const InvalidImageException(
+        'Invalid GIF graphic control extension.',
+      );
+    }
+    if (offset + blockSize >= bytes.length) {
+      throw const InvalidImageException(
+        'Truncated GIF graphic control extension.',
+      );
+    }
+    if (bytes[offset + blockSize] != 0) {
+      throw const InvalidImageException(
+        'Invalid GIF graphic control extension.',
+      );
+    }
     final packed = bytes[offset];
     final delay = Duration(milliseconds: readUint16Le(bytes, offset + 1) * 10);
     final transparent = (packed & 1) != 0 ? bytes[offset + 3] : null;
@@ -290,6 +316,9 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   Duration delay,
   Uint8List canvas,
 ) {
+  if (offset + 9 > bytes.length) {
+    throw const InvalidImageException('Truncated GIF image descriptor.');
+  }
   final left = readUint16Le(bytes, offset);
   final top = readUint16Le(bytes, offset + 2);
   final width = readUint16Le(bytes, offset + 4);
@@ -300,6 +329,9 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   var palette = globalPalette;
   if ((packed & 0x80) != 0) {
     final size = 3 * (1 << ((packed & 0x07) + 1));
+    if (offset + size > bytes.length) {
+      throw const InvalidImageException('Truncated GIF local color table.');
+    }
     palette = bytes.sublist(offset, offset + size);
     offset += size;
   }
@@ -308,6 +340,9 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   }
   if (left + width > screenWidth || top + height > screenHeight) {
     throw const InvalidImageException('GIF frame exceeds logical screen.');
+  }
+  if (offset >= bytes.length) {
+    throw const InvalidImageException('Truncated GIF image data.');
   }
   final minCodeSize = bytes[offset++];
   final blocks = _readSubBlocks(bytes, offset);
@@ -320,6 +355,9 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
         continue;
       }
       final paletteOffset = index * 3;
+      if (paletteOffset + 2 >= palette.length) {
+        throw const InvalidImageException('GIF palette index out of range.');
+      }
       final target = ((top + row) * screenWidth + left + col) * 4;
       canvas[target] = palette[paletteOffset];
       canvas[target + 1] = palette[paletteOffset + 1];
@@ -371,9 +409,15 @@ void _disposeGifFrame(
 ({Uint8List bytes, int offset}) _readSubBlocks(Uint8List bytes, int offset) {
   final out = <int>[];
   while (true) {
+    if (offset >= bytes.length) {
+      throw const InvalidImageException('Truncated GIF data block.');
+    }
     final size = bytes[offset++];
     if (size == 0) {
       break;
+    }
+    if (offset + size > bytes.length) {
+      throw const InvalidImageException('Truncated GIF data block.');
     }
     out.addAll(bytes.sublist(offset, offset + size));
     offset += size;
