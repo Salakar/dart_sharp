@@ -17,9 +17,10 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
   WebP metadata, VP8L, VP8 lossy, alpha, and animation decoding are implemented
   for supported bitstreams.
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
-  alpha/channel operations, filters, convolution, color math, boolean ops,
-  compositing, tiling, frame-aware joins, EXIF auto-orient, encoded header
-  metadata reads with XMP/EXIF/ICC payloads, and stats.
+  alpha/channel operations, filters, convolution, color math, sRGB/b-w
+  colorspace conversion, boolean ops, compositing, tiling, frame-aware joins,
+  EXIF auto-orient, encoded header metadata reads with XMP/EXIF/ICC payloads,
+  and stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
   `toImageBytesResult`, format-specific chain methods, WebP animation loop and
   per-frame delay controls, `withMetadata`, and explicit/kept JPEG/PNG/WebP

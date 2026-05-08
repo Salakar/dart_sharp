@@ -30,6 +30,37 @@ void main() {
     },
   );
 
+  test('colourspace methods support sRGB and black-white aliases', () async {
+    final bw = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgb(2, 1, <int>[10, 20, 30, 40, 50, 60]),
+      ).toColourspace('b-w'),
+    );
+    final grey = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[40, 50, 60]),
+      ).pipelineColorspace('greyscale'),
+    );
+    final srgb = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).toColorspace('srgb'),
+    );
+
+    expect(bw.channels, ChannelCount.one);
+    expect(firstBytes(bw), <int>[18, 48]);
+    expect(grey.channels, ChannelCount.one);
+    expect(firstBytes(grey), <int>[48]);
+    expect(srgb.channels, ChannelCount.three);
+    expect(firstBytes(srgb), <int>[1, 2, 3]);
+    expect(
+      ImagePipeline.fromRawPixels(
+        rawRgb(1, 1, <int>[1, 2, 3]),
+      ).toColourspace('cmyk').toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
+
   test(
     'linear, tint, normalize, recomb, modulate, and clahe adjust colors',
     () async {

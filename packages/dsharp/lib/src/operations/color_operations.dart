@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import '../api/exceptions.dart';
 import '../pipeline/pipeline_operation.dart';
 import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
@@ -40,6 +41,29 @@ final class GrayscaleOperation implements PipelineOperation {
   }
 }
 
+/// Converts pixels to a supported output colourspace.
+final class ColourspaceOperation implements PipelineOperation {
+  /// Creates a colourspace conversion operation.
+  const ColourspaceOperation(this.colourspace, {required this.name});
+
+  /// Requested colourspace name.
+  final String colourspace;
+
+  @override
+  final String name;
+
+  @override
+  PixelImage apply(PixelImage image) {
+    return switch (_normalizeColourspace(colourspace)) {
+      'rgb' || 'srgb' => image,
+      'bw' => mapFrames(image, _toBlackAndWhite),
+      _ => throw OperationValidationException(
+        'Unsupported colourspace "$colourspace".',
+      ),
+    };
+  }
+}
+
 /// Negates pixel channels.
 final class NegateOperation implements PipelineOperation {
   /// Creates a negate operation.
@@ -65,6 +89,34 @@ final class NegateOperation implements PipelineOperation {
     }
     return sameSizeRaw(raw, output, raw.channels);
   }
+}
+
+String _normalizeColourspace(String colourspace) {
+  final normalized = colourspace.toLowerCase().replaceAll('_', '-');
+  return switch (normalized) {
+    'b-w' ||
+    'bw' ||
+    'black-white' ||
+    'grey' ||
+    'gray' ||
+    'greyscale' ||
+    'grayscale' => 'bw',
+    'rgb' || 'srgb' => normalized,
+    _ => normalized,
+  };
+}
+
+RawPixels _toBlackAndWhite(RawPixels raw) {
+  if (raw.channels == ChannelCount.one) {
+    return raw;
+  }
+  final input = raw.bytes;
+  final channels = raw.channels.value;
+  final output = Uint8List(raw.width * raw.height);
+  for (var i = 0, o = 0; i < input.length; i += channels, o += 1) {
+    output[o] = luminance(readColor(input, i, channels));
+  }
+  return sameSizeRaw(raw, output, ChannelCount.one);
 }
 
 /// Thresholds pixels.

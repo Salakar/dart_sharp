@@ -10,6 +10,28 @@ extension ImagePipelineColor on ImagePipeline {
   /// Converts pixels to greyscale.
   ImagePipeline greyscale() => grayscale();
 
+  /// Sets the pipeline colourspace for supported pure Dart colourspaces.
+  ImagePipeline pipelineColourspace([String colourspace = 'srgb']) {
+    return _append(
+      ColourspaceOperation(colourspace, name: 'pipelineColourspace'),
+    );
+  }
+
+  /// Sets the pipeline colorspace for supported pure Dart colorspaces.
+  ImagePipeline pipelineColorspace([String colorspace = 'srgb']) {
+    return pipelineColourspace(colorspace);
+  }
+
+  /// Converts output to a supported pure Dart colourspace.
+  ImagePipeline toColourspace([String colourspace = 'srgb']) {
+    return _append(ColourspaceOperation(colourspace, name: 'toColourspace'));
+  }
+
+  /// Converts output to a supported pure Dart colorspace.
+  ImagePipeline toColorspace([String colorspace = 'srgb']) {
+    return toColourspace(colorspace);
+  }
+
   /// Negates pixel channels.
   ImagePipeline negate({bool alpha = false}) {
     return _append(NegateOperation(negateAlpha: alpha));
