@@ -6,6 +6,7 @@ import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec.dart';
 import 'codec_pixels.dart';
+import 'deflate_codec.dart';
 import 'encoder_options.dart';
 import 'image_format.dart';
 import 'output.dart';
@@ -36,12 +37,19 @@ final class TiffImageCodec implements ImageCodec {
     final stripOffset = tags.value(273);
     final samples = tags.value(277, fallback: 1);
     final byteCount = tags.value(279);
-    if (compression != 1 || photometric == 3) {
+    if (photometric == 3) {
       throw const UnsupportedCodecException(
-        'Only uncompressed non-paletted TIFF is supported.',
+        'Paletted TIFF decoding is not implemented yet.',
       );
     }
-    final source = bytes.sublist(stripOffset, stripOffset + byteCount);
+    final strip = bytes.sublist(stripOffset, stripOffset + byteCount);
+    final source = switch (compression) {
+      1 => strip,
+      8 || 32946 => zlibDecode(Uint8List.fromList(strip)),
+      _ => throw const UnsupportedCodecException(
+        'Only uncompressed and deflate TIFF are supported.',
+      ),
+    };
     final rgba = _toRgba(source, width, height, samples, photometric);
     return PixelImage.fromRawPixels(
       RawPixels(
@@ -58,9 +66,10 @@ final class TiffImageCodec implements ImageCodec {
     final tiffOptions = options is TiffEncoderOptions
         ? options
         : const TiffEncoderOptions();
-    if (tiffOptions.compression != TiffCompression.none) {
+    if (tiffOptions.compression != TiffCompression.none &&
+        tiffOptions.compression != TiffCompression.deflate) {
       throw const UnsupportedCodecException(
-        'TIFF encoding currently supports uncompressed output only.',
+        'TIFF encoding currently supports uncompressed and deflate output only.',
       );
     }
     if (tiffOptions.bitDepth != 8) {
@@ -86,6 +95,12 @@ final class TiffImageCodec implements ImageCodec {
     final raw = image.firstFrame.pixels;
     final channels = raw.channels == ChannelCount.three ? 3 : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);
+    final encodedPixels = tiffOptions.compression == TiffCompression.deflate
+        ? zlibEncodeFixed(pixels)
+        : pixels;
+    final compressionTag = tiffOptions.compression == TiffCompression.deflate
+        ? 8
+        : 1;
     const entryCount = 10;
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
@@ -99,12 +114,12 @@ final class TiffImageCodec implements ImageCodec {
     _entry(writer, 256, 4, 1, raw.width);
     _entry(writer, 257, 4, 1, raw.height);
     _entry(writer, 258, 3, channels, bitsOffset);
-    _entry(writer, 259, 3, 1, 1);
+    _entry(writer, 259, 3, 1, compressionTag);
     _entry(writer, 262, 3, 1, 2);
     _entry(writer, 273, 4, 1, pixelOffset);
     _entry(writer, 277, 3, 1, channels);
     _entry(writer, 278, 4, 1, raw.height);
-    _entry(writer, 279, 4, 1, pixels.length);
+    _entry(writer, 279, 4, 1, encodedPixels.length);
     _entry(writer, 284, 3, 1, 1);
     writer.writeUint32Le(0);
     for (var i = 0; i < channels; i += 1) {
@@ -113,7 +128,7 @@ final class TiffImageCodec implements ImageCodec {
     if (channels == 4) {
       writer.writeUint16Le(2);
     }
-    writer.writeBytes(pixels);
+    writer.writeBytes(encodedPixels);
     final bytes = writer.toBytes();
     return EncodedImage(
       bytes: bytes,

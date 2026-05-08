@@ -412,6 +412,25 @@ void main() {
     expect(decoded.height, 1);
   });
 
+  test('tiff encoder deflate compression round trips pixels', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var i = 0; i < 16; i += 1) ...[i * 12, 255 - i * 12, i * 4, 255],
+      ]),
+      width: 4,
+      height: 4,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(const TiffEncoderOptions(compression: TiffCompression.deflate))
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 259), 8);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('webp codec encodes decodable VP8L bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
@@ -552,4 +571,27 @@ int _gifFirstImagePacked(Uint8List bytes) {
     }
   }
   throw StateError('GIF image descriptor not found.');
+}
+
+int _tiffShortTagValue(Uint8List bytes, int tag) {
+  final ifdOffset = _readUint32Le(bytes, 4);
+  final count = _readUint16Le(bytes, ifdOffset);
+  for (var i = 0; i < count; i += 1) {
+    final entry = ifdOffset + 2 + i * 12;
+    if (_readUint16Le(bytes, entry) == tag) {
+      return _readUint16Le(bytes, entry + 8);
+    }
+  }
+  throw StateError('TIFF tag $tag not found.');
+}
+
+int _readUint16Le(Uint8List bytes, int offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+int _readUint32Le(Uint8List bytes, int offset) {
+  return bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
 }
