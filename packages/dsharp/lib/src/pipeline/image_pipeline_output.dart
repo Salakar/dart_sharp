@@ -3,15 +3,16 @@ part of 'image_pipeline.dart';
 /// Output, cancellation, and metadata pipeline options.
 extension ImagePipelineOutput on ImagePipeline {
   /// Selects an output format.
-  ImagePipeline toFormat(ImageFormat format, {EncoderOptions? options}) {
-    if (options != null && options.format != format) {
+  ImagePipeline toFormat(Object format, {EncoderOptions? options}) {
+    final resolved = _resolveFormatArgument(format);
+    if (options != null && options.format != resolved) {
       throw const OperationValidationException(
         'Encoder options must match the requested output format.',
       );
     }
     return _copyPipelineWith(
       this,
-      outputFormat: format,
+      outputFormat: resolved,
       encoderOptions: options,
     );
   }
@@ -175,4 +176,34 @@ extension ImagePipelineOutput on ImagePipeline {
   ImagePipeline withXmp(String xmp) {
     return withXmpMetadata(XmpMetadata.parse(xmp));
   }
+}
+
+ImageFormat _resolveFormatArgument(Object format) {
+  if (format is ImageFormat) {
+    return format;
+  }
+  if (format is CodecSupport) {
+    return format.format;
+  }
+  if (format is String) {
+    return _resolveFormatId(format);
+  }
+  if (format is Map<Object?, Object?>) {
+    final id = format['id'];
+    if (id is String) {
+      return _resolveFormatId(id);
+    }
+  }
+  throw const OperationValidationException(
+    'Output format must be an ImageFormat, format id string, '
+    'CodecSupport, or map with an id string.',
+  );
+}
+
+ImageFormat _resolveFormatId(String id) {
+  final format = ImageFormat.fromId(id);
+  if (format != ImageFormat.unknown) {
+    return format;
+  }
+  throw OperationValidationException('Unsupported output format "$id".');
 }

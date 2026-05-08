@@ -55,7 +55,7 @@ enum ImageFormat {
   vips('v'),
 
   /// Deep zoom tile output.
-  deepZoom('dz'),
+  deepZoom('dz', aliases: ['deepzoom', 'tile']),
 
   /// Unknown or unsupported-by-name image format.
   unknown('unknown');
@@ -70,7 +70,7 @@ enum ImageFormat {
 
   /// Finds a known format by identifier or alias.
   static ImageFormat fromId(String id) {
-    final normalized = id.toLowerCase();
+    final normalized = id.trim().toLowerCase();
     for (final format in ImageFormat.values) {
       if (format.id == normalized || format.aliases.contains(normalized)) {
         return format;
