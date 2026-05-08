@@ -55,6 +55,34 @@ final class TiffImageCodec implements ImageCodec {
 
   @override
   EncodedImage encode(PixelImage image, {EncoderOptions? options}) {
+    final tiffOptions = options is TiffEncoderOptions
+        ? options
+        : const TiffEncoderOptions();
+    if (tiffOptions.compression != TiffCompression.none) {
+      throw const UnsupportedCodecException(
+        'TIFF encoding currently supports uncompressed output only.',
+      );
+    }
+    if (tiffOptions.bitDepth != 8) {
+      throw const UnsupportedCodecException(
+        'TIFF encoding currently supports 8-bit output only.',
+      );
+    }
+    if (tiffOptions.tile) {
+      throw const UnsupportedCodecException(
+        'Tiled TIFF encoding is not implemented yet.',
+      );
+    }
+    if (tiffOptions.pyramid) {
+      throw const UnsupportedCodecException(
+        'TIFF pyramid encoding is not implemented yet.',
+      );
+    }
+    if (tiffOptions.quality != 80) {
+      throw const UnsupportedCodecException(
+        'TIFF quality is only meaningful for compressed output.',
+      );
+    }
     final raw = image.firstFrame.pixels;
     final channels = raw.channels == ChannelCount.three ? 3 : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);

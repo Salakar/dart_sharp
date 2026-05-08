@@ -39,7 +39,14 @@ final class JpegEncoderOptions extends EncoderOptions {
   ImageFormat get format => ImageFormat.jpeg;
 
   @override
-  void validate() => _quality(quality);
+  void validate() {
+    _quality(quality);
+    if (chromaSubsampling != '4:2:0' && chromaSubsampling != '4:4:4') {
+      throw const OperationValidationException(
+        'JPEG chromaSubsampling must be 4:2:0 or 4:4:4.',
+      );
+    }
+  }
 }
 
 /// PNG encoder options.
@@ -133,7 +140,7 @@ final class TiffEncoderOptions extends EncoderOptions {
   /// Creates TIFF options.
   const TiffEncoderOptions({
     this.quality = 80,
-    this.compression = TiffCompression.jpeg,
+    this.compression = TiffCompression.none,
     this.bitDepth = 8,
     this.tile = false,
     this.pyramid = false,

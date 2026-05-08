@@ -138,6 +138,31 @@ void main() {
     expect(sniffImageFormat(high), ImageFormat.jpeg);
   });
 
+  test('jpeg encoder chromaSubsampling changes sampling factors', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        for (var y = 0; y < 16; y += 1)
+          for (var x = 0; x < 16; x += 1) ...[x * 16, y * 16, (x + y) * 8],
+      ]),
+      width: 16,
+      height: 16,
+      channels: ChannelCount.three,
+    );
+
+    final subsampled = await ImagePipeline.fromRawPixels(raw).jpeg().toBytes();
+    final full = await ImagePipeline.fromRawPixels(
+      raw,
+    ).jpeg(const JpegEncoderOptions(chromaSubsampling: '4:4:4')).toBytes();
+
+    expect(_jpegSofSampling(subsampled), <int>[0x22, 0x11, 0x11]);
+    expect(_jpegSofSampling(full), <int>[0x11, 0x11, 0x11]);
+    expect(
+      (await ImagePipeline.fromBytes(subsampled).toPixelImage()).width,
+      16,
+    );
+    expect((await ImagePipeline.fromBytes(full).toPixelImage()).height, 16);
+  });
+
   test('gif codec encodes decodable bytes', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
@@ -200,6 +225,49 @@ void main() {
     expect(decoded.frames[1].pixels.bytes, <int>[0, 0, 255, 255]);
   });
 
+  test('gif encoder removes duplicate frames unless kept', () async {
+    RawPixels pixel(List<int> bytes) {
+      return RawPixels(
+        bytes: Uint8List.fromList(bytes),
+        width: 1,
+        height: 1,
+        channels: ChannelCount.four,
+      );
+    }
+
+    final image = PixelImage(
+      frames: <ImageFrame>[
+        ImageFrame(
+          pixels: pixel(<int>[255, 0, 0, 255]),
+          delay: const Duration(milliseconds: 10),
+        ),
+        ImageFrame(
+          pixels: pixel(<int>[255, 0, 0, 255]),
+          delay: const Duration(milliseconds: 20),
+        ),
+        ImageFrame(
+          pixels: pixel(<int>[0, 0, 255, 255]),
+          delay: const Duration(milliseconds: 30),
+        ),
+      ],
+    );
+
+    final compact = await ImagePipeline.fromPixelImage(image).gif().toBytes();
+    final kept = await ImagePipeline.fromPixelImage(
+      image,
+    ).gif(const GifEncoderOptions(keepDuplicateFrames: true)).toBytes();
+
+    final compactDecoded = await ImagePipeline.fromBytes(
+      compact,
+    ).toPixelImage();
+    final keptDecoded = await ImagePipeline.fromBytes(kept).toPixelImage();
+
+    expect(compactDecoded.frames.length, 2);
+    expect(compactDecoded.frames[0].delay, const Duration(milliseconds: 30));
+    expect(compactDecoded.frames[1].delay, const Duration(milliseconds: 30));
+    expect(keptDecoded.frames.length, 3);
+  });
+
   test('gif encoder colors option limits palette size', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
@@ -236,6 +304,41 @@ void main() {
     };
 
     expect(colors.length, lessThanOrEqualTo(2));
+  });
+
+  test('png encoder palette option writes indexed png', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[
+        255,
+        0,
+        0,
+        255,
+        0,
+        255,
+        0,
+        255,
+        0,
+        0,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+      ]),
+      width: 4,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    final encoded = await ImagePipeline.fromRawPixels(
+      raw,
+    ).png(const PngEncoderOptions(palette: true)).toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_pngColorType(encoded), 3);
+    expect(_pngHasChunk(encoded, 'PLTE'), isTrue);
+    expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
   test('tiff codec encodes decodable bytes', () async {
@@ -317,4 +420,55 @@ void main() {
       throwsA(isA<UnsupportedCodecException>()),
     );
   });
+}
+
+List<int> _jpegSofSampling(Uint8List bytes) {
+  var offset = 2;
+  while (offset + 4 <= bytes.length) {
+    while (offset < bytes.length && bytes[offset] == 0xff) {
+      offset += 1;
+    }
+    if (offset >= bytes.length) {
+      break;
+    }
+    final marker = bytes[offset++];
+    if (marker == 0xd9 || marker == 0xda) {
+      break;
+    }
+    final length = (bytes[offset] << 8) | bytes[offset + 1];
+    if (marker == 0xc0) {
+      final dataStart = offset + 2;
+      final count = bytes[dataStart + 5];
+      final sampling = <int>[];
+      var componentOffset = dataStart + 6;
+      for (var i = 0; i < count; i += 1) {
+        sampling.add(bytes[componentOffset + 1]);
+        componentOffset += 3;
+      }
+      return sampling;
+    }
+    offset += length;
+  }
+  throw StateError('JPEG SOF0 segment not found.');
+}
+
+int _pngColorType(Uint8List bytes) => bytes[25];
+
+bool _pngHasChunk(Uint8List bytes, String type) {
+  var offset = 8;
+  while (offset + 12 <= bytes.length) {
+    final length =
+        (bytes[offset] << 24) |
+        (bytes[offset + 1] << 16) |
+        (bytes[offset + 2] << 8) |
+        bytes[offset + 3];
+    final chunkType = String.fromCharCodes(
+      bytes.sublist(offset + 4, offset + 8),
+    );
+    if (chunkType == type) {
+      return true;
+    }
+    offset += length + 12;
+  }
+  return false;
 }

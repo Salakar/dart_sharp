@@ -9,7 +9,11 @@ import 'jpeg_tables.dart';
 import 'jpeg_transform.dart';
 
 /// Encodes pixels as baseline sequential JPEG bytes.
-Uint8List encodeJpegBytes(RawPixels raw, {int quality = 80}) {
+Uint8List encodeJpegBytes(
+  RawPixels raw, {
+  int quality = 80,
+  String chromaSubsampling = '4:2:0',
+}) {
   final rgb = rawToRgb(raw);
   final lumaQuant = jpegScaledQuantTable(jpegStandardLumaQuant, quality);
   final chromaQuant = jpegScaledQuantTable(jpegStandardChromaQuant, quality);
@@ -19,12 +23,19 @@ Uint8List encodeJpegBytes(RawPixels raw, {int quality = 80}) {
   _segment(writer, 0xe0, _jfif());
   _segment(writer, 0xdb, _dqt(0, lumaQuant));
   _segment(writer, 0xdb, _dqt(1, chromaQuant));
-  _segment(writer, 0xc0, _sof(raw.width, raw.height));
+  _segment(writer, 0xc0, _sof(raw.width, raw.height, chromaSubsampling));
   _segment(writer, 0xc4, _dht(0, 0));
   _segment(writer, 0xc4, _dht(1, 0));
   _segment(writer, 0xda, _sos());
   writer.writeBytes(
-    _entropy(rgb, raw.width, raw.height, lumaQuant, chromaQuant),
+    _entropy(
+      rgb,
+      raw.width,
+      raw.height,
+      lumaQuant,
+      chromaQuant,
+      chromaSubsampling,
+    ),
   );
   writer
     ..writeByte(0xff)
@@ -33,6 +44,20 @@ Uint8List encodeJpegBytes(RawPixels raw, {int quality = 80}) {
 }
 
 Uint8List _entropy(
+  Uint8List rgb,
+  int width,
+  int height,
+  List<int> lumaQuant,
+  List<int> chromaQuant,
+  String chromaSubsampling,
+) {
+  if (chromaSubsampling == '4:2:0') {
+    return _entropy420(rgb, width, height, lumaQuant, chromaQuant);
+  }
+  return _entropy444(rgb, width, height, lumaQuant, chromaQuant);
+}
+
+Uint8List _entropy444(
   Uint8List rgb,
   int width,
   int height,
@@ -66,6 +91,47 @@ Uint8List _entropy(
   return bits.finish();
 }
 
+Uint8List _entropy420(
+  Uint8List rgb,
+  int width,
+  int height,
+  List<int> lumaQuant,
+  List<int> chromaQuant,
+) {
+  final bits = JpegBitWriter();
+  final predictors = List<int>.filled(3, 0);
+  final mcuCols = (width + 15) ~/ 16;
+  final mcuRows = (height + 15) ~/ 16;
+  for (var my = 0; my < mcuRows; my += 1) {
+    for (var mx = 0; mx < mcuCols; mx += 1) {
+      for (var vy = 0; vy < 2; vy += 1) {
+        for (var hx = 0; hx < 2; hx += 1) {
+          predictors[0] = _writeBlock(
+            bits,
+            jpegFdct(
+              _lumaBlock(rgb, width, height, mx * 2 + hx, my * 2 + vy),
+              lumaQuant,
+            ),
+            predictors[0],
+          );
+        }
+      }
+      final chroma = _chroma420Block(rgb, width, height, mx, my);
+      predictors[1] = _writeBlock(
+        bits,
+        jpegFdct(chroma[0], chromaQuant),
+        predictors[1],
+      );
+      predictors[2] = _writeBlock(
+        bits,
+        jpegFdct(chroma[1], chromaQuant),
+        predictors[2],
+      );
+    }
+  }
+  return bits.finish();
+}
+
 List<List<int>> _blockPlanes(
   Uint8List rgb,
   int width,
@@ -77,15 +143,10 @@ List<List<int>> _blockPlanes(
   final cb = List<int>.filled(64, 0);
   final cr = List<int>.filled(64, 0);
   for (var yy = 0; yy < 8; yy += 1) {
-    final py = (by * 8 + yy).clamp(0, height - 1).toInt();
+    final py = _clampIndex(by * 8 + yy, height - 1);
     for (var xx = 0; xx < 8; xx += 1) {
-      final px = (bx * 8 + xx).clamp(0, width - 1).toInt();
-      final source = (py * width + px) * 3;
-      final color = jpegRgbToYcbcr(
-        rgb[source],
-        rgb[source + 1],
-        rgb[source + 2],
-      );
+      final px = _clampIndex(bx * 8 + xx, width - 1);
+      final color = _ycbcrAt(rgb, width, px, py);
       final index = yy * 8 + xx;
       y[index] = color.y;
       cb[index] = color.cb;
@@ -93,6 +154,60 @@ List<List<int>> _blockPlanes(
     }
   }
   return <List<int>>[y, cb, cr];
+}
+
+List<int> _lumaBlock(Uint8List rgb, int width, int height, int bx, int by) {
+  final y = List<int>.filled(64, 0);
+  for (var yy = 0; yy < 8; yy += 1) {
+    final py = _clampIndex(by * 8 + yy, height - 1);
+    for (var xx = 0; xx < 8; xx += 1) {
+      final px = _clampIndex(bx * 8 + xx, width - 1);
+      y[yy * 8 + xx] = _ycbcrAt(rgb, width, px, py).y;
+    }
+  }
+  return y;
+}
+
+List<List<int>> _chroma420Block(
+  Uint8List rgb,
+  int width,
+  int height,
+  int mx,
+  int my,
+) {
+  final cb = List<int>.filled(64, 0);
+  final cr = List<int>.filled(64, 0);
+  for (var yy = 0; yy < 8; yy += 1) {
+    for (var xx = 0; xx < 8; xx += 1) {
+      var cbSum = 0;
+      var crSum = 0;
+      for (var dy = 0; dy < 2; dy += 1) {
+        final py = _clampIndex(my * 16 + yy * 2 + dy, height - 1);
+        for (var dx = 0; dx < 2; dx += 1) {
+          final px = _clampIndex(mx * 16 + xx * 2 + dx, width - 1);
+          final color = _ycbcrAt(rgb, width, px, py);
+          cbSum += color.cb;
+          crSum += color.cr;
+        }
+      }
+      final index = yy * 8 + xx;
+      cb[index] = (cbSum + 2) >> 2;
+      cr[index] = (crSum + 2) >> 2;
+    }
+  }
+  return <List<int>>[cb, cr];
+}
+
+({int y, int cb, int cr}) _ycbcrAt(Uint8List rgb, int width, int x, int y) {
+  final source = (y * width + x) * 3;
+  return jpegRgbToYcbcr(rgb[source], rgb[source + 1], rgb[source + 2]);
+}
+
+int _clampIndex(int value, int max) {
+  if (value < 0) {
+    return 0;
+  }
+  return value > max ? max : value;
 }
 
 int _writeBlock(JpegBitWriter bits, List<int> coeffs, int previousDc) {
@@ -150,14 +265,15 @@ Uint8List _dqt(int id, List<int> table) {
   return writer.toBytes();
 }
 
-Uint8List _sof(int width, int height) {
+Uint8List _sof(int width, int height, String chromaSubsampling) {
+  final ySampling = chromaSubsampling == '4:2:0' ? 0x22 : 0x11;
   return (ByteWriter()
         ..writeByte(8)
         ..writeUint16Be(height)
         ..writeUint16Be(width)
         ..writeByte(3)
         ..writeByte(1)
-        ..writeByte(0x11)
+        ..writeByte(ySampling)
         ..writeByte(0)
         ..writeByte(2)
         ..writeByte(0x11)

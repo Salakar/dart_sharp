@@ -9,6 +9,7 @@ import 'codec.dart';
 import 'codec_pixels.dart';
 import 'deflate_codec.dart';
 import 'encoder_options.dart';
+import 'gif_palette.dart';
 import 'image_format.dart';
 import 'output.dart';
 
@@ -102,8 +103,21 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
+    if (pngOptions.progressive) {
+      throw const UnsupportedCodecException(
+        'Progressive PNG encoding is not implemented yet.',
+      );
+    }
+    if (pngOptions.bitDepth != 8) {
+      throw const UnsupportedCodecException(
+        'PNG encoding currently supports 8-bit output only.',
+      );
+    }
     final raw = image.firstFrame.pixels;
     final rgba = rawToRgba(raw);
+    if (pngOptions.palette) {
+      return _encodePalettePng(raw.width, raw.height, rgba, pngOptions);
+    }
     final scanlines = ByteWriter();
     final rowLength = raw.width * 4;
     for (var y = 0; y < raw.height; y += 1) {
@@ -142,6 +156,47 @@ final class PngImageCodec implements ImageCodec {
     }
     return true;
   }
+}
+
+EncodedImage _encodePalettePng(
+  int width,
+  int height,
+  Uint8List rgba,
+  PngEncoderOptions options,
+) {
+  final palette = GifPalette.fromRgba(rgba);
+  final scanlines = ByteWriter();
+  for (var y = 0; y < height; y += 1) {
+    scanlines.writeByte(0);
+    scanlines.writeBytes(palette.indices.sublist(y * width, (y + 1) * width));
+  }
+  final writer = ByteWriter()..writeBytes(PngImageCodec._signature);
+  _writeChunk(writer, 'IHDR', _ihdr(width, height, colorType: 3));
+  _writeChunk(writer, 'PLTE', _pngPaletteBytes(palette));
+  final transparency = _pngTransparency(palette);
+  if (transparency != null) {
+    _writeChunk(writer, 'tRNS', transparency);
+  }
+  final data = scanlines.toBytes();
+  _writeChunk(
+    writer,
+    'IDAT',
+    options.compressionLevel == 0
+        ? zlibEncodeStored(data)
+        : zlibEncodeFixed(data),
+  );
+  _writeChunk(writer, 'IEND', Uint8List(0));
+  final bytes = writer.toBytes();
+  return EncodedImage(
+    bytes: bytes,
+    info: OutputInfo(
+      format: ImageFormat.png,
+      size: bytes.length,
+      width: width,
+      height: height,
+      channels: 4,
+    ),
+  );
 }
 
 Uint8List _decodeScanlines(
@@ -254,16 +309,33 @@ int _paeth(int left, int up, int upLeft) {
   return pb <= pc ? up : upLeft;
 }
 
-Uint8List _ihdr(int width, int height) {
+Uint8List _ihdr(int width, int height, {int colorType = 6}) {
   return (ByteWriter()
         ..writeUint32Be(width)
         ..writeUint32Be(height)
         ..writeByte(8)
-        ..writeByte(6)
+        ..writeByte(colorType)
         ..writeByte(0)
         ..writeByte(0)
         ..writeByte(0))
       .toBytes();
+}
+
+Uint8List _pngPaletteBytes(GifPalette palette) {
+  return Uint8List.fromList(palette.bytes.sublist(0, palette.size * 3));
+}
+
+Uint8List? _pngTransparency(GifPalette palette) {
+  final transparent = palette.transparentIndex;
+  if (transparent == null) {
+    return null;
+  }
+  final bytes = Uint8List(transparent + 1);
+  for (var i = 0; i < transparent; i += 1) {
+    bytes[i] = 255;
+  }
+  bytes[transparent] = 0;
+  return bytes;
 }
 
 void _writeChunk(ByteWriter writer, String type, Uint8List data) {

@@ -56,6 +56,12 @@ void main() {
     expect(
       ImagePipeline.fromRawPixels(
         raw(),
+      ).jpeg(const JpegEncoderOptions(chromaSubsampling: '4:2:2')).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
       ).png(const PngEncoderOptions(compressionLevel: 10)).toBytes(),
       throwsA(isA<OperationValidationException>()),
     );
@@ -71,6 +77,58 @@ void main() {
       ).webp(const WebpEncoderOptions(effort: 7)).toBytes(),
       throwsA(isA<OperationValidationException>()),
     );
+  });
+
+  test('unsupported encoder options fail only when selected', () async {
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).jpeg(const JpegEncoderOptions(progressive: true)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).png(const PngEncoderOptions(progressive: true)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).png(const PngEncoderOptions(bitDepth: 16)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).gif(const GifEncoderOptions(progressive: true)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(raw())
+          .tiff(const TiffEncoderOptions(compression: TiffCompression.lzw))
+          .toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).tiff(const TiffEncoderOptions(tile: true)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+    expect(
+      ImagePipeline.fromRawPixels(
+        raw(),
+      ).tiff(const TiffEncoderOptions(pyramid: true)).toBytes(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+
+    final pngBytes = await ImagePipeline.fromRawPixels(raw()).png().toBytes();
+    final kept = await ImagePipeline.fromBytes(pngBytes)
+        .jpeg(const JpegEncoderOptions(progressive: true, force: false))
+        .toBytesWithInfo();
+
+    expect(kept.info.format, ImageFormat.png);
   });
 
   test('force false keeps encoded input format when possible', () async {

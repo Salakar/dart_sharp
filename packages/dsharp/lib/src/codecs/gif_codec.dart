@@ -80,12 +80,15 @@ final class GifImageCodec implements ImageCodec {
     final gifOptions = options is GifEncoderOptions
         ? options
         : const GifEncoderOptions();
+    if (gifOptions.progressive) {
+      throw const UnsupportedCodecException(
+        'Interlaced GIF encoding is not implemented yet.',
+      );
+    }
     final raw = image.firstFrame.pixels;
-    final frameRgba = <Uint8List>[
-      for (final frame in image.frames) rawToRgba(frame.pixels),
-    ];
+    final frames = _framesForEncoding(image, gifOptions.keepDuplicateFrames);
     final palette = GifPalette.fromRgba(
-      Uint8List.fromList(<int>[for (final rgba in frameRgba) ...rgba]),
+      Uint8List.fromList(<int>[for (final frame in frames) ...frame.rgba]),
       maxColors: gifOptions.colors,
     );
     final minCodeSize = _minCodeSize(palette.size);
@@ -101,12 +104,11 @@ final class GifImageCodec implements ImageCodec {
       _writeLoopExtension(writer, image.loopCount!);
     }
     var indexOffset = 0;
-    for (var i = 0; i < image.frames.length; i += 1) {
-      final frame = image.frames[i];
-      final pixelCount = frame.width * frame.height;
+    for (final frame in frames) {
+      final pixelCount = frame.image.width * frame.image.height;
       _writeFrame(
         writer,
-        frame,
+        frame.image,
         GifPalette(
           palette.bytes,
           palette.indices.sublist(indexOffset, indexOffset + pixelCount),
@@ -128,11 +130,67 @@ final class GifImageCodec implements ImageCodec {
         width: raw.width,
         height: raw.height,
         channels: 4,
-        frames: image.frames.length,
+        frames: frames.length,
         loopCount: image.loopCount,
+        frameDelays: <Duration>[
+          for (final frame in frames)
+            if (frame.image.delay != null) frame.image.delay!,
+        ],
       ),
     );
   }
+}
+
+final class _GifFrameData {
+  _GifFrameData(this.image, this.rgba);
+
+  final ImageFrame image;
+  final Uint8List rgba;
+}
+
+List<_GifFrameData> _framesForEncoding(PixelImage image, bool keepDuplicates) {
+  final frames = <_GifFrameData>[];
+  for (final frame in image.frames) {
+    final data = _GifFrameData(frame, rawToRgba(frame.pixels));
+    if (!keepDuplicates &&
+        frames.isNotEmpty &&
+        _sameFramePixels(frames.last, data)) {
+      frames[frames.length - 1] = _GifFrameData(
+        ImageFrame(
+          pixels: frames.last.image.pixels,
+          delay: _combinedDelay(frames.last.image.delay, frame.delay),
+        ),
+        frames.last.rgba,
+      );
+    } else {
+      frames.add(data);
+    }
+  }
+  return frames;
+}
+
+bool _sameFramePixels(_GifFrameData a, _GifFrameData b) {
+  if (a.image.width != b.image.width ||
+      a.image.height != b.image.height ||
+      a.rgba.length != b.rgba.length) {
+    return false;
+  }
+  for (var i = 0; i < a.rgba.length; i += 1) {
+    if (a.rgba[i] != b.rgba[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Duration? _combinedDelay(Duration? a, Duration? b) {
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
+  return a + b;
 }
 
 ({int offset, Duration? delay, int? transparentIndex, int? loopCount})
@@ -183,6 +241,11 @@ _readExtension(Uint8List bytes, int offset, int loopCount) {
   final height = readUint16Le(bytes, offset + 6);
   final packed = bytes[offset + 8];
   offset += 9;
+  if ((packed & 0x40) != 0) {
+    throw const UnsupportedCodecException(
+      'Interlaced GIF decoding is not implemented yet.',
+    );
+  }
   var palette = globalPalette;
   if ((packed & 0x80) != 0) {
     final size = 3 * (1 << ((packed & 0x07) + 1));
