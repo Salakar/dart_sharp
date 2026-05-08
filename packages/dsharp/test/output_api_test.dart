@@ -39,6 +39,20 @@ void main() {
     );
   });
 
+  test('toBuffer aliases byte output APIs', () async {
+    final pipeline = ImagePipeline.fromRawPixels(raw()).png();
+    final bytes = await pipeline.toBytes();
+    final buffer = await pipeline.toBuffer();
+    final result = await pipeline.toBufferWithInfo();
+    final copy = result.bytes;
+    copy[0] ^= 0xff;
+
+    expect(buffer, orderedEquals(bytes));
+    expect(result.info.format, ImageFormat.png);
+    expect(result.info.size, result.bytes.length);
+    expect(result.bytes[0], isNot(copy[0]));
+  });
+
   test('explicit and chained output formats do not reset each other', () async {
     final pipeline = ImagePipeline.fromRawPixels(raw()).png();
     final png = await pipeline.toBytesWithInfo();

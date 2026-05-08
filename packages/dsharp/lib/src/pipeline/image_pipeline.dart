@@ -192,6 +192,19 @@ final class ImagePipeline {
     )).bytes;
   }
 
+  /// Encodes the processed image and returns bytes using sharp's method name.
+  Future<Uint8List> toBuffer({
+    ImageFormat? format,
+    CodecRegistry? registry,
+    CancellationToken? cancellationToken,
+  }) {
+    return toBytes(
+      format: format,
+      registry: registry,
+      cancellationToken: cancellationToken,
+    );
+  }
+
   /// Encodes the processed image and returns bytes plus metadata.
   Future<ImageBytesResult> toImageBytesResult({
     ImageFormat? format,
@@ -204,6 +217,20 @@ final class ImagePipeline {
       cancellationToken: cancellationToken,
     );
     return ImageBytesResult(bytes: encoded.bytes, info: encoded.info);
+  }
+
+  /// Encodes the processed image and returns bytes plus metadata using sharp's
+  /// method name.
+  Future<ImageBytesResult> toBufferWithInfo({
+    ImageFormat? format,
+    CodecRegistry? registry,
+    CancellationToken? cancellationToken,
+  }) {
+    return toImageBytesResult(
+      format: format,
+      registry: registry,
+      cancellationToken: cancellationToken,
+    );
   }
 
   /// Computes pixel statistics for the first decoded frame.
