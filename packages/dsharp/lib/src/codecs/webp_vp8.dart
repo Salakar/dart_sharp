@@ -283,10 +283,17 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
     frame.segmentation,
     macroblocks,
   );
+  final output = _scaleVp8Output(
+    planes.composeRgba(),
+    sourceWidth: header.width,
+    sourceHeight: header.height,
+    targetWidth: header.displayWidth,
+    targetHeight: header.displayHeight,
+  );
   return RawPixels(
-    bytes: planes.composeRgba(),
-    width: header.width,
-    height: header.height,
+    bytes: output,
+    width: header.displayWidth,
+    height: header.displayHeight,
     channels: ChannelCount.four,
   );
 }
@@ -314,12 +321,53 @@ _Vp8Header _readFrameHeader(Uint8List chunk) {
       10 + firstPartSize > chunk.length) {
     throw const InvalidImageException('Invalid VP8 key-frame header.');
   }
-  final width = readUint16Le(chunk, 6) & 0x3fff;
-  final height = readUint16Le(chunk, 8) & 0x3fff;
+  final widthAndScale = readUint16Le(chunk, 6);
+  final heightAndScale = readUint16Le(chunk, 8);
+  final width = widthAndScale & 0x3fff;
+  final height = heightAndScale & 0x3fff;
   if (width == 0 || height == 0) {
     throw const InvalidImageException('Invalid VP8 dimensions.');
   }
-  return _Vp8Header(width: width, height: height, firstPartSize: firstPartSize);
+  return _Vp8Header(
+    width: width,
+    height: height,
+    displayWidth: _scaledVp8Dimension(width, widthAndScale >> 14),
+    displayHeight: _scaledVp8Dimension(height, heightAndScale >> 14),
+    firstPartSize: firstPartSize,
+  );
+}
+
+Uint8List _scaleVp8Output(
+  Uint8List rgba, {
+  required int sourceWidth,
+  required int sourceHeight,
+  required int targetWidth,
+  required int targetHeight,
+}) {
+  if (sourceWidth == targetWidth && sourceHeight == targetHeight) {
+    return rgba;
+  }
+  final scaled = Uint8List(targetWidth * targetHeight * 4);
+  for (var y = 0; y < targetHeight; y += 1) {
+    final sourceY = (y * sourceHeight) ~/ targetHeight;
+    for (var x = 0; x < targetWidth; x += 1) {
+      final sourceX = (x * sourceWidth) ~/ targetWidth;
+      final sourceOffset = (sourceY * sourceWidth + sourceX) * 4;
+      final targetOffset = (y * targetWidth + x) * 4;
+      scaled.setRange(targetOffset, targetOffset + 4, rgba, sourceOffset);
+    }
+  }
+  return scaled;
+}
+
+int _scaledVp8Dimension(int dimension, int scale) {
+  return switch (scale) {
+    0 => dimension,
+    1 => ((dimension * 5) + 3) ~/ 4,
+    2 => ((dimension * 5) + 2) ~/ 3,
+    3 => dimension * 2,
+    _ => dimension,
+  };
 }
 
 _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
@@ -456,11 +504,15 @@ final class _Vp8Header {
   const _Vp8Header({
     required this.width,
     required this.height,
+    required this.displayWidth,
+    required this.displayHeight,
     required this.firstPartSize,
   });
 
   final int width;
   final int height;
+  final int displayWidth;
+  final int displayHeight;
   final int firstPartSize;
 }
 

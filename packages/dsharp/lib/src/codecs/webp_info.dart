@@ -321,14 +321,16 @@ WebpImageInfo _vp8Info(Uint8List data) {
       10 + firstPartSize > data.length) {
     throw const InvalidImageException('Invalid VP8 key-frame header.');
   }
-  final width = readUint16Le(data, 6) & 0x3fff;
-  final height = readUint16Le(data, 8) & 0x3fff;
+  final widthAndScale = readUint16Le(data, 6);
+  final heightAndScale = readUint16Le(data, 8);
+  final width = widthAndScale & 0x3fff;
+  final height = heightAndScale & 0x3fff;
   if (width == 0 || height == 0) {
     throw const InvalidImageException('Invalid VP8 dimensions.');
   }
   return WebpImageInfo(
-    width: width,
-    height: height,
+    width: _scaledVp8Dimension(width, widthAndScale >> 14),
+    height: _scaledVp8Dimension(height, heightAndScale >> 14),
     compression: WebpCompression.vp8,
     hasAlpha: false,
     hasProfile: false,
@@ -338,6 +340,16 @@ WebpImageInfo _vp8Info(Uint8List data) {
     loopCount: null,
     frames: const <WebpFrameInfo>[],
   );
+}
+
+int _scaledVp8Dimension(int dimension, int scale) {
+  return switch (scale) {
+    0 => dimension,
+    1 => ((dimension * 5) + 3) ~/ 4,
+    2 => ((dimension * 5) + 2) ~/ 3,
+    3 => dimension * 2,
+    _ => dimension,
+  };
 }
 
 WebpImageInfo _vp8lInfo(Uint8List data) {
