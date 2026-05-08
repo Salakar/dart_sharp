@@ -89,6 +89,39 @@ void main() {
     );
   });
 
+  test('rejects VP8X chunks that are not first', () async {
+    final imageBeforeVp8x = extendedSolidVp8Webp(width: 1, height: 1);
+    final alphaBeforeVp8x = alphaSolidVp8Webp(
+      width: 1,
+      height: 1,
+      alpha: <int>[127],
+    );
+    final cases = <Uint8List>[
+      Uint8List.fromList(<int>[
+        ...imageBeforeVp8x.sublist(0, 12),
+        ...imageBeforeVp8x.sublist(30),
+        ...imageBeforeVp8x.sublist(12, 30),
+      ]),
+      Uint8List.fromList(<int>[
+        ...alphaBeforeVp8x.sublist(0, 12),
+        ...alphaBeforeVp8x.sublist(30, 40),
+        ...alphaBeforeVp8x.sublist(12, 30),
+        ...alphaBeforeVp8x.sublist(40),
+      ]),
+    ];
+
+    for (final bytes in cases) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;

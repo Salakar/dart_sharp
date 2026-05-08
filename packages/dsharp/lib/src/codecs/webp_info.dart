@@ -150,6 +150,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       if (hasVp8x) {
         throw const InvalidImageException('WebP has multiple VP8X chunks.');
       }
+      if (offset != 12) {
+        throw const InvalidImageException('WebP VP8X chunk must be first.');
+      }
       hasVp8x = true;
       info = _vp8xInfo(data);
     } else if (type == 'ALPH') {
