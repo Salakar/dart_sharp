@@ -44,6 +44,8 @@ List<List<_Vp8ChromaAc>> _lossyChromaAcBlocks(
     build(_lossyChromaThirdHorizontalAcBlock),
     build(_lossyChromaSecondHorizontalVerticalAcBlock),
     build(_lossyChromaHorizontalSecondVerticalAcBlock),
+    build(_lossyChromaThirdVerticalAcBlock),
+    build(_lossyChromaHorizontalThirdVerticalAcBlock),
   ];
 }
 
@@ -330,6 +332,31 @@ _Vp8ChromaAc _lossyChromaHorizontalSecondVerticalAcBlock(
   );
 }
 
+_Vp8ChromaAc _lossyChromaHorizontalThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  return _lossyChromaMixedAcBlock(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    mbX: mbX,
+    mbY: mbY,
+    block: block,
+    positive: (sampleX, sampleY) {
+      final isLeft = sampleX < 2;
+      return isLeft == sampleY.isEven;
+    },
+    scale: 2,
+  );
+}
+
 _Vp8ChromaAc _lossyChromaVerticalAcBlock(
   Uint8List rgba, {
   required int width,
@@ -385,6 +412,84 @@ _Vp8ChromaAc _lossyChromaVerticalAcBlock(
   return _Vp8ChromaAc(
     u: _clampDctCoefficient(((topUAverage - bottomUAverage) * 3) ~/ 4),
     v: _clampDctCoefficient(((topVAverage - bottomVAverage) * 3) ~/ 4),
+  );
+}
+
+_Vp8ChromaAc _lossyChromaThirdVerticalAcBlock(
+  Uint8List rgba, {
+  required int width,
+  required int height,
+  required int quality,
+  required int mbX,
+  required int mbY,
+  required int block,
+}) {
+  final blockX = block & 1;
+  final blockY = block >> 1;
+  final xStart = mbX * 16 + blockX * 8;
+  final yStart = mbY * 16 + blockY * 8;
+  if (xStart >= width || yStart >= height) {
+    return const _Vp8ChromaAc(u: 0, v: 0);
+  }
+  var evenU = 0;
+  var evenV = 0;
+  var oddU = 0;
+  var oddV = 0;
+  var evenPixels = 0;
+  var oddPixels = 0;
+  var row0Pixels = 0;
+  var row1Pixels = 0;
+  var row2Pixels = 0;
+  var row3Pixels = 0;
+  final xEnd = xStart + 8 < width ? xStart + 8 : width;
+  final yEnd = yStart + 8 < height ? yStart + 8 : height;
+  for (var y = yStart; y < yEnd; y += 1) {
+    var offset = (y * width + xStart) * 4;
+    for (var x = xStart; x < xEnd; x += 1) {
+      final color = _rgbToVp8Yuv(
+        _quantizeLossyColor(
+          _Rgb(rgba[offset], rgba[offset + 1], rgba[offset + 2]),
+          quality,
+        ),
+      );
+      final sampleY = (y - yStart) >> 1;
+      if (sampleY == 0) {
+        evenU += color.u;
+        evenV += color.v;
+        evenPixels += 1;
+        row0Pixels += 1;
+      } else if (sampleY == 1) {
+        oddU += color.u;
+        oddV += color.v;
+        oddPixels += 1;
+        row1Pixels += 1;
+      } else if (sampleY == 2) {
+        evenU += color.u;
+        evenV += color.v;
+        evenPixels += 1;
+        row2Pixels += 1;
+      } else if (sampleY == 3) {
+        oddU += color.u;
+        oddV += color.v;
+        oddPixels += 1;
+        row3Pixels += 1;
+      }
+      offset += 4;
+    }
+  }
+  if (row0Pixels == 0 ||
+      row1Pixels == 0 ||
+      row2Pixels == 0 ||
+      row3Pixels == 0) {
+    return const _Vp8ChromaAc(u: 0, v: 0);
+  }
+  final evenUAverage = (evenU + evenPixels ~/ 2) ~/ evenPixels;
+  final evenVAverage = (evenV + evenPixels ~/ 2) ~/ evenPixels;
+  final oddUAverage = (oddU + oddPixels ~/ 2) ~/ oddPixels;
+  final oddVAverage = (oddV + oddPixels ~/ 2) ~/ oddPixels;
+  return _Vp8ChromaAc(
+    u: _clampDctCoefficient(evenUAverage - oddUAverage),
+    v: _clampDctCoefficient(evenVAverage - oddVAverage),
   );
 }
 
