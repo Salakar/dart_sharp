@@ -19,7 +19,7 @@ Use `package:dsharp/dsharp.dart` on VM and web. Use
 - Operations: resize, extract, extend, trim, flip, flop, rotate, affine,
   alpha/channel operations, filters, convolution, color math, boolean ops,
   compositing, tiling, frame-aware joins, EXIF auto-orient, encoded header
-  metadata reads, and stats.
+  metadata reads with XMP/EXIF/ICC payloads, and stats.
 - Output: typed encoder options, `toBytes`, `toBytesWithInfo`,
   `toImageBytesResult`, format-specific chain methods, WebP animation loop and
   per-frame delay controls, `withMetadata`, explicit/kept JPEG/PNG/WebP XMP,

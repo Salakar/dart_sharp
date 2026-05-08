@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dsharp/dsharp.dart';
 import 'package:dsharp/src/codecs/binary_io.dart';
+import 'package:dsharp/src/codecs/deflate_codec.dart';
 import 'package:test/test.dart';
 
 import 'helpers/webp_lossless_fixture.dart';
@@ -21,6 +22,12 @@ void main() {
     expect(metadata.bitDepth, 16);
     expect(metadata.density, closeTo(300, 0.05));
     expect(metadata.hasProfile, isTrue);
+    expect(metadata.iccProfile, <int>[1, 2, 3]);
+    expect(metadata.hasExif, isTrue);
+    expect(metadata.exif, isNotNull);
+    expect(metadata.orientation, 6);
+    expect(metadata.hasXmp, isTrue);
+    expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.isProgressive, isTrue);
   });
 
@@ -37,8 +44,11 @@ void main() {
     expect(metadata.density, 72);
     expect(metadata.orientation, 6);
     expect(metadata.hasProfile, isTrue);
+    expect(metadata.iccProfile, <int>[0]);
     expect(metadata.hasExif, isTrue);
+    expect(metadata.exif, isNotNull);
     expect(metadata.hasXmp, isTrue);
+    expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.isProgressive, isTrue);
   });
 
@@ -99,9 +109,26 @@ void main() {
     expect(metadata.width, 3);
     expect(metadata.height, 2);
     expect(metadata.hasProfile, isTrue);
+    expect(metadata.iccProfile, <int>[1, 2, 3, 4]);
     expect(metadata.hasExif, isTrue);
+    expect(metadata.exif, isNotNull);
     expect(metadata.hasXmp, isTrue);
+    expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.orientation, 6);
+  });
+
+  test('metadata payload byte getters are defensive', () async {
+    final metadata = await ImagePipeline.fromBytes(
+      _webpMetadataBytes(),
+    ).metadata();
+    final profile = metadata.iccProfile!;
+    final exif = metadata.exif!;
+
+    profile[0] = 99;
+    exif[0] = 99;
+
+    expect(metadata.iccProfile, <int>[1, 2, 3, 4]);
+    expect(metadata.exif![0], isNot(99));
   });
 
   test('rejects WebP metadata without image payload', () async {
@@ -200,7 +227,22 @@ Uint8List _pngMetadataBytes() {
     ..writeBytes(<int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   _pngChunk(writer, 'IHDR', <int>[0, 0, 0, 3, 0, 0, 0, 2, 16, 6, 0, 0, 1]);
   _pngChunk(writer, 'pHYs', <int>[0, 0, 0x2e, 0x23, 0, 0, 0x2e, 0x23, 1]);
-  _pngChunk(writer, 'iCCP', <int>[...ascii.encode('test'), 0, 0, 1, 2, 3]);
+  _pngChunk(writer, 'iCCP', <int>[
+    ...ascii.encode('test'),
+    0,
+    0,
+    ...zlibEncodeStored(Uint8List.fromList(<int>[1, 2, 3])),
+  ]);
+  _pngChunk(writer, 'eXIf', _exifOrientation(6).sublist(6));
+  _pngChunk(writer, 'iTXt', <int>[
+    ...ascii.encode('XML:com.adobe.xmp'),
+    0,
+    0,
+    0,
+    0,
+    0,
+    ...utf8.encode('<x:xmpmeta />'),
+  ]);
   _pngChunk(writer, 'IEND', const <int>[]);
   return writer.toBytes();
 }

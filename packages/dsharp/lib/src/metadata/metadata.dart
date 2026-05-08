@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import '../codecs/image_format.dart';
 import '../pixels/pixel_image.dart';
+import 'xmp_metadata.dart';
 
 /// Basic metadata for an image or decoded pixel buffer.
 final class ImageMetadata {
@@ -15,13 +18,20 @@ final class ImageMetadata {
     this.pageHeight,
     this.loopCount,
     this.density,
-    this.hasProfile = false,
-    this.hasExif = false,
-    this.hasXmp = false,
+    bool hasProfile = false,
+    bool hasExif = false,
+    bool hasXmp = false,
+    Uint8List? iccProfile,
+    Uint8List? exif,
+    this.xmp,
     this.bitDepth,
     this.orientation,
     this.isProgressive = false,
-  });
+  }) : _iccProfile = iccProfile,
+       _exif = exif,
+       hasProfile = hasProfile || iccProfile != null,
+       hasExif = hasExif || exif != null,
+       hasXmp = hasXmp || xmp != null;
 
   /// Encoded or source format.
   final ImageFormat format;
@@ -56,11 +66,27 @@ final class ImageMetadata {
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;
 
+  final Uint8List? _iccProfile;
+
+  /// Embedded ICC profile bytes when present and parsed.
+  Uint8List? get iccProfile => _copyBytes(_iccProfile);
+
   /// Whether EXIF metadata is present.
   final bool hasExif;
 
+  final Uint8List? _exif;
+
+  /// Embedded EXIF bytes when present and parsed.
+  Uint8List? get exif => _copyBytes(_exif);
+
   /// Whether XMP metadata is present.
   final bool hasXmp;
+
+  /// Embedded XMP metadata when present and parsed.
+  final XmpMetadata? xmp;
+
+  /// Embedded XMP metadata as text when present and parsed.
+  String? get xmpAsString => xmp?.xmlText;
 
   /// Encoded bits per sample when known.
   final int? bitDepth;
@@ -90,4 +116,8 @@ final class ImageMetadata {
       bitDepth: 8,
     );
   }
+}
+
+Uint8List? _copyBytes(Uint8List? bytes) {
+  return bytes == null ? null : Uint8List.fromList(bytes);
 }

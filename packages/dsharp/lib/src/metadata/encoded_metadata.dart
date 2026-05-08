@@ -5,6 +5,7 @@ import '../codecs/binary_io.dart';
 import '../codecs/image_format.dart';
 import '../codecs/webp_info.dart';
 import '../source/input_options.dart';
+import 'encoded_metadata_payloads.dart';
 import 'metadata.dart';
 
 /// Reads container metadata without decoding pixels when that is safe.
@@ -93,6 +94,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
       'Unsupported PNG colour type or bit depth.',
     );
   }
+  final payloads = readEncodedMetadataPayloads(bytes, ImageFormat.png);
   final channels = switch (colorType) {
     0 => 1,
     2 || 3 => hasTransparency ? 4 : 3,
@@ -113,6 +115,9 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,
+    iccProfile: payloads.iccProfile,
+    exif: payloads.exif,
+    xmp: payloads.xmp,
     bitDepth: bitDepth,
     orientation: orientation,
     isProgressive: interlace == 1,
@@ -203,6 +208,7 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     throw const InvalidImageException('JPEG missing frame header.');
   }
   _checkMetadataLimits(parsed.width, parsed.height);
+  final payloads = readEncodedMetadataPayloads(bytes, ImageFormat.jpeg);
   return ImageMetadata(
     format: ImageFormat.jpeg,
     size: bytes.length,
@@ -214,6 +220,9 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,
+    iccProfile: payloads.iccProfile,
+    exif: payloads.exif,
+    xmp: payloads.xmp,
     bitDepth: parsed.precision,
     orientation: orientation,
     isProgressive: parsed.progressive,
@@ -317,7 +326,7 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
   final info = readWebpInfo(bytes);
   final frames = info.frames.isEmpty ? 1 : info.frames.length;
   _checkMetadataLimits(info.width, info.height, frames: frames);
-  final exif = _webpChunk(bytes, 'EXIF');
+  final payloads = readEncodedMetadataPayloads(bytes, ImageFormat.webp);
   return ImageMetadata(
     format: ImageFormat.webp,
     size: bytes.length,
@@ -330,27 +339,14 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
     hasProfile: info.hasProfile,
     hasExif: info.hasExif,
     hasXmp: info.hasXmp,
+    iccProfile: payloads.iccProfile,
+    exif: payloads.exif,
+    xmp: payloads.xmp,
     bitDepth: 8,
-    orientation: exif == null ? null : _exifOrientation(exif),
+    orientation: payloads.exif == null
+        ? null
+        : _exifOrientation(payloads.exif!),
   );
-}
-
-Uint8List? _webpChunk(Uint8List bytes, String target) {
-  var offset = 12;
-  while (offset + 8 <= bytes.length) {
-    final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
-    final length = readUint32Le(bytes, offset + 4);
-    final start = offset + 8;
-    final end = start + length;
-    if (end > bytes.length) {
-      throw const InvalidImageException('Truncated WebP chunk.');
-    }
-    if (type == target) {
-      return bytes.sublist(start, end);
-    }
-    offset = end + (length.isOdd ? 1 : 0);
-  }
-  return null;
 }
 
 ImageMetadata _tiffMetadata(Uint8List bytes) {
