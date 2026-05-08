@@ -76,11 +76,18 @@ Uint8List _encodeVp8SolidFromRgba(
     quality: quality,
     macroblockColors: colors,
   );
+  final chromaBlocks = _lossyChromaBlocks(
+    rgba,
+    width: width,
+    height: height,
+    quality: quality,
+    macroblockColors: colors,
+  );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
-    colors: colors,
     lumaBlocks: lumaBlocks,
+    chromaBlocks: chromaBlocks,
   );
 }
 
@@ -153,8 +160,8 @@ bool _hasLossyAnimationAlpha(PixelImage image) {
 Uint8List _encodeVp8SolidPayload({
   required int width,
   required int height,
-  required List<_Vp8Yuv> colors,
   required List<int> lumaBlocks,
+  required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
@@ -189,7 +196,6 @@ Uint8List _encodeVp8SolidPayload({
   for (var mbY = 0; mbY < mbRows; mbY += 1) {
     contexts.resetLeft();
     for (var mbX = 0; mbX < mbCols; mbX += 1) {
-      final color = colors[mbY * mbCols + mbX];
       for (var block = 0; block < 16; block += 1) {
         final target = lumaBlocks[(mbY * mbCols + mbX) * 16 + block];
         _writeLumaDc(
@@ -201,38 +207,38 @@ Uint8List _encodeVp8SolidPayload({
               2,
         );
       }
+      final predictedU = _predictedChromaDc(
+        chromaBlocks,
+        mbCols,
+        mbX,
+        mbY,
+        (c) => c.u,
+      );
+      final predictedV = _predictedChromaDc(
+        chromaBlocks,
+        mbCols,
+        mbX,
+        mbY,
+        (c) => c.v,
+      );
       for (var block = 0; block < 4; block += 1) {
+        final chroma = chromaBlocks[(mbY * mbCols + mbX) * 4 + block];
         _writeChromaDc(
           coeffs,
           contexts,
           mbX,
           16 + block,
-          (color.u -
-                  _predictedMacroblockDc(
-                    colors,
-                    mbCols,
-                    mbX,
-                    mbY,
-                    (c) => c.u,
-                  )) *
-              2,
+          (chroma.u - predictedU) * 2,
         );
       }
       for (var block = 0; block < 4; block += 1) {
+        final chroma = chromaBlocks[(mbY * mbCols + mbX) * 4 + block];
         _writeChromaDc(
           coeffs,
           contexts,
           mbX,
           20 + block,
-          (color.v -
-                  _predictedMacroblockDc(
-                    colors,
-                    mbCols,
-                    mbX,
-                    mbY,
-                    (c) => c.v,
-                  )) *
-              2,
+          (chroma.v - predictedV) * 2,
         );
       }
     }

@@ -170,6 +170,34 @@ void main() {
     },
   );
 
+  test(
+    'WebP lossy encoder preserves chroma blocks within one macroblock',
+    () async {
+      final bytes = <int>[
+        for (var row = 0; row < 8; row += 1)
+          for (var col = 0; col < 16; col += 1)
+            if (col < 8) ...<int>[255, 0, 0, 255] else ...<int>[0, 0, 255, 255],
+      ];
+      final raw = RawPixels(
+        bytes: Uint8List.fromList(bytes),
+        width: 16,
+        height: 8,
+        channels: ChannelCount.four,
+      );
+
+      final decoded = await ImagePipeline.fromRawPixels(raw)
+          .webp(const WebpEncoderOptions(lossless: false, quality: 100))
+          .toBytes()
+          .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
+      final pixels = decoded.firstFrameBytes();
+
+      expect(pixels[0], greaterThan(180));
+      expect(pixels[2], lessThan(80));
+      expect(pixels[15 * 4], lessThan(80));
+      expect(pixels[15 * 4 + 2], greaterThan(180));
+    },
+  );
+
   test('WebP lossy encoder writes animated VP8 frames', () async {
     final encoded = await ImagePipeline.fromPixelImage(_animation(loopCount: 2))
         .webp(
