@@ -156,6 +156,11 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       if (hasAlphaChunk) {
         throw const InvalidImageException('WebP has multiple ALPH chunks.');
       }
+      if (imageChunkCount > 0) {
+        throw const InvalidImageException(
+          'WebP ALPH chunk follows image data.',
+        );
+      }
       hasAlphaChunk = true;
     } else if (type == 'ICCP') {
       if (hasProfileChunk) {
@@ -391,6 +396,11 @@ _framePayloadInfo(Uint8List bytes, {required int start}) {
       if (hasAlpha) {
         throw const InvalidImageException(
           'WebP animation frame has multiple ALPH chunks.',
+        );
+      }
+      if (imageChunkCount > 0) {
+        throw const InvalidImageException(
+          'WebP animation frame ALPH chunk follows image data.',
         );
       }
       hasAlpha = true;

@@ -53,6 +53,42 @@ void main() {
     }
   });
 
+  test('rejects static ALPH chunks after VP8 image data', () async {
+    final ordered = alphaSolidVp8Webp(width: 1, height: 1, alpha: <int>[127]);
+    final reordered = Uint8List.fromList(<int>[
+      ...ordered.sublist(0, 30),
+      ...ordered.sublist(40),
+      ...ordered.sublist(30, 40),
+    ]);
+
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects animation frame ALPH chunks after VP8 image data', () async {
+    final ordered = animatedVp8Webp(width: 1, height: 1, alpha: <int>[127]);
+    final reordered = Uint8List.fromList(<int>[
+      ...ordered.sublist(0, 68),
+      ...ordered.sublist(78),
+      ...ordered.sublist(68, 78),
+    ]);
+
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(reordered).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects extended VP8 WebP with mismatched canvas dimensions', () async {
     final bytes = extendedSolidVp8Webp(width: 1, height: 1);
     bytes[24] = 1;
