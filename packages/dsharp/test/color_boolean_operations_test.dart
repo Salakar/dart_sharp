@@ -9,6 +9,12 @@ void main() {
     () async {
       final raw = rawRgba(1, 1, <int>[10, 20, 30, 77]);
       final gray = await pixels(ImagePipeline.fromRawPixels(raw).greyscale());
+      final grayDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw).grayscale(false),
+      );
+      final greyDisabled = await pixels(
+        ImagePipeline.fromRawPixels(raw).greyscale(false),
+      );
       final negated = await pixels(ImagePipeline.fromRawPixels(raw).negate());
       final threshold = await pixels(
         ImagePipeline.fromRawPixels(raw).threshold(20),
@@ -23,6 +29,12 @@ void main() {
       );
 
       expect(firstBytes(gray), <int>[18, 18, 18, 77]);
+      expect(firstBytes(grayDisabled), <int>[10, 20, 30, 77]);
+      expect(firstBytes(greyDisabled), <int>[10, 20, 30, 77]);
+      expect(
+        ImagePipeline.fromRawPixels(raw).grayscale(false).operations,
+        isEmpty,
+      );
       expect(firstBytes(negated), <int>[245, 235, 225, 77]);
       expect(firstBytes(threshold), <int>[0, 0, 0, 77]);
       expect(firstBytes(colorThreshold), <int>[0, 255, 255, 77]);

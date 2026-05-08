@@ -2,13 +2,13 @@ part of 'image_pipeline.dart';
 
 /// Color math pipeline operations.
 extension ImagePipelineColor on ImagePipeline {
-  /// Converts pixels to grayscale.
-  ImagePipeline grayscale() {
-    return _append(const GrayscaleOperation());
+  /// Converts pixels to grayscale when [grayscale] is true.
+  ImagePipeline grayscale([bool grayscale = true]) {
+    return grayscale ? _append(const GrayscaleOperation()) : this;
   }
 
-  /// Converts pixels to greyscale.
-  ImagePipeline greyscale() => grayscale();
+  /// Converts pixels to greyscale when [greyscale] is true.
+  ImagePipeline greyscale([bool greyscale = true]) => grayscale(greyscale);
 
   /// Sets the pipeline colourspace for supported pure Dart colourspaces.
   ImagePipeline pipelineColourspace([String colourspace = 'srgb']) {
