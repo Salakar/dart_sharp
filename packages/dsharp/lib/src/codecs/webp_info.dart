@@ -181,7 +181,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     if (frames.isEmpty) {
       throw const InvalidImageException('WebP animation has no frames.');
     }
-  } else if (frames.isNotEmpty) {
+  } else if (hasAnimationHeader || frames.isNotEmpty) {
     throw const InvalidImageException('WebP animation flag is not set.');
   }
   for (final frame in frames) {

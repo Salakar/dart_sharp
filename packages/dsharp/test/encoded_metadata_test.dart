@@ -167,6 +167,19 @@ void main() {
     );
   });
 
+  test('rejects WebP ANIM chunks without animation flag', () async {
+    final bytes = _webpAnimHeaderWithoutFlagBytes();
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects malformed WebP frame metadata chunks', () async {
     await expectLater(
       ImagePipeline.fromBytes(_truncatedWebpAnmfBytes()).metadata(),
@@ -357,6 +370,29 @@ Uint8List _truncatedWebpAnimBytes() {
   _riffChunk(content, 'ANIM', <int>[0, 0, 0, 0, 1]);
   final vp8l = ByteWriter()..writeByte(0x2f);
   vp8l.writeUint32Le(0);
+  _riffChunk(content, 'VP8L', vp8l.toBytes());
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+Uint8List _webpAnimHeaderWithoutFlagBytes() {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, 0);
+  _writeUint24Le(content, 0);
+  _riffChunk(content, 'ANIM', <int>[0, 0, 0, 0, 1, 0]);
+  final vp8l = ByteWriter()
+    ..writeByte(0x2f)
+    ..writeUint32Le(0);
   _riffChunk(content, 'VP8L', vp8l.toBytes());
   final writer = ByteWriter()
     ..writeAscii('RIFF')
