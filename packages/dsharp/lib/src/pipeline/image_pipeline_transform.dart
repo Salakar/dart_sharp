@@ -13,8 +13,24 @@ extension ImagePipelineTransform on ImagePipeline {
   }
 
   /// Rotates by [degrees], or auto-orients when no angle is provided.
-  ImagePipeline rotate([int? degrees]) {
-    return degrees == null ? autoOrient() : _append(RotateOperation(degrees));
+  ImagePipeline rotate([Object? degrees, Object? options]) {
+    if (degrees == null) {
+      return autoOrient();
+    }
+    final angle = switch (degrees) {
+      final num value => value,
+      _ => throw const OperationValidationException(
+        'Rotate angle must be numeric.',
+      ),
+    };
+    final rotateOptions = switch (options) {
+      null => const RotateOptions(),
+      final RotateOptions value => value,
+      _ => throw const OperationValidationException(
+        'Rotate options must be RotateOptions.',
+      ),
+    };
+    return _append(RotateOperation(angle, rotateOptions));
   }
 
   /// Adds a metadata-driven auto-orient hook.

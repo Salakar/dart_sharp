@@ -253,6 +253,15 @@ final class AffineTransformOptions {
   final double ody;
 }
 
+/// Options for arbitrary-angle rotation.
+final class RotateOptions {
+  /// Creates rotate options.
+  const RotateOptions({this.background = RgbaColor.black});
+
+  /// Background color used for exposed pixels.
+  final RgbaColor background;
+}
+
 void _validateRange(String label, num value, num min, num max) {
   if (value < min || value > max) {
     throw OperationValidationException('$label must be between $min and $max.');

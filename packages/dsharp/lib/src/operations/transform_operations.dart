@@ -5,6 +5,7 @@ import '../pipeline/pipeline_operation.dart';
 import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
+import 'operation_options.dart';
 import 'pixel_helpers.dart';
 
 /// Flips image vertically.
@@ -58,13 +59,16 @@ final class FlopOperation implements PipelineOperation {
   }
 }
 
-/// Rotates by a multiple of 90 degrees.
+/// Rotates by an angle in degrees.
 final class RotateOperation implements PipelineOperation {
   /// Creates a rotate operation.
-  const RotateOperation(this.degrees);
+  const RotateOperation(this.degrees, [this.options = const RotateOptions()]);
 
   /// Degrees clockwise.
-  final int degrees;
+  final num degrees;
+
+  /// Options.
+  final RotateOptions options;
 
   @override
   String get name => 'rotate';
@@ -76,9 +80,12 @@ final class RotateOperation implements PipelineOperation {
       return image;
     }
     if (normalized % 90 == 0) {
-      return mapFrames(image, (raw) => _rotate(raw, normalized));
+      return mapFrames(image, (raw) => _rotate(raw, normalized.toInt()));
     }
-    return mapFrames(image, (raw) => _rotateArbitrary(raw, normalized));
+    return mapFrames(
+      image,
+      (raw) => _rotateArbitrary(raw, normalized, options.background),
+    );
   }
 }
 
@@ -172,7 +179,7 @@ RawPixels _rotate(RawPixels raw, int degrees) {
   );
 }
 
-RawPixels _rotateArbitrary(RawPixels raw, int degrees) {
+RawPixels _rotateArbitrary(RawPixels raw, num degrees, RgbaColor background) {
   final radians = degrees * pi / 180;
   final cosAngle = cos(radians);
   final sinAngle = sin(radians);
@@ -205,7 +212,7 @@ RawPixels _rotateArbitrary(RawPixels raw, int degrees) {
         y,
         sourceX.round(),
         sourceY.round(),
-        RgbaColor.black,
+        background,
       );
     }
   }

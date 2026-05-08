@@ -163,6 +163,11 @@ void main() {
       final rotated = await pixels(
         ImagePipeline.fromRawPixels(raw2x2()).rotate(45),
       );
+      final rotatedBackground = await pixels(
+        ImagePipeline.fromRawPixels(
+          raw2x2(),
+        ).rotate(45, const RotateOptions(background: RgbaColor.white)),
+      );
       final affine = await pixels(
         ImagePipeline.fromRawPixels(
           raw2x2(),
@@ -180,6 +185,7 @@ void main() {
 
       expect(rotated.width, 3);
       expect(rotated.height, 3);
+      expect(firstBytes(rotatedBackground).take(4), <int>[255, 255, 255, 255]);
       expect(affine.width, 4);
       expect(affine.height, 4);
       expect(affineFlat.width, 4);
@@ -189,6 +195,15 @@ void main() {
         ImagePipeline.fromRawPixels(
           raw2x2(),
         ).affine(const AffineOptions(a: 1, b: 1, c: 1, d: 1)).toPixelImage(),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () => ImagePipeline.fromRawPixels(raw2x2()).rotate('45'),
+        throwsA(isA<OperationValidationException>()),
+      );
+      expect(
+        () =>
+            ImagePipeline.fromRawPixels(raw2x2()).rotate(45, 'invalid options'),
         throwsA(isA<OperationValidationException>()),
       );
       expect(
