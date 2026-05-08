@@ -83,100 +83,17 @@ Uint8List _encodeVp8SolidFromRgba(
     quality: quality,
     macroblockColors: colors,
   );
-  final lumaAcBlocks = _lossyLumaHorizontalAcBlocks(
+  final lumaAcBlocks = _lossyLumaAcBlocks(
     rgba,
     width: width,
     height: height,
     quality: quality,
   );
-  final lumaVerticalAcBlocks = _lossyLumaVerticalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaSecondVerticalAcBlocks = _lossyLumaSecondVerticalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaDiagonalAcBlocks = _lossyLumaDiagonalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaSecondHorizontalAcBlocks = _lossyLumaSecondHorizontalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaThirdHorizontalAcBlocks = _lossyLumaThirdHorizontalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaSecondHorizontalVerticalAcBlocks =
-      _lossyLumaSecondHorizontalVerticalAcBlocks(
-        rgba,
-        width: width,
-        height: height,
-        quality: quality,
-      );
-  final lumaHorizontalSecondVerticalAcBlocks =
-      _lossyLumaHorizontalSecondVerticalAcBlocks(
-        rgba,
-        width: width,
-        height: height,
-        quality: quality,
-      );
-  final lumaThirdVerticalAcBlocks = _lossyLumaThirdVerticalAcBlocks(
-    rgba,
-    width: width,
-    height: height,
-    quality: quality,
-  );
-  final lumaHorizontalThirdVerticalAcBlocks =
-      _lossyLumaHorizontalThirdVerticalAcBlocks(
-        rgba,
-        width: width,
-        height: height,
-        quality: quality,
-      );
-  final lumaSecondHorizontalSecondVerticalAcBlocks =
-      _lossyLumaSecondHorizontalSecondVerticalAcBlocks(
-        rgba,
-        width: width,
-        height: height,
-        quality: quality,
-      );
-  final lumaThirdHorizontalVerticalAcBlocks =
-      _lossyLumaThirdHorizontalVerticalAcBlocks(
-        rgba,
-        width: width,
-        height: height,
-        quality: quality,
-      );
   return _encodeVp8SolidPayload(
     width: width,
     height: height,
     lumaBlocks: lumaBlocks,
     lumaAcBlocks: lumaAcBlocks,
-    lumaVerticalAcBlocks: lumaVerticalAcBlocks,
-    lumaSecondVerticalAcBlocks: lumaSecondVerticalAcBlocks,
-    lumaDiagonalAcBlocks: lumaDiagonalAcBlocks,
-    lumaSecondHorizontalAcBlocks: lumaSecondHorizontalAcBlocks,
-    lumaThirdHorizontalAcBlocks: lumaThirdHorizontalAcBlocks,
-    lumaSecondHorizontalVerticalAcBlocks: lumaSecondHorizontalVerticalAcBlocks,
-    lumaHorizontalSecondVerticalAcBlocks: lumaHorizontalSecondVerticalAcBlocks,
-    lumaThirdVerticalAcBlocks: lumaThirdVerticalAcBlocks,
-    lumaHorizontalThirdVerticalAcBlocks: lumaHorizontalThirdVerticalAcBlocks,
-    lumaSecondHorizontalSecondVerticalAcBlocks:
-        lumaSecondHorizontalSecondVerticalAcBlocks,
-    lumaThirdHorizontalVerticalAcBlocks: lumaThirdHorizontalVerticalAcBlocks,
     chromaBlocks: chromaBlocks,
   );
 }
@@ -251,18 +168,7 @@ Uint8List _encodeVp8SolidPayload({
   required int width,
   required int height,
   required List<int> lumaBlocks,
-  required List<int> lumaAcBlocks,
-  required List<int> lumaVerticalAcBlocks,
-  required List<int> lumaSecondVerticalAcBlocks,
-  required List<int> lumaDiagonalAcBlocks,
-  required List<int> lumaSecondHorizontalAcBlocks,
-  required List<int> lumaThirdHorizontalAcBlocks,
-  required List<int> lumaSecondHorizontalVerticalAcBlocks,
-  required List<int> lumaHorizontalSecondVerticalAcBlocks,
-  required List<int> lumaThirdVerticalAcBlocks,
-  required List<int> lumaHorizontalThirdVerticalAcBlocks,
-  required List<int> lumaSecondHorizontalSecondVerticalAcBlocks,
-  required List<int> lumaThirdHorizontalVerticalAcBlocks,
+  required List<List<int>> lumaAcBlocks,
   required List<_Vp8Yuv> chromaBlocks,
 }) {
   final mbCols = (width + 15) >> 4;
@@ -301,26 +207,14 @@ Uint8List _encodeVp8SolidPayload({
       for (var block = 0; block < 16; block += 1) {
         final blockOffset = (mbY * mbCols + mbX) * 16 + block;
         final target = lumaBlocks[blockOffset];
-        _writeLumaDct(
-          coeffs,
-          contexts,
-          mbX,
-          block,
-          (target - _predictedSubblockDc(lumaBlocks, mbCols, mbX, mbY, block)) *
-              2,
-          lumaAcBlocks[blockOffset],
-          lumaVerticalAcBlocks[blockOffset],
-          lumaSecondVerticalAcBlocks[blockOffset],
-          lumaDiagonalAcBlocks[blockOffset],
-          lumaSecondHorizontalAcBlocks[blockOffset],
-          lumaThirdHorizontalAcBlocks[blockOffset],
-          lumaSecondHorizontalVerticalAcBlocks[blockOffset],
-          lumaHorizontalSecondVerticalAcBlocks[blockOffset],
-          lumaThirdVerticalAcBlocks[blockOffset],
-          lumaHorizontalThirdVerticalAcBlocks[blockOffset],
-          lumaSecondHorizontalSecondVerticalAcBlocks[blockOffset],
-          lumaThirdHorizontalVerticalAcBlocks[blockOffset],
-        );
+        final dcCoefficient =
+            (target -
+                _predictedSubblockDc(lumaBlocks, mbCols, mbX, mbY, block)) *
+            2;
+        _writeLumaDct(coeffs, contexts, mbX, block, <int>[
+          dcCoefficient,
+          for (final blocks in lumaAcBlocks) blocks[blockOffset],
+        ]);
       }
       final predictedU = _predictedChromaDc(
         chromaBlocks,
@@ -378,60 +272,21 @@ void _writeLumaDct(
   _Vp8TokenContexts contexts,
   int mbX,
   int block,
-  int dcCoefficient,
-  int acCoefficient,
-  int verticalAcCoefficient,
-  int secondVerticalAcCoefficient,
-  int diagonalAcCoefficient,
-  int secondHorizontalAcCoefficient,
-  int thirdHorizontalAcCoefficient,
-  int secondHorizontalVerticalAcCoefficient,
-  int horizontalSecondVerticalAcCoefficient,
-  int thirdVerticalAcCoefficient,
-  int horizontalThirdVerticalAcCoefficient,
-  int secondHorizontalSecondVerticalAcCoefficient,
-  int thirdHorizontalVerticalAcCoefficient,
+  List<int> coefficients,
 ) {
   final probs = _Vp8LumaProbs.defaults();
   final context = contexts.contextFor(mbX, block);
-  _writeDctTokens(
-    out,
-    <int>[
-      dcCoefficient,
-      acCoefficient,
-      verticalAcCoefficient,
-      secondVerticalAcCoefficient,
-      diagonalAcCoefficient,
-      secondHorizontalAcCoefficient,
-      thirdHorizontalAcCoefficient,
-      secondHorizontalVerticalAcCoefficient,
-      horizontalSecondVerticalAcCoefficient,
-      thirdVerticalAcCoefficient,
-      horizontalThirdVerticalAcCoefficient,
-      secondHorizontalSecondVerticalAcCoefficient,
-      thirdHorizontalVerticalAcCoefficient,
-    ],
+  _writeDctTokens(out, coefficients, context, (
+    coefficientIndex,
     context,
-    (coefficientIndex, context, node) {
-      return probs.probabilityAt(coefficientIndex, context, node);
-    },
-  );
+    node,
+  ) {
+    return probs.probabilityAt(coefficientIndex, context, node);
+  });
   contexts.setHasCoefficients(
     mbX,
     block,
-    dcCoefficient != 0 ||
-        acCoefficient != 0 ||
-        verticalAcCoefficient != 0 ||
-        secondVerticalAcCoefficient != 0 ||
-        diagonalAcCoefficient != 0 ||
-        secondHorizontalAcCoefficient != 0 ||
-        thirdHorizontalAcCoefficient != 0 ||
-        secondHorizontalVerticalAcCoefficient != 0 ||
-        horizontalSecondVerticalAcCoefficient != 0 ||
-        thirdVerticalAcCoefficient != 0 ||
-        horizontalThirdVerticalAcCoefficient != 0 ||
-        secondHorizontalSecondVerticalAcCoefficient != 0 ||
-        thirdHorizontalVerticalAcCoefficient != 0,
+    coefficients.any((coefficient) => coefficient != 0),
   );
 }
 
