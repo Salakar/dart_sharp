@@ -35,7 +35,7 @@ void _decodeLosslessScan(JpegState state) {
       }
       for (final component in scan.components) {
         final samples = rawSamples[component]!;
-        final table = state.dcTrees[component.dcTable]!;
+        final table = _requiredDcTree(state, component);
         final size = table.read(reader);
         final diff = jpegExtend(reader.readBits(size), size);
         final predictor = _losslessPredictor(state, samples, x, y);

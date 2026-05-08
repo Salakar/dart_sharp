@@ -61,6 +61,69 @@ void main() {
     expect(image.height, 8);
     expect(image.firstFrameBytes().length, 8 * 8 * 4);
   });
+
+  test(
+    'rejects malformed JPEG structural segments with typed errors',
+    () async {
+      final cases = <Uint8List>[
+        _jpegWith(
+          (writer) => _segment(writer, 0xdb, Uint8List.fromList(<int>[0, 1])),
+        ),
+        _jpegWith(
+          (writer) =>
+              _segment(writer, 0xc4, Uint8List.fromList(<int>[0, 1, 0])),
+        ),
+        _jpegWith(
+          (writer) => _segment(writer, 0xc0, Uint8List.fromList(<int>[8, 0])),
+        ),
+        _jpegWith((writer) => _segment(writer, 0xdd, Uint8List(0))),
+        _jpegWith((writer) => _segment(writer, 0xda, Uint8List(0))),
+        _jpegWith(
+          (writer) => _segment(writer, 0xc0, _sofOneComponent(sampling: 0x01)),
+        ),
+      ];
+
+      for (final bytes in cases) {
+        await expectLater(
+          ImagePipeline.fromBytes(bytes).toPixelImage(),
+          throwsA(isA<InvalidImageException>()),
+        );
+      }
+    },
+  );
+
+  test('rejects malformed JPEG scan and table references', () async {
+    final cases = <Uint8List>[
+      _jpegWith((writer) {
+        _segment(writer, 0xdb, _dqtOnes());
+        _segment(writer, 0xc0, _sofOneComponent());
+        _segment(writer, 0xc4, _dht(0));
+        _segment(writer, 0xc4, _dht(1));
+        _segment(writer, 0xda, _baselineSos(componentId: 2));
+        writer.writeByte(0);
+      }),
+      _jpegWith((writer) {
+        _segment(writer, 0xc0, _sofOneComponent());
+        _segment(writer, 0xc4, _dht(0));
+        _segment(writer, 0xc4, _dht(1));
+        _segment(writer, 0xda, _baselineSos());
+        writer.writeByte(0);
+      }),
+      _jpegWith((writer) {
+        _segment(writer, 0xdb, _dqtOnes());
+        _segment(writer, 0xc0, _sofOneComponent());
+        _segment(writer, 0xda, _baselineSos());
+        writer.writeByte(0);
+      }),
+    ];
+
+    for (final bytes in cases) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
 }
 
 Uint8List _losslessJpeg() {
@@ -122,6 +185,17 @@ Uint8List _losslessJpeg() {
     ..writeByte(0xff)
     ..writeByte(0xd9);
   return writer.toBytes();
+}
+
+Uint8List _jpegWith(void Function(ByteWriter writer) writeSegments) {
+  final writer = ByteWriter()
+    ..writeByte(0xff)
+    ..writeByte(0xd8);
+  writeSegments(writer);
+  return (writer
+        ..writeByte(0xff)
+        ..writeByte(0xd9))
+      .toBytes();
 }
 
 void _segment(ByteWriter writer, int marker, Uint8List data) {
@@ -195,6 +269,14 @@ Uint8List _progressiveAcRefinementJpeg() {
 
 Uint8List _dqtOnes() {
   return Uint8List.fromList(<int>[0, ...List<int>.filled(64, 1)]);
+}
+
+Uint8List _sofOneComponent({int sampling = 0x11}) {
+  return Uint8List.fromList(<int>[8, 0, 1, 0, 1, 1, 1, sampling, 0]);
+}
+
+Uint8List _baselineSos({int componentId = 1}) {
+  return Uint8List.fromList(<int>[1, componentId, 0, 0, 63, 0]);
 }
 
 Uint8List _dht(int tableClass) {

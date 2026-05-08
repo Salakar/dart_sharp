@@ -65,7 +65,7 @@ void _decodeProgressiveDcInitial(JpegState state, JpegScan scan) {
     state,
     scan,
     (component, blockX, blockY, reader) {
-      final tree = state.dcTrees[component.dcTable]!;
+      final tree = _requiredDcTree(state, component);
       final size = tree.read(reader);
       final diff = jpegExtend(reader.readBits(size), size);
       component.predictor += diff;
@@ -101,7 +101,7 @@ void _decodeProgressiveAcInitial(JpegState state, JpegScan scan) {
         eobRun -= 1;
         return;
       }
-      final tree = state.acTrees[component.acTable]!;
+      final tree = _requiredAcTree(state, component);
       var k = scan.spectralStart;
       while (k <= scan.spectralEnd) {
         final symbol = tree.read(reader);
@@ -151,7 +151,7 @@ void _decodeProgressiveAcRefinement(JpegState state, JpegScan scan) {
         eobRun -= 1;
         return;
       }
-      final tree = state.acTrees[component.acTable]!;
+      final tree = _requiredAcTree(state, component);
       var k = scan.spectralStart;
       while (k <= scan.spectralEnd) {
         final symbol = tree.read(reader);
@@ -347,7 +347,7 @@ int _placeRefinedCoefficient(
 void _writeProgressiveSamples(JpegState state) {
   for (final component in state.components) {
     component.samples = Uint8List(component.width * component.height);
-    final quant = state.quant[component.quantId]!;
+    final quant = _requiredQuantTable(state, component);
     for (var by = 0; by < component.blockRows; by += 1) {
       for (var bx = 0; bx < component.blockCols; bx += 1) {
         final source = _coeffBlock(component, bx, by);

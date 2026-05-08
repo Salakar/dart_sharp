@@ -97,6 +97,9 @@ JpegState _parse(Uint8List bytes) {
       state.lossless = true;
       _readSof0(state, data);
     } else if (marker == 0xdd) {
+      if (data.length != 2) {
+        throw const InvalidImageException('Invalid JPEG restart interval.');
+      }
       state.restartInterval = readUint16Be(data, 0);
     } else if (marker == 0xee) {
       _readApp14(state, data);
@@ -117,11 +120,21 @@ void _readDqt(JpegState state, Uint8List data) {
     final spec = data[offset++];
     final precision = spec >> 4;
     final id = spec & 0x0f;
+    if (precision > 1 || id > 3) {
+      throw const InvalidImageException('Invalid JPEG quantization table.');
+    }
+    final valueBytes = precision == 0 ? 64 : 128;
+    if (offset + valueBytes > data.length) {
+      throw const InvalidImageException('Truncated JPEG quantization table.');
+    }
     final table = List<int>.filled(64, 0);
     for (var i = 0; i < 64; i += 1) {
       final value = precision == 0
           ? data[offset++]
-          : readUint16Be(data, (offset += 2) - 2);
+          : readUint16Be(data, offset);
+      if (precision != 0) {
+        offset += 2;
+      }
       table[jpegZigZag[i]] = value;
     }
     state.quant[id] = table;
@@ -134,9 +147,21 @@ void _readDht(JpegState state, Uint8List data) {
     final spec = data[offset++];
     final tableClass = spec >> 4;
     final id = spec & 0x0f;
+    if (tableClass > 1 || id > 3) {
+      throw const InvalidImageException('Invalid JPEG Huffman table.');
+    }
+    if (offset + 16 > data.length) {
+      throw const InvalidImageException('Truncated JPEG Huffman table.');
+    }
     final counts = data.sublist(offset, offset + 16);
     offset += 16;
     final total = counts.fold<int>(0, (int sum, int value) => sum + value);
+    if (total == 0 || total > 256) {
+      throw const InvalidImageException('Invalid JPEG Huffman table.');
+    }
+    if (offset + total > data.length) {
+      throw const InvalidImageException('Truncated JPEG Huffman table.');
+    }
     final symbols = data.sublist(offset, offset + total);
     offset += total;
     final tree = JpegHuffmanTree(counts, symbols);
@@ -149,6 +174,9 @@ void _readDht(JpegState state, Uint8List data) {
 }
 
 void _readSof0(JpegState state, Uint8List data) {
+  if (data.length < 6) {
+    throw const InvalidImageException('Truncated JPEG frame header.');
+  }
   if (data[0] != 8) {
     throw const UnsupportedCodecException('Only 8-bit JPEG is supported.');
   }
@@ -156,18 +184,23 @@ void _readSof0(JpegState state, Uint8List data) {
   state.height = readUint16Be(data, 1);
   state.width = readUint16Be(data, 3);
   final count = data[5];
+  if (count != 1 && count != 3 && count != 4) {
+    throw const UnsupportedCodecException('Unsupported JPEG component count.');
+  }
+  if (data.length < 6 + count * 3) {
+    throw const InvalidImageException('Truncated JPEG frame components.');
+  }
   var offset = 6;
   for (var i = 0; i < count; i += 1) {
     final id = data[offset++];
     final sampling = data[offset++];
-    state.components.add(
-      JpegComponent(
-        id: id,
-        h: sampling >> 4,
-        v: sampling & 0x0f,
-        quantId: data[offset++],
-      ),
-    );
+    final h = sampling >> 4;
+    final v = sampling & 0x0f;
+    final quantId = data[offset++];
+    if (h == 0 || v == 0 || quantId > 3) {
+      throw const InvalidImageException('Invalid JPEG frame component.');
+    }
+    state.components.add(JpegComponent(id: id, h: h, v: v, quantId: quantId));
   }
 }
 
@@ -184,29 +217,51 @@ void _readApp14(JpegState state, Uint8List data) {
 }
 
 JpegScan _readSos(JpegState state, Uint8List data) {
+  if (data.length < 4) {
+    throw const InvalidImageException('Truncated JPEG scan header.');
+  }
+  final count = data[0];
+  if (count == 0 || data.length < 1 + count * 2 + 3) {
+    throw const InvalidImageException('Truncated JPEG scan components.');
+  }
   final components = <JpegComponent>[];
   var offset = 1;
-  for (var i = 0; i < data[0]; i += 1) {
+  for (var i = 0; i < count; i += 1) {
     final id = data[offset++];
     final tables = data[offset++];
-    final component = state.components.firstWhere((item) => item.id == id);
+    final component = _componentById(state, id);
+    if (component == null) {
+      throw const InvalidImageException(
+        'JPEG scan references unknown component.',
+      );
+    }
+    if ((tables >> 4) > 3 || (tables & 0x0f) > 3) {
+      throw const InvalidImageException('Invalid JPEG scan table selector.');
+    }
     component
       ..dcTable = tables >> 4
       ..acTable = tables & 0x0f;
     components.add(component);
   }
-  if (offset + 3 <= data.length) {
-    state.losslessPredictor = data[offset];
-    state.pointTransform = data[offset + 2] & 0x0f;
-  }
+  state.losslessPredictor = data[offset];
+  state.pointTransform = data[offset + 2] & 0x0f;
   return JpegScan(
     components: components,
     entropySegments: const <Uint8List>[],
-    spectralStart: offset + 3 <= data.length ? data[offset] : 0,
-    spectralEnd: offset + 3 <= data.length ? data[offset + 1] : 63,
-    successiveHigh: offset + 3 <= data.length ? data[offset + 2] >> 4 : 0,
-    successiveLow: offset + 3 <= data.length ? data[offset + 2] & 0x0f : 0,
+    spectralStart: data[offset],
+    spectralEnd: data[offset + 1],
+    successiveHigh: data[offset + 2] >> 4,
+    successiveLow: data[offset + 2] & 0x0f,
   );
+}
+
+JpegComponent? _componentById(JpegState state, int id) {
+  for (final component in state.components) {
+    if (component.id == id) {
+      return component;
+    }
+  }
+  return null;
 }
 
 _EntropyScan _entropySegments(Uint8List bytes, int offset) {
@@ -339,9 +394,9 @@ void _decodeBlock(
   int blockY,
 ) {
   final coeffs = List<int>.filled(64, 0);
-  final quant = state.quant[component.quantId]!;
-  final dcTree = state.dcTrees[component.dcTable]!;
-  final acTree = state.acTrees[component.acTable]!;
+  final quant = _requiredQuantTable(state, component);
+  final dcTree = _requiredDcTree(state, component);
+  final acTree = _requiredAcTree(state, component);
   final dcSize = dcTree.read(reader);
   component.predictor += jpegExtend(reader.readBits(dcSize), dcSize);
   coeffs[0] = component.predictor * quant[0];
@@ -364,6 +419,30 @@ void _decodeBlock(
     }
   }
   _writeSamples(component, blockX, blockY, jpegIdct(coeffs));
+}
+
+List<int> _requiredQuantTable(JpegState state, JpegComponent component) {
+  final table = state.quant[component.quantId];
+  if (table == null) {
+    throw const InvalidImageException('JPEG missing quantization table.');
+  }
+  return table;
+}
+
+JpegHuffmanTree _requiredDcTree(JpegState state, JpegComponent component) {
+  final tree = state.dcTrees[component.dcTable];
+  if (tree == null) {
+    throw const InvalidImageException('JPEG missing Huffman table.');
+  }
+  return tree;
+}
+
+JpegHuffmanTree _requiredAcTree(JpegState state, JpegComponent component) {
+  final tree = state.acTrees[component.acTable];
+  if (tree == null) {
+    throw const InvalidImageException('JPEG missing Huffman table.');
+  }
+  return tree;
 }
 
 void _writeSamples(
