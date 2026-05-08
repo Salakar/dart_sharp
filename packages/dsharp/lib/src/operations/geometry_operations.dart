@@ -7,6 +7,7 @@ import '../geometry/resize_geometry.dart';
 import '../pipeline/pipeline_operation.dart';
 import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
+import '../resize/crop_strategy.dart';
 import '../resize/kernels.dart';
 import '../source/raw_pixels.dart';
 
@@ -23,6 +24,16 @@ final class ResizeOperation implements PipelineOperation {
 
   @override
   PixelImage apply(PixelImage image) {
+    if (options.strategy != null && options.fit != ResizeFit.cover) {
+      throw const OperationValidationException(
+        'Resize strategy is supported only for cover fit.',
+      );
+    }
+    if (options.strategy != null && image.isAnimated) {
+      throw const UnsupportedCodecException(
+        'Resize strategy is not supported for multi-frame images.',
+      );
+    }
     final resolved = resolveResize(
       sourceWidth: image.width,
       sourceHeight: image.height,
@@ -131,13 +142,15 @@ RawPixels _resizeCover(
   if (scaled.width == width && scaled.height == height) {
     return scaled;
   }
-  final offset = _gravityOffset(
-    outerWidth: scaled.width,
-    outerHeight: scaled.height,
-    innerWidth: width,
-    innerHeight: height,
-    gravity: options.gravity,
-  );
+  final offset = options.strategy == null
+      ? _gravityOffset(
+          outerWidth: scaled.width,
+          outerHeight: scaled.height,
+          innerWidth: width,
+          innerHeight: height,
+          gravity: options.gravity,
+        )
+      : _strategyOffset(scaled, width, height, options.strategy!);
   return _crop(
     scaled,
     Region(left: offset.x, top: offset.y, width: width, height: height),
@@ -198,6 +211,34 @@ RawPixels _resizeContain(
     Gravity.northwest => (x: 0, y: 0),
     Gravity.center => (x: centerX, y: centerY),
   };
+}
+
+({int x, int y}) _strategyOffset(
+  RawPixels raw,
+  int cropWidth,
+  int cropHeight,
+  CropStrategy strategy,
+) {
+  final maxX = max(0, raw.width - cropWidth);
+  final maxY = max(0, raw.height - cropHeight);
+  var bestX = 0;
+  var bestY = 0;
+  var bestScore = double.negativeInfinity;
+  for (var y = 0; y <= maxY; y += 1) {
+    for (var x = 0; x <= maxX; x += 1) {
+      final candidate = _crop(
+        raw,
+        Region(left: x, top: y, width: cropWidth, height: cropHeight),
+      );
+      final score = strategy.score(PixelImage.fromRawPixels(candidate));
+      if (score > bestScore) {
+        bestScore = score;
+        bestX = x;
+        bestY = y;
+      }
+    }
+  }
+  return (x: bestX, y: bestY);
 }
 
 RawPixels _resizeRaw(

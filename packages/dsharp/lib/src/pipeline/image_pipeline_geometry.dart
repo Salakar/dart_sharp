@@ -70,6 +70,7 @@ ResizeOptions _resolveResizeOptions(
     height: base.height ?? height,
     fit: base.fit,
     gravity: base.gravity,
+    strategy: base.strategy,
     kernel: base.kernel,
     background: base.background,
     withoutEnlargement: base.withoutEnlargement,

@@ -1,5 +1,6 @@
 import '../api/exceptions.dart';
 import '../pixels/color.dart';
+import '../resize/crop_strategy.dart';
 
 /// Rectangular pixel region.
 final class Region {
@@ -204,6 +205,7 @@ final class ResizeOptions {
     this.height,
     this.fit = ResizeFit.cover,
     this.gravity = Gravity.center,
+    this.strategy,
     this.kernel = ResizeKernel.lanczos3,
     this.background = RgbaColor.black,
     this.withoutEnlargement = false,
@@ -221,6 +223,9 @@ final class ResizeOptions {
 
   /// Placement gravity.
   final Gravity gravity;
+
+  /// Dynamic crop strategy for cover resize.
+  final CropStrategy? strategy;
 
   /// Sampling kernel.
   final ResizeKernel kernel;

@@ -104,6 +104,57 @@ void main() {
     );
   });
 
+  test('cover resize applies attention crop strategy', () async {
+    final image = await ImagePipeline.fromRawPixels(_attentionCropRaw())
+        .resize(
+          const ResizeOptions(
+            width: 2,
+            height: 2,
+            fit: ResizeFit.cover,
+            kernel: ResizeKernel.nearest,
+            strategy: AttentionCropStrategy(),
+          ),
+        )
+        .toPixelImage();
+
+    expect(_redChannel(image.firstFrameBytes()), <int>[220, 230, 220, 230]);
+  });
+
+  test('resize strategy validates unsupported combinations', () async {
+    final animated = PixelImage(
+      frames: <ImageFrame>[
+        ImageFrame(pixels: _attentionCropRaw()),
+        ImageFrame(pixels: _attentionCropRaw()),
+      ],
+    );
+
+    expect(
+      ImagePipeline.fromRawPixels(_attentionCropRaw())
+          .resize(
+            const ResizeOptions(
+              width: 2,
+              height: 2,
+              fit: ResizeFit.contain,
+              strategy: AttentionCropStrategy(),
+            ),
+          )
+          .toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      ImagePipeline.fromPixelImage(animated)
+          .resize(
+            const ResizeOptions(
+              width: 2,
+              height: 2,
+              strategy: AttentionCropStrategy(),
+            ),
+          )
+          .toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
+    );
+  });
+
   test('extract operation crops a region', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2())
         .extract(const Region(left: 1, top: 1, width: 1, height: 1))
@@ -260,9 +311,58 @@ void main() {
 
     expect(const EntropyCropStrategy().name, 'entropy');
     expect(const EntropyCropStrategy().score(image), greaterThan(0));
+    expect(const AttentionCropStrategy().name, 'attention');
     expect(
       const AttentionCropStrategy().score(image),
-      const EntropyCropStrategy().score(image),
+      isNot(const EntropyCropStrategy().score(image)),
     );
   });
+}
+
+RawPixels _attentionCropRaw() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[
+      20,
+      20,
+      20,
+      255,
+      25,
+      25,
+      25,
+      255,
+      220,
+      20,
+      20,
+      255,
+      230,
+      24,
+      24,
+      255,
+      20,
+      20,
+      20,
+      255,
+      25,
+      25,
+      25,
+      255,
+      220,
+      20,
+      20,
+      255,
+      230,
+      24,
+      24,
+      255,
+    ]),
+    width: 4,
+    height: 2,
+    channels: ChannelCount.four,
+  );
+}
+
+List<int> _redChannel(Uint8List bytes) {
+  return <int>[
+    for (var offset = 0; offset < bytes.length; offset += 4) bytes[offset],
+  ];
 }
