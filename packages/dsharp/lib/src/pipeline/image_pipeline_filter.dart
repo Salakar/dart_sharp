@@ -2,9 +2,9 @@ part of 'image_pipeline.dart';
 
 /// Filter and convolution pipeline operations.
 extension ImagePipelineFilter on ImagePipeline {
-  /// Applies a blur.
-  ImagePipeline blur() {
-    return _append(const BlurOperation());
+  /// Applies a blur when [blur] is true.
+  ImagePipeline blur([bool blur = true]) {
+    return blur ? _append(const BlurOperation()) : this;
   }
 
   /// Applies a sharpen filter.

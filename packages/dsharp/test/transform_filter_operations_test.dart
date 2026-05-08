@@ -197,11 +197,16 @@ void main() {
   test('blur, median, dilate, and erode handle tiny edge pixels', () async {
     final raw = rawGray(3, 3, <int>[0, 0, 0, 0, 255, 0, 0, 0, 0]);
     final blurred = await pixels(ImagePipeline.fromRawPixels(raw).blur());
+    final blurDisabled = await pixels(
+      ImagePipeline.fromRawPixels(raw).blur(false),
+    );
     final median = await pixels(ImagePipeline.fromRawPixels(raw).median());
     final dilated = await pixels(ImagePipeline.fromRawPixels(raw).dilate());
     final eroded = await pixels(ImagePipeline.fromRawPixels(raw).erode());
 
     expect(firstBytes(blurred)[4], 28);
+    expect(firstBytes(blurDisabled), raw.bytes);
+    expect(ImagePipeline.fromRawPixels(raw).blur(false).operations, isEmpty);
     expect(firstBytes(median)[4], 0);
     expect(firstBytes(dilated)[0], 255);
     expect(firstBytes(eroded)[4], 0);
