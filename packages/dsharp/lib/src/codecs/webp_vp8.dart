@@ -13,6 +13,7 @@ const _kfYModeTree = <int>[-4, 2, 4, 6, 0, -1, -2, -3];
 const _kfYModeProb = <int>[145, 156, 163, 128];
 const _kfUvModeTree = <int>[0, 2, -1, 4, -2, -3];
 const _kfUvModeProb = <int>[142, 114, 183];
+const _segmentTree = <int>[2, 4, 0, -1, -2, -3];
 const _coefficientUpdateProbCodes =
     '\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff'
     '\u00ff\u00b0\u00f6\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00df\u00f1\u00fc\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff\u00f9\u00fd\u00fd\u00ff\u00ff\u00ff\u00ff\u00ff\u00ff'
@@ -67,6 +68,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
   for (var mbY = 0; mbY < planes.mbRows; mbY += 1) {
     contexts.resetLeft();
     for (var mbX = 0; mbX < planes.mbCols; mbX += 1) {
+      final segmentId = frame.readSegmentId(bits);
       final skipCoeff = mbNoSkipCoeff && bits.readBool(probSkipFalse) == 1;
       final yMode = bits.readTree(_kfYModeTree, _kfYModeProb);
       if (yMode == 4) {
@@ -77,7 +79,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
       final uvMode = bits.readTree(_kfUvModeTree, _kfUvModeProb);
       planes.predictMacroblock(mbX, mbY, yMode, uvMode);
       if (!skipCoeff) {
-        _readResidual(coeffs, planes, contexts, mbX, mbY, frame);
+        _readResidual(coeffs, planes, contexts, mbX, mbY, frame, segmentId);
       } else {
         contexts.clearMacroblock(mbX);
       }
@@ -125,11 +127,7 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   if (colorSpace != 0) {
     throw const UnsupportedCodecException('Unsupported VP8 color space.');
   }
-  if (bits.readBit() == 1) {
-    throw const UnsupportedCodecException(
-      'VP8 segmentation is not implemented yet.',
-    );
-  }
+  final segmentation = _Vp8Segmentation.read(bits);
   bits.readBit();
   final loopFilterLevel = bits.readLiteral(6);
   bits.readLiteral(3);
@@ -141,6 +139,11 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
   if (loopFilterLevel != 0) {
     throw const UnsupportedCodecException(
       'VP8 loop filtering is not implemented yet.',
+    );
+  }
+  if (segmentation.hasLoopFilterUpdates) {
+    throw const UnsupportedCodecException(
+      'VP8 segmentation loop-filter updates are not implemented yet.',
     );
   }
   if (bits.readLiteral(2) != 0) {
@@ -182,11 +185,12 @@ _Vp8FrameHeader _readSupportedFrameHeader(Vp8BoolDecoder bits) {
     }
   }
   return _Vp8FrameHeader(
-    yAcQuantIndex: qIndex,
-    y2DcQuantIndex: qIndex + y2DcDelta,
-    y2AcQuantIndex: qIndex + y2AcDelta,
-    uvDcQuantIndex: qIndex + uvDcDelta,
-    uvAcQuantIndex: qIndex + uvAcDelta,
+    baseQuantIndex: qIndex,
+    y2DcDelta: y2DcDelta,
+    y2AcDelta: y2AcDelta,
+    uvDcDelta: uvDcDelta,
+    uvAcDelta: uvAcDelta,
+    segmentation: segmentation,
     yAcProbs: yAcProbs,
     y2Probs: y2Probs,
     uvProbs: uvProbs,
@@ -244,22 +248,122 @@ final class _Vp8Header {
 
 final class _Vp8FrameHeader {
   const _Vp8FrameHeader({
-    required this.yAcQuantIndex,
-    required this.y2DcQuantIndex,
-    required this.y2AcQuantIndex,
-    required this.uvDcQuantIndex,
-    required this.uvAcQuantIndex,
+    required this.baseQuantIndex,
+    required this.y2DcDelta,
+    required this.y2AcDelta,
+    required this.uvDcDelta,
+    required this.uvAcDelta,
+    required this.segmentation,
     required this.yAcProbs,
     required this.y2Probs,
     required this.uvProbs,
   });
 
-  final int yAcQuantIndex;
-  final int y2DcQuantIndex;
-  final int y2AcQuantIndex;
-  final int uvDcQuantIndex;
-  final int uvAcQuantIndex;
+  final int baseQuantIndex;
+  final int y2DcDelta;
+  final int y2AcDelta;
+  final int uvDcDelta;
+  final int uvAcDelta;
+  final _Vp8Segmentation segmentation;
   final _Vp8LumaAcProbs yAcProbs;
   final _Vp8Y2Probs y2Probs;
   final _Vp8ChromaProbs uvProbs;
+
+  int readSegmentId(Vp8BoolDecoder bits) => segmentation.readSegmentId(bits);
+
+  int yAcQuantIndex(int segmentId) {
+    return segmentation.quantIndex(baseQuantIndex, segmentId);
+  }
+
+  int y2DcQuantIndex(int segmentId) => yAcQuantIndex(segmentId) + y2DcDelta;
+
+  int y2AcQuantIndex(int segmentId) => yAcQuantIndex(segmentId) + y2AcDelta;
+
+  int uvDcQuantIndex(int segmentId) => yAcQuantIndex(segmentId) + uvDcDelta;
+
+  int uvAcQuantIndex(int segmentId) => yAcQuantIndex(segmentId) + uvAcDelta;
+}
+
+final class _Vp8Segmentation {
+  const _Vp8Segmentation._({
+    required this.enabled,
+    required this.updateMap,
+    required this.absolute,
+    required this.quantizerValues,
+    required this.loopFilterValues,
+    required this.probabilities,
+  });
+
+  factory _Vp8Segmentation.read(Vp8BoolDecoder bits) {
+    if (bits.readBit() == 0) {
+      return _Vp8Segmentation.disabled();
+    }
+    final updateMap = bits.readBit() == 1;
+    final updateFeatureData = bits.readBit() == 1;
+    var absolute = false;
+    final quantizerValues = List<int>.filled(4, 0);
+    final loopFilterValues = List<int>.filled(4, 0);
+    if (updateFeatureData) {
+      absolute = bits.readBit() == 1;
+      for (var i = 0; i < 4; i += 1) {
+        quantizerValues[i] = _readOptionalSigned(bits, 7);
+      }
+      for (var i = 0; i < 4; i += 1) {
+        loopFilterValues[i] = _readOptionalSigned(bits, 6);
+      }
+    }
+    final probabilities = List<int>.filled(3, 255);
+    if (updateMap) {
+      for (var i = 0; i < probabilities.length; i += 1) {
+        if (bits.readBit() == 1) {
+          probabilities[i] = bits.readLiteral(8);
+        }
+      }
+    }
+    return _Vp8Segmentation._(
+      enabled: true,
+      updateMap: updateMap,
+      absolute: absolute,
+      quantizerValues: quantizerValues,
+      loopFilterValues: loopFilterValues,
+      probabilities: probabilities,
+    );
+  }
+
+  factory _Vp8Segmentation.disabled() {
+    return _Vp8Segmentation._(
+      enabled: false,
+      updateMap: false,
+      absolute: false,
+      quantizerValues: List<int>.filled(4, 0),
+      loopFilterValues: List<int>.filled(4, 0),
+      probabilities: List<int>.filled(3, 255),
+    );
+  }
+
+  final bool enabled;
+  final bool updateMap;
+  final bool absolute;
+  final List<int> quantizerValues;
+  final List<int> loopFilterValues;
+  final List<int> probabilities;
+
+  bool get hasLoopFilterUpdates {
+    return loopFilterValues.any((value) => value != 0);
+  }
+
+  int readSegmentId(Vp8BoolDecoder bits) {
+    if (!enabled || !updateMap) {
+      return 0;
+    }
+    return bits.readTree(_segmentTree, probabilities);
+  }
+
+  int quantIndex(int baseQuantIndex, int segmentId) {
+    if (!enabled) {
+      return baseQuantIndex;
+    }
+    final value = quantizerValues[segmentId];
+    return absolute ? value : baseQuantIndex + value;
+  }
 }

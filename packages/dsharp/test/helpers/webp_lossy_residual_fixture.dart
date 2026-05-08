@@ -120,6 +120,25 @@ Uint8List y2DcResidualVp8Webp({
   return _simpleWebp(vp8);
 }
 
+/// Builds a VP8 WebP whose first macroblock uses a segment quantizer.
+Uint8List segmentedY2DcResidualVp8Webp({
+  required int width,
+  required int height,
+  int segmentQIndex = 40,
+}) {
+  final mbCount = ((width + 15) >> 4) * ((height + 15) >> 4);
+  final vp8 = _residualVp8Payload(
+    width: width,
+    height: height,
+    y2: true,
+    qIndex: 0,
+    segmentIds: List<int>.filled(mbCount, 1),
+    segmentQuantIndexes: <int?>[null, segmentQIndex, null, null],
+    segmentAbsolute: true,
+  );
+  return _simpleWebp(vp8);
+}
+
 /// Builds a VP8 WebP with a supported Y2 AC residual.
 Uint8List y2AcResidualVp8Webp({
   required int width,
@@ -194,13 +213,33 @@ Uint8List _residualVp8Payload({
   int? uvDcCatFiveProbability,
   int? yAcBandOneEobProbability,
   int? yAcBandTwoEobProbability,
+  List<int>? segmentIds,
+  List<int?>? segmentQuantIndexes,
+  bool segmentAbsolute = false,
 }) {
   final mbCols = (width + 15) >> 4;
   final mbRows = (height + 15) >> 4;
+  final currentSegmentIds = segmentIds;
+  if (currentSegmentIds != null &&
+      currentSegmentIds.length != mbCols * mbRows) {
+    throw ArgumentError.value(currentSegmentIds.length, 'segmentIds.length');
+  }
+  if (segmentQuantIndexes != null && segmentQuantIndexes.length != 4) {
+    throw ArgumentError.value(
+      segmentQuantIndexes.length,
+      'segmentQuantIndexes',
+    );
+  }
   final first = _BoolWriter()
     ..bit(false)
-    ..bit(false)
-    ..bit(false)
+    ..bit(false);
+  _writeSegmentationHeader(
+    first,
+    segmentIds: currentSegmentIds,
+    segmentQuantIndexes: segmentQuantIndexes,
+    segmentAbsolute: segmentAbsolute,
+  );
+  first
     ..bit(false)
     ..literal(0, 6)
     ..literal(0, 3)
@@ -234,6 +273,9 @@ Uint8List _residualVp8Payload({
   }
   first.bit(false);
   for (var i = 0; i < mbCols * mbRows; i += 1) {
+    if (currentSegmentIds != null) {
+      _writeSegmentId(first, currentSegmentIds[i]);
+    }
     _writeYMode(first, 0);
     first.prob(142, false);
   }
@@ -326,6 +368,56 @@ Uint8List _residualVp8Payload({
         ..bytes(firstPartition)
         ..bytes(coeffs.finish()))
       .finish();
+}
+
+void _writeSegmentationHeader(
+  _BoolWriter out, {
+  required List<int>? segmentIds,
+  required List<int?>? segmentQuantIndexes,
+  required bool segmentAbsolute,
+}) {
+  if (segmentIds == null) {
+    out.bit(false);
+    return;
+  }
+  out
+    ..bit(true)
+    ..bit(true)
+    ..bit(segmentQuantIndexes != null);
+  if (segmentQuantIndexes != null) {
+    out.bit(segmentAbsolute);
+    for (final quantIndex in segmentQuantIndexes) {
+      out.bit(quantIndex != null);
+      if (quantIndex != null) {
+        out
+          ..literal(quantIndex.abs(), 7)
+          ..bit(quantIndex < 0);
+      }
+    }
+    for (var i = 0; i < 4; i += 1) {
+      out.bit(false);
+    }
+  }
+  for (var i = 0; i < 3; i += 1) {
+    out
+      ..bit(true)
+      ..literal(128, 8);
+  }
+}
+
+void _writeSegmentId(_BoolWriter out, int segmentId) {
+  if (segmentId < 0 || segmentId > 3) {
+    throw ArgumentError.value(segmentId, 'segmentId');
+  }
+  if (segmentId < 2) {
+    out
+      ..prob(128, false)
+      ..prob(128, segmentId == 1);
+  } else {
+    out
+      ..prob(128, true)
+      ..prob(128, segmentId == 3);
+  }
 }
 
 final class _FixtureTokenContexts {

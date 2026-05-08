@@ -257,6 +257,22 @@ void main() {
     ]);
   });
 
+  test('applies VP8 segment quantizers to residual decoding', () async {
+    const segmentQIndex = 40;
+    final reference = await ImagePipeline.fromBytes(
+      y2DcResidualVp8Webp(width: 2, height: 2, qIndex: segmentQIndex),
+    ).toPixelImage();
+    final segmented = await ImagePipeline.fromBytes(
+      segmentedY2DcResidualVp8Webp(
+        width: 2,
+        height: 2,
+        segmentQIndex: segmentQIndex,
+      ),
+    ).toPixelImage();
+
+    expect(segmented.firstFrameBytes(), reference.firstFrameBytes());
+  });
+
   test('applies supported VP8 Y2 AC residuals', () async {
     final bytes = y2AcResidualVp8Webp(width: 16, height: 16);
 

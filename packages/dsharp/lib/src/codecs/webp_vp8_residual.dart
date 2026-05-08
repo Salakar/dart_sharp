@@ -220,10 +220,12 @@ void _readResidual(
   int mbX,
   int mbY,
   _Vp8FrameHeader frame,
+  int segmentId,
 ) {
   final lumaDc = _readY2Block(
     coeffs,
     frame,
+    segmentId,
     contexts.contextFor(mbX, _y2BlockIndex),
   );
   contexts.setHasCoefficients(mbX, _y2BlockIndex, lumaDc != null);
@@ -235,6 +237,7 @@ void _readResidual(
       mbY,
       block,
       frame,
+      segmentId,
       lumaDc?[block] ?? 0,
       contexts.contextFor(mbX, block),
     );
@@ -250,6 +253,7 @@ void _readResidual(
       block,
       true,
       frame,
+      segmentId,
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
@@ -264,6 +268,7 @@ void _readResidual(
       block,
       false,
       frame,
+      segmentId,
       contexts.contextFor(mbX, blockIndex),
     );
     contexts.setHasCoefficients(mbX, blockIndex, hasCoefficients);
@@ -273,6 +278,7 @@ void _readResidual(
 List<int>? _readY2Block(
   Vp8BoolDecoder coeffs,
   _Vp8FrameHeader frame,
+  int segmentId,
   int initialContext,
 ) {
   List<int>? coefficients;
@@ -290,8 +296,8 @@ List<int>? _readY2Block(
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
     final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
     final quant = coefficientIndex == 0
-        ? _y2DcQuant(frame.y2DcQuantIndex)
-        : _y2AcQuant(frame.y2AcQuantIndex);
+        ? _y2DcQuant(frame.y2DcQuantIndex(segmentId))
+        : _y2AcQuant(frame.y2AcQuantIndex(segmentId));
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
@@ -306,10 +312,11 @@ bool _readLumaAcBlock(
   int mbY,
   int block,
   _Vp8FrameHeader frame,
+  int segmentId,
   int dcCoefficient,
   int initialContext,
 ) {
-  final quant = _yAcQuant(frame.yAcQuantIndex);
+  final quant = _yAcQuant(frame.yAcQuantIndex(segmentId));
   List<int>? coefficients = dcCoefficient == 0 ? null : List<int>.filled(16, 0);
   var context = initialContext;
   var hasTokenCoefficient = false;
@@ -346,6 +353,7 @@ bool _readChromaBlock(
   int block,
   bool isU,
   _Vp8FrameHeader frame,
+  int segmentId,
   int initialContext,
 ) {
   List<int>? coefficients;
@@ -363,8 +371,8 @@ bool _readChromaBlock(
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
     final coefficient = coeffs.readBit() == 1 ? -magnitude : magnitude;
     final quant = coefficientIndex == 0
-        ? _uvDcQuant(frame.uvDcQuantIndex)
-        : _uvAcQuant(frame.uvAcQuantIndex);
+        ? _uvDcQuant(frame.uvDcQuantIndex(segmentId))
+        : _uvAcQuant(frame.uvAcQuantIndex(segmentId));
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
