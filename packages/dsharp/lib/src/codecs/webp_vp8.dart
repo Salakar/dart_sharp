@@ -242,7 +242,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
           );
         } else {
           planes.predictBPredMacroblock(mbX, mbY, bModes);
-          contexts.clearMacroblock(mbX);
+          contexts.clearMacroblock(mbX, yMode);
         }
       } else if (!skipCoeff) {
         planes.predictLumaMacroblock(mbX, mbY, yMode);
@@ -257,7 +257,7 @@ RawPixels decodeWebpVp8Chunk(Uint8List chunk) {
         );
       } else {
         planes.predictLumaMacroblock(mbX, mbY, yMode);
-        contexts.clearMacroblock(mbX);
+        contexts.clearMacroblock(mbX, yMode);
       }
       macroblocks.add(
         _Vp8MacroblockInfo(

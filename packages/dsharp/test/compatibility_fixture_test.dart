@@ -138,6 +138,12 @@ void main() {
     expect(image.width, 300);
     expect(image.height, 300);
     expect(rgba.length, 300 * 300 * 4);
+    _expectPixelNear(rgba, image.width, 150, 150, <int>[
+      0,
+      0,
+      0,
+      51,
+    ], tolerance: 24);
     expect(
       [
         for (var i = 3; i < rgba.length; i += 4) rgba[i],
@@ -165,6 +171,7 @@ void main() {
       expect(metadata.width, 370);
       expect(metadata.height, 285);
       expect(metadata.frames, greaterThan(1));
+      expect(metadata.loopCount, 3);
     },
   );
 
@@ -185,6 +192,7 @@ void main() {
     expect(image.height, 285);
     expect(image.isAnimated, isTrue);
     expect(image.frames.length, greaterThan(1));
+    expect(image.loopCount, 3);
     expect(image.frames.first.pixels.bytes.length, 370 * 285 * 4);
   });
 
@@ -257,7 +265,48 @@ void main() {
     expect(image.width, 1024);
     expect(image.height, 772);
     expect(image.firstFrameBytes().length, 1024 * 772 * 4);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 0, 0, <int>[
+      27,
+      125,
+      192,
+      255,
+    ]);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 512, 386, <int>[
+      82,
+      173,
+      231,
+      255,
+    ]);
+    _expectPixelNear(image.firstFrameBytes(), image.width, 1023, 771, <int>[
+      18,
+      21,
+      0,
+      255,
+    ]);
   });
+}
+
+void _expectPixelNear(
+  List<int> rgba,
+  int width,
+  int x,
+  int y,
+  List<int> expected, {
+  int tolerance = 20,
+}) {
+  final offset = (y * width + x) * 4;
+  final actual = rgba.sublist(offset, offset + 4);
+  for (var channel = 0; channel < 4; channel += 1) {
+    final channelTolerance = channel == 3 ? 0 : tolerance;
+    expect(
+      actual[channel],
+      inInclusiveRange(
+        expected[channel] - channelTolerance,
+        expected[channel] + channelTolerance,
+      ),
+      reason: 'pixel ($x,$y) channel $channel was $actual',
+    );
+  }
 }
 
 int _jpegMarkerCount(List<int> bytes, int marker) {

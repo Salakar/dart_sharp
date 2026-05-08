@@ -560,18 +560,22 @@ void _writeY2Token(
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
   var context = initialContext;
+  var previousWasZero = false;
   for (var index = 0; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureY2Probability(index, context, node);
-    coeffs
-      ..prob(probabilityAt(0), true)
-      ..prob(probabilityAt(1), false);
+    if (!previousWasZero) {
+      coeffs.prob(probabilityAt(0), true);
+    }
+    coeffs.prob(probabilityAt(1), false);
     context = 0;
+    previousWasZero = true;
   }
   int probabilityAt(int node) =>
       _fixtureY2Probability(coefficientIndex, context, node);
-  coeffs
-    ..prob(probabilityAt(0), true)
-    ..prob(probabilityAt(1), true);
+  if (!previousWasZero) {
+    coeffs.prob(probabilityAt(0), true);
+  }
+  coeffs.prob(probabilityAt(1), true);
   _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   final nextIndex = coefficientIndex + 1;
   coeffs.bit(coefficient.isNegative);
@@ -644,13 +648,16 @@ void _writeUvToken(
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
   var context = initialContext;
+  var previousWasZero = false;
   for (var index = 0; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) =>
         _fixtureUvProbability(index, context, node, uvDcCatFiveProbability);
-    coeffs
-      ..prob(probabilityAt(0), true)
-      ..prob(probabilityAt(1), false);
+    if (!previousWasZero) {
+      coeffs.prob(probabilityAt(0), true);
+    }
+    coeffs.prob(probabilityAt(1), false);
     context = 0;
+    previousWasZero = true;
   }
   int probabilityAt(int node) => _fixtureUvProbability(
     coefficientIndex,
@@ -658,9 +665,10 @@ void _writeUvToken(
     node,
     uvDcCatFiveProbability,
   );
-  coeffs
-    ..prob(probabilityAt(0), true)
-    ..prob(probabilityAt(1), true);
+  if (!previousWasZero) {
+    coeffs.prob(probabilityAt(0), true);
+  }
+  coeffs.prob(probabilityAt(1), true);
   _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   final nextIndex = coefficientIndex + 1;
   coeffs.bit(coefficient.isNegative);

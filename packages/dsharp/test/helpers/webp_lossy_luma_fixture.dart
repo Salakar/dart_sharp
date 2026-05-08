@@ -160,18 +160,22 @@ void _writeYToken(
     throw ArgumentError.value(coefficientIndex, 'coefficientIndex');
   }
   var context = initialContext;
+  var previousWasZero = false;
   for (var index = 0; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureYProbability(index, context, node);
-    coeffs
-      ..prob(probabilityAt(0), true)
-      ..prob(probabilityAt(1), false);
+    if (!previousWasZero) {
+      coeffs.prob(probabilityAt(0), true);
+    }
+    coeffs.prob(probabilityAt(1), false);
     context = 0;
+    previousWasZero = true;
   }
   int probabilityAt(int node) =>
       _fixtureYProbability(coefficientIndex, context, node);
-  coeffs
-    ..prob(probabilityAt(0), true)
-    ..prob(probabilityAt(1), true);
+  if (!previousWasZero) {
+    coeffs.prob(probabilityAt(0), true);
+  }
+  coeffs.prob(probabilityAt(1), true);
   _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   final nextIndex = coefficientIndex + 1;
   coeffs.bit(coefficient.isNegative);
@@ -212,6 +216,7 @@ void _writeYAcToken(
     }
   }
   var context = initialContext;
+  var previousWasZero = false;
   for (var index = 1; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureYAcProbability(
       index,
@@ -220,10 +225,12 @@ void _writeYAcToken(
       yAcBandOneEobProbability,
       yAcBandTwoEobProbability,
     );
-    coeffs
-      ..prob(probabilityAt(0), true)
-      ..prob(probabilityAt(1), false);
+    if (!previousWasZero) {
+      coeffs.prob(probabilityAt(0), true);
+    }
+    coeffs.prob(probabilityAt(1), false);
     context = 0;
+    previousWasZero = true;
   }
   int probabilityAt(int node) => _fixtureYAcProbability(
     coefficientIndex,
@@ -232,9 +239,10 @@ void _writeYAcToken(
     yAcBandOneEobProbability,
     yAcBandTwoEobProbability,
   );
-  coeffs
-    ..prob(probabilityAt(0), true)
-    ..prob(probabilityAt(1), true);
+  if (!previousWasZero) {
+    coeffs.prob(probabilityAt(0), true);
+  }
+  coeffs.prob(probabilityAt(1), true);
   _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   final nextIndex = coefficientIndex + 1;
   final nextContext = magnitude == 1 ? 1 : 2;
@@ -273,6 +281,7 @@ void _writeYAcTokenTail(
   int? yAcBandTwoEobProbability,
 ) {
   var currentContext = context;
+  var previousWasZero = false;
   for (var index = nextIndex; index < coefficientIndex; index += 1) {
     int probabilityAt(int node) => _fixtureYAcProbability(
       index,
@@ -281,10 +290,12 @@ void _writeYAcTokenTail(
       yAcBandOneEobProbability,
       yAcBandTwoEobProbability,
     );
-    coeffs
-      ..prob(probabilityAt(0), true)
-      ..prob(probabilityAt(1), false);
+    if (!previousWasZero) {
+      coeffs.prob(probabilityAt(0), true);
+    }
+    coeffs.prob(probabilityAt(1), false);
     currentContext = 0;
+    previousWasZero = true;
   }
   final magnitude = coefficient.abs();
   int probabilityAt(int node) => _fixtureYAcProbability(
@@ -294,9 +305,10 @@ void _writeYAcTokenTail(
     yAcBandOneEobProbability,
     yAcBandTwoEobProbability,
   );
-  coeffs
-    ..prob(probabilityAt(0), true)
-    ..prob(probabilityAt(1), true);
+  if (!previousWasZero) {
+    coeffs.prob(probabilityAt(0), true);
+  }
+  coeffs.prob(probabilityAt(1), true);
   _writeDctMagnitude(coeffs, magnitude, probabilityAt);
   coeffs.bit(coefficient.isNegative);
   final finalIndex = coefficientIndex + 1;

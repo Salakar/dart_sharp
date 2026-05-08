@@ -125,7 +125,7 @@ All complete → output: <promise>ALL_DONE</promise>
   - Phase TODO: [phases/phase03-codec-registry-and-initial-pure-dart-codecs.md](phases/phase03-codec-registry-and-initial-pure-dart-codecs.md)
   - Plan: [Codec Foundation](PLAN.md#52-codec-foundation)
   - Replace marker-raster JPEG/WebP placeholders with interoperable in-house codec implementations or update the support matrix to explicitly drop that support.
-- [ ] **Sharp parity follow-up: first-party WebP pixel decoder**
+- [x] **Sharp parity follow-up: first-party WebP pixel decoder**
   - Phase TODO: [phases/phase03-codec-registry-and-initial-pure-dart-codecs.md](phases/phase03-codec-registry-and-initial-pure-dart-codecs.md)
   - Plan: [Codec Foundation](PLAN.md#52-codec-foundation)
   - Implement VP8/VP8L WebP pixel reconstruction, including alpha and animated WebP frames, without runtime dependencies.

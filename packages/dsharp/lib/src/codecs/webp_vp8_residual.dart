@@ -333,7 +333,6 @@ bool _readBPredResidual(
   List<int> bModes,
 ) {
   var hasAnyCoefficients = false;
-  contexts.setHasCoefficients(mbX, _y2BlockIndex, false);
   for (var block = 0; block < 16; block += 1) {
     planes.predictLumaSubblock(mbX, mbY, block, bModes[block]);
     final hasCoefficients = _readLumaBlock(
@@ -392,14 +391,16 @@ List<int>? _readY2Block(
 ) {
   List<int>? coefficients;
   var context = initialContext;
+  var previousWasZero = false;
   for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.y2Probs.probabilityAt(coefficientIndex, context, node);
-    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+    if (!previousWasZero && coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
       break;
     }
     if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
       context = 0;
+      previousWasZero = true;
       continue;
     }
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
@@ -410,6 +411,7 @@ List<int>? _readY2Block(
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
+    previousWasZero = false;
   }
   return coefficients == null ? null : _inverseWht(coefficients);
 }
@@ -428,15 +430,17 @@ bool _readLumaAcBlock(
   final quant = _yAcQuant(frame.yAcQuantIndex(segmentId));
   List<int>? coefficients = dcCoefficient == 0 ? null : List<int>.filled(16, 0);
   var context = initialContext;
+  var previousWasZero = false;
   var hasTokenCoefficient = false;
   for (var coefficientIndex = 1; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.yAcProbs.probabilityAt(coefficientIndex, context, node);
-    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+    if (!previousWasZero && coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
       break;
     }
     if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
       context = 0;
+      previousWasZero = true;
       continue;
     }
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
@@ -444,6 +448,7 @@ bool _readLumaAcBlock(
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
+    previousWasZero = false;
     hasTokenCoefficient = true;
   }
   if (dcCoefficient != 0) {
@@ -466,14 +471,16 @@ bool _readLumaBlock(
 ) {
   List<int>? coefficients;
   var context = initialContext;
+  var previousWasZero = false;
   for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.yProbs.probabilityAt(coefficientIndex, context, node);
-    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+    if (!previousWasZero && coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
       break;
     }
     if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
       context = 0;
+      previousWasZero = true;
       continue;
     }
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
@@ -484,6 +491,7 @@ bool _readLumaBlock(
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
+    previousWasZero = false;
   }
   if (coefficients != null) {
     planes.addLumaDct(mbX, mbY, block, coefficients);
@@ -504,14 +512,16 @@ bool _readChromaBlock(
 ) {
   List<int>? coefficients;
   var context = initialContext;
+  var previousWasZero = false;
   for (var coefficientIndex = 0; coefficientIndex < 16; coefficientIndex += 1) {
     int probabilityAt(int node) =>
         frame.uvProbs.probabilityAt(coefficientIndex, context, node);
-    if (coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
+    if (!previousWasZero && coeffs.readBool(probabilityAt(_dctEobNode)) == 0) {
       break;
     }
     if (coeffs.readBool(probabilityAt(_dctZeroNode)) == 0) {
       context = 0;
+      previousWasZero = true;
       continue;
     }
     final magnitude = _readDctMagnitude(coeffs, probabilityAt);
@@ -522,6 +532,7 @@ bool _readChromaBlock(
     coefficients ??= List<int>.filled(16, 0);
     coefficients[_zigZag[coefficientIndex]] = coefficient * quant;
     context = magnitude == 1 ? 1 : 2;
+    previousWasZero = false;
   }
   if (coefficients != null) {
     planes.addChromaDct(mbX, mbY, block, isU, coefficients);
@@ -642,9 +653,16 @@ final class _Vp8TokenContexts {
     _left.fillRange(0, _left.length, 0);
   }
 
-  void clearMacroblock(int mbX) {
+  void clearMacroblock(int mbX, int yMode) {
+    final keepY2 = yMode == 4;
+    final leftY2 = _left[8];
+    final aboveY2 = _above[mbX * 9 + 8];
     _left.fillRange(0, _left.length, 0);
     _above.fillRange(mbX * 9, (mbX + 1) * 9, 0);
+    if (keepY2) {
+      _left[8] = leftY2;
+      _above[mbX * 9 + 8] = aboveY2;
+    }
   }
 
   int contextFor(int mbX, int block) {
