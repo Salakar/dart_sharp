@@ -87,6 +87,18 @@ void main() {
     expect(resized.width, 1);
     expect(resized.height, 1);
   });
+
+  test('reads WebP ICC and EXIF metadata from extended chunks', () async {
+    final metadata = await ImagePipeline.fromBytes(
+      _webpMetadataBytes(),
+    ).metadata();
+
+    expect(metadata.format, ImageFormat.webp);
+    expect(metadata.width, 3);
+    expect(metadata.height, 2);
+    expect(metadata.hasProfile, isTrue);
+    expect(metadata.orientation, 6);
+  });
 }
 
 Uint8List _pngMetadataBytes() {
@@ -177,6 +189,49 @@ void _pngChunk(ByteWriter writer, String type, List<int> data) {
     ..writeBytes(typeBytes)
     ..writeBytes(data)
     ..writeUint32Be(crc32(<int>[...typeBytes, ...data]));
+}
+
+Uint8List _webpMetadataBytes() {
+  final content = ByteWriter()
+    ..writeAscii('WEBP')
+    ..writeAscii('VP8X')
+    ..writeUint32Le(10)
+    ..writeByte(0x2c)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeUint24Le(content, 2);
+  _writeUint24Le(content, 1);
+  _riffChunk(content, 'ICCP', <int>[1, 2, 3, 4]);
+  _riffChunk(content, 'EXIF', _exifOrientation(6).sublist(6));
+  _riffChunk(content, 'XMP ', utf8.encode('<x:xmpmeta />'));
+  final vp8l = ByteWriter()..writeByte(0x2f);
+  final bits = 2 | (1 << 14);
+  vp8l.writeUint32Le(bits);
+  _riffChunk(content, 'VP8L', vp8l.toBytes());
+  final writer = ByteWriter()
+    ..writeAscii('RIFF')
+    ..writeUint32Le(content.length)
+    ..writeBytes(content.toBytes());
+  return writer.toBytes();
+}
+
+void _riffChunk(ByteWriter writer, String type, Iterable<int> data) {
+  final payload = Uint8List.fromList(List<int>.from(data));
+  writer
+    ..writeAscii(type)
+    ..writeUint32Le(payload.length)
+    ..writeBytes(payload);
+  if (payload.length.isOdd) {
+    writer.writeByte(0);
+  }
+}
+
+void _writeUint24Le(ByteWriter writer, int value) {
+  writer
+    ..writeByte(value)
+    ..writeByte(value >> 8)
+    ..writeByte(value >> 16);
 }
 
 void _jpegSegment(ByteWriter writer, int marker, List<int> data) {

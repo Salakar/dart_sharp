@@ -58,6 +58,9 @@ final class WebpImageInfo {
     required this.height,
     required this.compression,
     required this.hasAlpha,
+    required this.hasProfile,
+    required this.hasExif,
+    required this.hasXmp,
     required this.isAnimated,
     required this.loopCount,
     required this.frames,
@@ -74,6 +77,15 @@ final class WebpImageInfo {
 
   /// Whether alpha is present or advertised.
   final bool hasAlpha;
+
+  /// Whether an ICC profile chunk is present or advertised.
+  final bool hasProfile;
+
+  /// Whether an EXIF chunk is present or advertised.
+  final bool hasExif;
+
+  /// Whether an XMP chunk is present or advertised.
+  final bool hasXmp;
 
   /// Whether ANIM/ANMF chunks are present.
   final bool isAnimated;
@@ -95,6 +107,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   var offset = 12;
   WebpImageInfo? info;
   var hasAlpha = false;
+  var hasProfile = false;
+  var hasExif = false;
+  var hasXmp = false;
   var loopCount = 1;
   final frames = <WebpFrameInfo>[];
   while (offset + 8 <= bytes.length) {
@@ -113,8 +128,17 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     } else if (type == 'VP8X') {
       info = _vp8xInfo(data);
       hasAlpha = info.hasAlpha;
+      hasProfile = info.hasProfile;
+      hasExif = info.hasExif;
+      hasXmp = info.hasXmp;
     } else if (type == 'ALPH') {
       hasAlpha = true;
+    } else if (type == 'ICCP') {
+      hasProfile = true;
+    } else if (type == 'EXIF') {
+      hasExif = true;
+    } else if (type == 'XMP ') {
+      hasXmp = true;
     } else if (type == 'ANIM') {
       loopCount = readUint16Le(data, 4);
     } else if (type == 'ANMF') {
@@ -132,6 +156,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
     compression: parsed.compression,
     hasAlpha:
         parsed.hasAlpha || hasAlpha || frames.any((frame) => frame.hasAlpha),
+    hasProfile: parsed.hasProfile || hasProfile,
+    hasExif: parsed.hasExif || hasExif,
+    hasXmp: parsed.hasXmp || hasXmp,
     isAnimated: parsed.isAnimated || frames.isNotEmpty,
     loopCount: frames.isEmpty ? parsed.loopCount : loopCount,
     frames: List<WebpFrameInfo>.unmodifiable(frames),
@@ -150,6 +177,9 @@ WebpImageInfo _vp8Info(Uint8List data) {
     height: readUint16Le(data, 8) & 0x3fff,
     compression: WebpCompression.vp8,
     hasAlpha: false,
+    hasProfile: false,
+    hasExif: false,
+    hasXmp: false,
     isAnimated: false,
     loopCount: null,
     frames: const <WebpFrameInfo>[],
@@ -166,6 +196,9 @@ WebpImageInfo _vp8lInfo(Uint8List data) {
     height: ((bits >> 14) & 0x3fff) + 1,
     compression: WebpCompression.vp8l,
     hasAlpha: ((bits >> 28) & 1) == 1,
+    hasProfile: false,
+    hasExif: false,
+    hasXmp: false,
     isAnimated: false,
     loopCount: null,
     frames: const <WebpFrameInfo>[],
@@ -182,6 +215,9 @@ WebpImageInfo _vp8xInfo(Uint8List data) {
     height: _uint24Le(data, 7) + 1,
     compression: WebpCompression.extended,
     hasAlpha: (flags & 0x10) != 0,
+    hasProfile: (flags & 0x20) != 0,
+    hasExif: (flags & 0x08) != 0,
+    hasXmp: (flags & 0x04) != 0,
     isAnimated: (flags & 0x02) != 0,
     loopCount: null,
     frames: const <WebpFrameInfo>[],

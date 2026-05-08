@@ -283,6 +283,7 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
   final info = readWebpInfo(bytes);
   final frames = info.frames.isEmpty ? 1 : info.frames.length;
   _checkMetadataLimits(info.width, info.height, frames: frames);
+  final exif = _webpChunk(bytes, 'EXIF');
   return ImageMetadata(
     format: ImageFormat.webp,
     size: bytes.length,
@@ -292,8 +293,28 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
     hasAlpha: info.hasAlpha,
     frames: frames,
     loopCount: info.isAnimated ? info.loopCount : null,
+    hasProfile: info.hasProfile,
     bitDepth: 8,
+    orientation: exif == null ? null : _exifOrientation(exif),
   );
+}
+
+Uint8List? _webpChunk(Uint8List bytes, String target) {
+  var offset = 12;
+  while (offset + 8 <= bytes.length) {
+    final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
+    final length = readUint32Le(bytes, offset + 4);
+    final start = offset + 8;
+    final end = start + length;
+    if (end > bytes.length) {
+      throw const InvalidImageException('Truncated WebP chunk.');
+    }
+    if (type == target) {
+      return bytes.sublist(start, end);
+    }
+    offset = end + (length.isOdd ? 1 : 0);
+  }
+  return null;
 }
 
 ImageMetadata _tiffMetadata(Uint8List bytes) {
@@ -413,10 +434,16 @@ double? _jfifDensity(Uint8List data) {
 }
 
 int? _exifOrientation(Uint8List data) {
-  if (data.length < 14 || !_startsWithAscii(data, 'Exif')) {
+  if (data.length < 8) {
     return null;
   }
-  const tiff = 6;
+  var tiff = 0;
+  if (_startsWithAscii(data, 'Exif')) {
+    if (data.length < 14) {
+      return null;
+    }
+    tiff = 6;
+  }
   final little = data[tiff] == 0x49 && data[tiff + 1] == 0x49;
   final big = data[tiff] == 0x4d && data[tiff + 1] == 0x4d;
   if (!little && !big || _tiffRead16(data, tiff + 2, little) != 42) {
