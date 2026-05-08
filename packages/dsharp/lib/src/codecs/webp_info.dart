@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import 'binary_io.dart';
+import 'webp_riff.dart';
 
 /// WebP compression payload kind.
 enum WebpCompression {
@@ -104,6 +105,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       String.fromCharCodes(bytes.sublist(8, 12)) != 'WEBP') {
     throw const InvalidImageException('Invalid WebP signature.');
   }
+  final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
   WebpImageInfo? info;
   var hasAlpha = false;
@@ -114,12 +116,12 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
   var hasAnimationHeader = false;
   var imageChunkCount = 0;
   final frames = <WebpFrameInfo>[];
-  while (offset + 8 <= bytes.length) {
+  while (offset + 8 <= riffEnd) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final start = offset + 8;
     final end = start + length;
-    if (end > bytes.length) {
+    if (end > riffEnd) {
       throw const InvalidImageException('Truncated WebP chunk.');
     }
     final data = bytes.sublist(start, end);
@@ -159,6 +161,9 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       frames.add(_frameInfo(data));
     }
     offset = end + (length.isOdd ? 1 : 0);
+  }
+  if (offset != riffEnd) {
+    throw const InvalidImageException('Truncated WebP chunk.');
   }
   final parsed = info;
   if (parsed == null) {

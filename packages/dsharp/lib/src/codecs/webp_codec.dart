@@ -12,6 +12,7 @@ import 'webp_animation.dart';
 import 'webp_info.dart';
 import 'webp_lossless.dart';
 import 'webp_lossless_encoder.dart';
+import 'webp_riff.dart';
 import 'webp_vp8.dart';
 
 /// First-party WebP container decoder.
@@ -108,18 +109,22 @@ PixelImage _applyAnimationOptions(
 }
 
 bool _containsWebpChunk(Uint8List bytes, String target) {
+  final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
-  while (offset + 8 <= bytes.length) {
+  while (offset + 8 <= riffEnd) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final end = offset + 8 + length;
-    if (end > bytes.length) {
+    if (end > riffEnd) {
       return false;
     }
     if (type == target) {
       return true;
     }
     offset = end + (length.isOdd ? 1 : 0);
+  }
+  if (offset != riffEnd) {
+    return false;
   }
   return false;
 }

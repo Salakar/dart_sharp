@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../api/exceptions.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
+import 'webp_riff.dart';
 import 'webp_vp8_bool.dart';
 
 part 'webp_vp8_prediction.dart';
@@ -419,24 +420,23 @@ int _coefficientUpdateProbability(int plane, int band, int context, int node) {
 }
 
 Uint8List _findVp8Chunk(Uint8List bytes) {
-  if (bytes.length < 20 ||
-      String.fromCharCodes(bytes.sublist(0, 4)) != 'RIFF' ||
-      String.fromCharCodes(bytes.sublist(8, 12)) != 'WEBP') {
-    throw const InvalidImageException('Invalid WebP signature.');
-  }
+  final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
-  while (offset + 8 <= bytes.length) {
+  while (offset + 8 <= riffEnd) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final start = offset + 8;
     final end = start + length;
-    if (end > bytes.length) {
+    if (end > riffEnd) {
       throw const InvalidImageException('Truncated WebP chunk.');
     }
     if (type == 'VP8 ') {
       return bytes.sublist(start, end);
     }
     offset = end + (length.isOdd ? 1 : 0);
+  }
+  if (offset != riffEnd) {
+    throw const InvalidImageException('Truncated WebP chunk.');
   }
   throw const UnsupportedCodecException('WebP has no VP8 chunk.');
 }

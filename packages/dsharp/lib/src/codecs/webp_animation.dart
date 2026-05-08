@@ -6,6 +6,7 @@ import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'webp_alpha.dart';
 import 'webp_lossless.dart';
+import 'webp_riff.dart';
 import 'webp_vp8.dart';
 
 /// Decodes animated WebP frames whose frame payloads are VP8L or VP8.
@@ -72,6 +73,7 @@ _Animation _readAnimation(Uint8List bytes) {
       String.fromCharCodes(bytes.sublist(8, 12)) != 'WEBP') {
     throw const InvalidImageException('Invalid WebP signature.');
   }
+  final riffEnd = webpRiffEnd(bytes);
   var offset = 12;
   int? width;
   int? height;
@@ -79,12 +81,12 @@ _Animation _readAnimation(Uint8List bytes) {
   var loopCount = 1;
   var hasAnimationHeader = false;
   final frames = <_AnimationFrame>[];
-  while (offset + 8 <= bytes.length) {
+  while (offset + 8 <= riffEnd) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final start = offset + 8;
     final end = start + length;
-    if (end > bytes.length) {
+    if (end > riffEnd) {
       throw const InvalidImageException('Truncated WebP chunk.');
     }
     final data = bytes.sublist(start, end);
@@ -108,6 +110,9 @@ _Animation _readAnimation(Uint8List bytes) {
       frames.add(_readFrame(data));
     }
     offset = end + (length.isOdd ? 1 : 0);
+  }
+  if (offset != riffEnd) {
+    throw const InvalidImageException('Truncated WebP chunk.');
   }
   final currentWidth = width;
   final currentHeight = height;

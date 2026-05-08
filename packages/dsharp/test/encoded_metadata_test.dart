@@ -118,6 +118,48 @@ void main() {
     );
   });
 
+  test('rejects WebP with truncated RIFF payload size', () async {
+    final bytes = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    final malformed = _webpWithDeclaredLength(bytes, bytes.length - 7);
+
+    await expectLater(
+      ImagePipeline.fromBytes(malformed).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(malformed).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects WebP with trailing partial top-level chunk', () async {
+    final bytes = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    final malformed = Uint8List(bytes.length + 1)
+      ..setAll(0, bytes)
+      ..[bytes.length] = 0xff;
+
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _webpWithDeclaredLength(malformed, malformed.length - 8),
+      ).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects malformed WebP animation metadata chunks', () async {
     await expectLater(
       ImagePipeline.fromBytes(_truncatedWebpAnimBytes()).metadata(),
@@ -290,6 +332,15 @@ Uint8List _duplicateWebpImageBytes() {
     ..writeUint32Le(content.length)
     ..writeBytes(content.toBytes());
   return writer.toBytes();
+}
+
+Uint8List _webpWithDeclaredLength(Uint8List bytes, int length) {
+  final out = Uint8List.fromList(bytes);
+  out[4] = length & 0xff;
+  out[5] = (length >> 8) & 0xff;
+  out[6] = (length >> 16) & 0xff;
+  out[7] = (length >> 24) & 0xff;
+  return out;
 }
 
 Uint8List _truncatedWebpAnimBytes() {

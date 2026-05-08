@@ -129,6 +129,38 @@ Uint8List truncatedCompressedAlphaVp8Webp({
   return _riffWebp(chunks.finish());
 }
 
+/// Builds a VP8 WebP with an ALPH chunk appended outside declared RIFF bytes.
+Uint8List alphaOutsideRiffVp8Webp({
+  required int width,
+  required int height,
+  required List<int> alpha,
+}) {
+  if (alpha.length != width * height) {
+    throw ArgumentError.value(alpha.length, 'alpha.length');
+  }
+  final vp8 = _solidVp8Payload(width: width, height: height, yMode: 0);
+  final declared = _ByteWriter()
+    ..ascii('VP8X')
+    ..u32(10)
+    ..byte(0x10)
+    ..byte(0)
+    ..byte(0)
+    ..byte(0)
+    ..u24(width - 1)
+    ..u24(height - 1);
+  _writeChunk(declared, 'VP8 ', vp8);
+
+  final declaredPayload = declared.finish();
+  final payload = _ByteWriter()..bytes(declaredPayload);
+  _writeChunk(payload, 'ALPH', Uint8List.fromList(<int>[0, ...alpha]));
+  return (_ByteWriter()
+        ..ascii('RIFF')
+        ..u32(4 + declaredPayload.length)
+        ..ascii('WEBP')
+        ..bytes(payload.finish()))
+      .finish();
+}
+
 /// Builds an animated WebP with one lossy VP8 frame and optional ALPH data.
 Uint8List animatedVp8Webp({
   required int width,

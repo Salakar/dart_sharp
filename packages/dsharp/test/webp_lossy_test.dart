@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
+import 'helpers/webp_lossless_fixture.dart';
 import 'helpers/webp_lossy_fixture.dart';
 
 void main() {
@@ -58,6 +61,49 @@ void main() {
       128,
       128,
       255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  });
+
+  test('ignores VP8 chunks appended outside declared RIFF payload', () async {
+    final base = extendedVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    final extraWebp = solidVp8Webp(width: 1, height: 1);
+    final extraChunk = extraWebp.sublist(12);
+    final bytes = Uint8List(base.length + extraChunk.length)
+      ..setAll(0, base)
+      ..setAll(base.length, extraChunk);
+
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(image.firstFrameBytes(), <int>[1, 2, 3, 255]);
+  });
+
+  test('ignores ALPH chunks appended outside declared RIFF payload', () async {
+    final bytes = alphaOutsideRiffVp8Webp(
+      width: 2,
+      height: 1,
+      alpha: <int>[0, 255],
+    );
+
+    final metadata = await ImagePipeline.fromBytes(bytes).metadata();
+    final image = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(metadata.hasAlpha, isTrue);
+    expect(image.firstFrameBytes(), <int>[
       128,
       128,
       128,
