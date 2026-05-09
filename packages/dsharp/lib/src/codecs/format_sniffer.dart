@@ -69,6 +69,9 @@ ImageFormat sniffImageFormat(Uint8List bytes) {
   if (_startsWith(bytes, '%PDF'.codeUnits)) {
     return ImageFormat.pdf;
   }
+  if (_looksLikeSvg(bytes)) {
+    return ImageFormat.svg;
+  }
   if (_startsWith(bytes, const <int>[0x76, 0x2f, 0x31, 0x01])) {
     return ImageFormat.exr;
   }
@@ -107,6 +110,112 @@ bool _rangeEquals(Uint8List bytes, int offset, List<int> expected) {
     }
   }
   return true;
+}
+
+bool _looksLikeSvg(Uint8List bytes) {
+  final offset = _skipSvgPreamble(bytes);
+  return _startsSvgElement(bytes, offset) || _startsSvgDoctype(bytes, offset);
+}
+
+int _skipSvgPreamble(Uint8List bytes) {
+  var offset = _skipWhitespace(bytes, _skipUtf8Bom(bytes));
+  while (offset < bytes.length) {
+    if (_rangeEqualsAsciiCaseInsensitive(bytes, offset, '<?xml'.codeUnits)) {
+      final end = _findSequence(bytes, offset + 5, '?>'.codeUnits);
+      if (end < 0) {
+        return offset;
+      }
+      offset = _skipWhitespace(bytes, end + 2);
+      continue;
+    }
+    if (_rangeEquals(bytes, offset, '<!--'.codeUnits)) {
+      final end = _findSequence(bytes, offset + 4, '-->'.codeUnits);
+      if (end < 0) {
+        return offset;
+      }
+      offset = _skipWhitespace(bytes, end + 3);
+      continue;
+    }
+    return offset;
+  }
+  return offset;
+}
+
+int _skipUtf8Bom(Uint8List bytes) {
+  if (_startsWith(bytes, const <int>[0xef, 0xbb, 0xbf])) {
+    return 3;
+  }
+  return 0;
+}
+
+int _skipWhitespace(Uint8List bytes, int offset) {
+  var cursor = offset;
+  while (cursor < bytes.length && _isWhitespace(bytes[cursor])) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+bool _startsSvgElement(Uint8List bytes, int offset) {
+  if (!_rangeEqualsAsciiCaseInsensitive(bytes, offset, '<svg'.codeUnits)) {
+    return false;
+  }
+  final next = offset + 4;
+  return next >= bytes.length ||
+      _isWhitespace(bytes[next]) ||
+      bytes[next] == 0x2f ||
+      bytes[next] == 0x3a ||
+      bytes[next] == 0x3e;
+}
+
+bool _startsSvgDoctype(Uint8List bytes, int offset) {
+  if (!_rangeEqualsAsciiCaseInsensitive(bytes, offset, '<!doctype'.codeUnits)) {
+    return false;
+  }
+  final token = _skipWhitespace(bytes, offset + 9);
+  if (!_rangeEqualsAsciiCaseInsensitive(bytes, token, 'svg'.codeUnits)) {
+    return false;
+  }
+  final next = token + 3;
+  return next >= bytes.length ||
+      _isWhitespace(bytes[next]) ||
+      bytes[next] == 0x3e;
+}
+
+bool _rangeEqualsAsciiCaseInsensitive(
+  Uint8List bytes,
+  int offset,
+  List<int> expected,
+) {
+  if (bytes.length < offset + expected.length) {
+    return false;
+  }
+  for (var i = 0; i < expected.length; i += 1) {
+    if (_asciiLower(bytes[offset + i]) != _asciiLower(expected[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+int _asciiLower(int byte) {
+  if (byte >= 0x41 && byte <= 0x5a) {
+    return byte + 0x20;
+  }
+  return byte;
+}
+
+int _findSequence(Uint8List bytes, int start, List<int> pattern) {
+  for (
+    var offset = start;
+    offset + pattern.length <= bytes.length;
+    offset += 1
+  ) {
+    if (_rangeEquals(bytes, offset, pattern)) {
+      return offset;
+    }
+  }
+  return -1;
 }
 
 Iterable<String> _isoBmffBrands(Uint8List bytes) sync* {

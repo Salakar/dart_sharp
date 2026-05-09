@@ -4,6 +4,44 @@ import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('sniffs SVG buffers before unsupported decode failure', () async {
+    final direct = _bytes('<svg xmlns="http://www.w3.org/2000/svg"/>');
+    final withPreamble = _bytes(
+      '  <?xml version="1.0"?>\n<!-- generated -->\n<SVG width="1"/>',
+    );
+    final withBom = Uint8List.fromList(<int>[
+      0xef,
+      0xbb,
+      0xbf,
+      ...'<svg:svg/>'.codeUnits,
+    ]);
+    final withDoctype = _bytes('<!DOCTYPE svg><svg/>');
+
+    for (final bytes in <Uint8List>[
+      direct,
+      withPreamble,
+      withBom,
+      withDoctype,
+    ]) {
+      expect(sniffImageFormat(bytes), ImageFormat.svg);
+    }
+    expect(
+      sniffImageFormat(_bytes('<html><svg></svg></html>')),
+      isNot(ImageFormat.svg),
+    );
+
+    await expectLater(
+      ImagePipeline.fromBytes(direct).toPixelImage(),
+      throwsA(
+        isA<UnsupportedCodecException>().having(
+          (error) => error.message,
+          'message',
+          contains('svg decode is unsupported'),
+        ),
+      ),
+    );
+  });
+
   test('sniffs AVIF and HEIF ISO BMFF brands', () {
     expect(_ftyp('avif'), ImageFormat.avif);
     expect(_ftyp('avis'), ImageFormat.avif);
@@ -73,6 +111,8 @@ void main() {
     );
   });
 }
+
+Uint8List _bytes(String value) => Uint8List.fromList(value.codeUnits);
 
 ImageFormat _ftyp(String major, {List<String> compatible = const <String>[]}) {
   final bytes = <int>[];
