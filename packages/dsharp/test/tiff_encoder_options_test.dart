@@ -5,6 +5,16 @@ import 'package:dsharp/src/codecs/binary_io.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('TIFF defaults to JPEG compression like sharp', () async {
+    final encoded = await ImagePipeline.fromRawPixels(
+      _solidRaw(),
+    ).tiff().toBytesWithInfo();
+
+    expect(encoded.info.format, ImageFormat.tiff);
+    expect(encoded.info.channels, 3);
+    expect(_tiffShortTagValue(encoded.bytes, 259), 7);
+  });
+
   test('TIFF encoder writes LZW and Deflate compression', () async {
     final raw = _raw();
 
@@ -19,6 +29,52 @@ void main() {
 
       expect(_tiffShortTagValue(encoded, 259), entry.$2);
       expect(decoded.firstFrameBytes(), raw.bytes);
+    }
+  });
+
+  test('TIFF advanced parity options fail clearly when unsupported', () {
+    final pipeline = ImagePipeline.fromRawPixels(_raw());
+
+    for (final options in <TiffEncoderOptions>[
+      const TiffEncoderOptions(bitDepth: 1),
+      const TiffEncoderOptions(bitdepth: 4),
+      const TiffEncoderOptions(bigTiff: true),
+      const TiffEncoderOptions(bigtiff: true),
+      const TiffEncoderOptions(predictor: TiffPredictor.none),
+      const TiffEncoderOptions(tile: true),
+      const TiffEncoderOptions(pyramid: true),
+      const TiffEncoderOptions(tileWidth: 128),
+      const TiffEncoderOptions(tileHeight: 128),
+      const TiffEncoderOptions(xres: 2),
+      const TiffEncoderOptions(yres: 2),
+      const TiffEncoderOptions(resolutionUnit: TiffResolutionUnit.cm),
+      const TiffEncoderOptions(miniswhite: true),
+      const TiffEncoderOptions(compression: TiffCompression.ccittFax4),
+      const TiffEncoderOptions(compression: TiffCompression.webp),
+      const TiffEncoderOptions(compression: TiffCompression.zstd),
+      const TiffEncoderOptions(compression: TiffCompression.jp2k),
+      const TiffEncoderOptions(
+        compression: TiffCompression.deflate,
+        quality: 90,
+      ),
+    ]) {
+      expect(
+        pipeline.tiff(options).toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
+
+    for (final options in <TiffEncoderOptions>[
+      const TiffEncoderOptions(bitDepth: 16),
+      const TiffEncoderOptions(tileWidth: 0),
+      const TiffEncoderOptions(tileHeight: 0),
+      const TiffEncoderOptions(xres: 0),
+      const TiffEncoderOptions(yres: 0),
+    ]) {
+      expect(
+        pipeline.tiff(options).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
     }
   });
 

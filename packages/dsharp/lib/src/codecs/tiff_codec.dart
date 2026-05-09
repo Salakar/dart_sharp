@@ -38,27 +38,7 @@ final class TiffImageCodec implements ImageCodec {
     final tiffOptions = options is TiffEncoderOptions
         ? options
         : const TiffEncoderOptions();
-    if (tiffOptions.bitDepth != 8) {
-      throw const UnsupportedCodecException(
-        'TIFF encoding currently supports 8-bit output only.',
-      );
-    }
-    if (tiffOptions.tile) {
-      throw const UnsupportedCodecException(
-        'Tiled TIFF encoding is not implemented yet.',
-      );
-    }
-    if (tiffOptions.pyramid) {
-      throw const UnsupportedCodecException(
-        'TIFF pyramid encoding is not implemented yet.',
-      );
-    }
-    if (tiffOptions.compression != TiffCompression.jpeg &&
-        tiffOptions.quality != 80) {
-      throw const UnsupportedCodecException(
-        'TIFF quality is only meaningful for compressed output.',
-      );
-    }
+    _rejectUnsupportedTiffOptions(tiffOptions);
     final raw = image.firstFrame.pixels;
     final channels = tiffOptions.compression == TiffCompression.jpeg
         ? 3
@@ -76,13 +56,19 @@ final class TiffImageCodec implements ImageCodec {
         quality: tiffOptions.quality,
         chromaSubsampling: '4:4:4',
       ),
+      _ => throw const UnsupportedCodecException(
+        'Unsupported TIFF compression.',
+      ),
     };
     final compressionTag = switch (tiffOptions.compression) {
       TiffCompression.none => 1,
-      TiffCompression.lzw => 5,
-      TiffCompression.packBits => 32773,
-      TiffCompression.deflate => 8,
       TiffCompression.jpeg => 7,
+      TiffCompression.deflate => 8,
+      TiffCompression.packBits => 32773,
+      TiffCompression.lzw => 5,
+      _ => throw const UnsupportedCodecException(
+        'Unsupported TIFF compression.',
+      ),
     };
     final photometricTag = tiffOptions.compression == TiffCompression.jpeg
         ? 6
@@ -125,6 +111,73 @@ final class TiffImageCodec implements ImageCodec {
         height: raw.height,
         channels: channels,
       ),
+    );
+  }
+}
+
+void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
+  if (options.bitDepth != 8) {
+    throw const UnsupportedCodecException(
+      'TIFF encoding currently supports 8-bit output only.',
+    );
+  }
+  if (options.bigTiff) {
+    throw const UnsupportedCodecException(
+      'BigTIFF encoding is not implemented yet.',
+    );
+  }
+  if (options.predictor != TiffPredictor.horizontal) {
+    throw const UnsupportedCodecException(
+      'TIFF predictor is not implemented yet.',
+    );
+  }
+  if (options.tile) {
+    throw const UnsupportedCodecException(
+      'Tiled TIFF encoding is not implemented yet.',
+    );
+  }
+  if (options.pyramid) {
+    throw const UnsupportedCodecException(
+      'TIFF pyramid encoding is not implemented yet.',
+    );
+  }
+  if (options.tileWidth != 256) {
+    throw const UnsupportedCodecException(
+      'TIFF tileWidth is not implemented yet.',
+    );
+  }
+  if (options.tileHeight != 256) {
+    throw const UnsupportedCodecException(
+      'TIFF tileHeight is not implemented yet.',
+    );
+  }
+  if (options.xres != 1) {
+    throw const UnsupportedCodecException('TIFF xres is not implemented yet.');
+  }
+  if (options.yres != 1) {
+    throw const UnsupportedCodecException('TIFF yres is not implemented yet.');
+  }
+  if (options.resolutionUnit != TiffResolutionUnit.inch) {
+    throw const UnsupportedCodecException(
+      'TIFF resolutionUnit is not implemented yet.',
+    );
+  }
+  if (options.miniswhite) {
+    throw const UnsupportedCodecException(
+      'TIFF miniswhite is not implemented yet.',
+    );
+  }
+  if (options.compression == TiffCompression.ccittFax4 ||
+      options.compression == TiffCompression.webp ||
+      options.compression == TiffCompression.zstd ||
+      options.compression == TiffCompression.jp2k) {
+    throw const UnsupportedCodecException(
+      'TIFF compression is not implemented yet.',
+    );
+  }
+  if (options.compression != TiffCompression.jpeg && options.quality != 80) {
+    throw const UnsupportedCodecException(
+      'TIFF quality is only meaningful for JPEG compression.',
     );
   }
 }

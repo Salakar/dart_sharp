@@ -301,17 +301,50 @@ enum TiffCompression {
   /// No compression.
   none,
 
-  /// LZW compression.
-  lzw,
-
-  /// PackBits run-length compression.
-  packBits,
+  /// JPEG compression.
+  jpeg,
 
   /// Deflate compression.
   deflate,
 
-  /// JPEG compression.
-  jpeg,
+  /// PackBits run-length compression.
+  packBits,
+
+  /// CCITT Group 4 fax compression.
+  ccittFax4,
+
+  /// LZW compression.
+  lzw,
+
+  /// WebP compression.
+  webp,
+
+  /// Zstandard compression.
+  zstd,
+
+  /// JPEG 2000 compression.
+  jp2k,
+}
+
+/// TIFF compression predictor.
+enum TiffPredictor {
+  /// No prediction.
+  none,
+
+  /// Horizontal differencing.
+  horizontal,
+
+  /// Floating-point prediction.
+  float,
+}
+
+/// TIFF resolution unit.
+enum TiffResolutionUnit {
+  /// Inches.
+  inch,
+
+  /// Centimetres.
+  cm,
 }
 
 /// TIFF encoder options.
@@ -319,12 +352,23 @@ final class TiffEncoderOptions extends EncoderOptions {
   /// Creates TIFF options.
   const TiffEncoderOptions({
     this.quality = 80,
-    this.compression = TiffCompression.none,
-    this.bitDepth = 8,
+    this.compression = TiffCompression.jpeg,
+    int bitDepth = 8,
+    int? bitdepth,
+    bool bigTiff = false,
+    bool? bigtiff,
+    this.predictor = TiffPredictor.horizontal,
     this.tile = false,
     this.pyramid = false,
+    this.tileWidth = 256,
+    this.tileHeight = 256,
+    this.xres = 1,
+    this.yres = 1,
+    this.resolutionUnit = TiffResolutionUnit.inch,
+    this.miniswhite = false,
     super.force,
-  });
+  }) : bitDepth = bitdepth ?? bitDepth,
+       bigTiff = bigtiff ?? bigTiff;
 
   /// Quality from 1 to 100 for lossy compression.
   final int quality;
@@ -335,11 +379,53 @@ final class TiffEncoderOptions extends EncoderOptions {
   /// Bit depth.
   final int bitDepth;
 
+  /// Whether to write BigTIFF.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
+  final bool bigTiff;
+
+  /// Compression predictor.
+  ///
+  /// Values other than [TiffPredictor.horizontal] currently throw
+  /// [UnsupportedCodecException].
+  final TiffPredictor predictor;
+
   /// Whether to write tiled TIFF.
   final bool tile;
 
   /// Whether to write an image pyramid.
   final bool pyramid;
+
+  /// Horizontal tile size.
+  ///
+  /// Values other than `256` currently throw [UnsupportedCodecException].
+  final int tileWidth;
+
+  /// Vertical tile size.
+  ///
+  /// Values other than `256` currently throw [UnsupportedCodecException].
+  final int tileHeight;
+
+  /// Horizontal resolution in pixels per millimetre.
+  ///
+  /// Values other than `1` currently throw [UnsupportedCodecException].
+  final num xres;
+
+  /// Vertical resolution in pixels per millimetre.
+  ///
+  /// Values other than `1` currently throw [UnsupportedCodecException].
+  final num yres;
+
+  /// TIFF resolution unit.
+  ///
+  /// Values other than [TiffResolutionUnit.inch] currently throw
+  /// [UnsupportedCodecException].
+  final TiffResolutionUnit resolutionUnit;
+
+  /// Whether to write 1-bit images as miniswhite.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
+  final bool miniswhite;
 
   @override
   ImageFormat get format => ImageFormat.tiff;
@@ -347,7 +433,31 @@ final class TiffEncoderOptions extends EncoderOptions {
   @override
   void validate() {
     _quality(quality);
-    _bitDepth(bitDepth);
+    if (bitDepth != 1 && bitDepth != 2 && bitDepth != 4 && bitDepth != 8) {
+      throw const OperationValidationException(
+        'TIFF bitDepth must be one of 1, 2, 4, or 8.',
+      );
+    }
+    if (tileWidth <= 0) {
+      throw const OperationValidationException(
+        'TIFF tileWidth must be greater than zero.',
+      );
+    }
+    if (tileHeight <= 0) {
+      throw const OperationValidationException(
+        'TIFF tileHeight must be greater than zero.',
+      );
+    }
+    if (xres <= 0) {
+      throw const OperationValidationException(
+        'TIFF xres must be greater than zero.',
+      );
+    }
+    if (yres <= 0) {
+      throw const OperationValidationException(
+        'TIFF yres must be greater than zero.',
+      );
+    }
   }
 }
 
