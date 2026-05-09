@@ -114,6 +114,45 @@ void main() {
     );
   });
 
+  test('rejects malformed static ALPH chunk headers', () async {
+    final reservedFlags = alphaSolidVp8Webp(
+      width: 1,
+      height: 1,
+      alpha: <int>[127],
+    );
+    final reservedAlpha = _firstChunk(
+      reservedFlags,
+      'ALPH',
+      start: 12,
+      end: _riffEnd(reservedFlags),
+    );
+    reservedFlags[reservedAlpha.start] |= 0x80;
+
+    final unsupportedCompression = alphaSolidVp8Webp(
+      width: 1,
+      height: 1,
+      alpha: <int>[127],
+    );
+    final compressionAlpha = _firstChunk(
+      unsupportedCompression,
+      'ALPH',
+      start: 12,
+      end: _riffEnd(unsupportedCompression),
+    );
+    unsupportedCompression[compressionAlpha.start] |= 0x02;
+
+    for (final bytes in <Uint8List>[reservedFlags, unsupportedCompression]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects static VP8 alpha flag and chunk mismatches', () async {
     final alphaFlagWithoutChunk = extendedSolidVp8Webp(width: 1, height: 1);
     alphaFlagWithoutChunk[20] |= 0x10;
@@ -201,6 +240,27 @@ void main() {
       start: frame.start + 16,
       end: frame.end,
     );
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects malformed animation frame ALPH chunk headers', () async {
+    final bytes = animatedVp8Webp(width: 1, height: 1, alpha: <int>[127]);
+    final frame = _firstChunk(bytes, 'ANMF', start: 12, end: _riffEnd(bytes));
+    final alpha = _firstChunk(
+      bytes,
+      'ALPH',
+      start: frame.start + 16,
+      end: frame.end,
+    );
+    bytes[alpha.start] |= 0x80;
 
     await expectLater(
       ImagePipeline.fromBytes(bytes).metadata(),

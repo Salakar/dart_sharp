@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import 'binary_io.dart';
+import 'webp_alpha.dart';
 import 'webp_riff.dart';
 
 const _vp8xReservedFeatureFlags = 0xc1;
@@ -162,6 +163,7 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
           'WebP ALPH chunk follows image data.',
         );
       }
+      validateWebpAlphaChunkHeader(data);
       hasAlphaChunk = true;
     } else if (type == 'ICCP') {
       if (hasProfileChunk) {
@@ -476,6 +478,7 @@ _framePayloadInfo(Uint8List bytes, {required int start}) {
           'WebP animation frame ALPH chunk follows image data.',
         );
       }
+      validateWebpAlphaChunkHeader(bytes.sublist(dataStart, dataEnd));
       hasAlphaChunk = true;
       hasAlpha = true;
     } else if (type == 'VP8L') {

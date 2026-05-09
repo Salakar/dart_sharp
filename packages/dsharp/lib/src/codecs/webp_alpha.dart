@@ -40,13 +40,8 @@ Uint8List decodeWebpAlphaChunk(
   required int width,
   required int height,
 }) {
-  if (chunk.isEmpty) {
-    throw const InvalidImageException('Invalid WebP ALPH chunk.');
-  }
+  validateWebpAlphaChunkHeader(chunk);
   final flags = chunk[0];
-  if ((flags & _alphaReservedFlags) != 0) {
-    throw const InvalidImageException('Invalid WebP ALPH flags.');
-  }
   final compression = flags & 0x03;
   final filter = (flags >> 2) & 0x03;
   final expectedLength = width * height;
@@ -59,13 +54,25 @@ Uint8List decodeWebpAlphaChunk(
       filter,
     );
   }
-  if (compression != 0) {
-    throw const InvalidImageException('Invalid WebP ALPH compression method.');
-  }
   if (data.length != expectedLength) {
     throw const InvalidImageException('Invalid WebP ALPH payload length.');
   }
   return _unfilterAlpha(data, width, height, filter);
+}
+
+/// Validates the structural byte that prefixes every WebP ALPH chunk.
+void validateWebpAlphaChunkHeader(Uint8List chunk) {
+  if (chunk.isEmpty) {
+    throw const InvalidImageException('Invalid WebP ALPH chunk.');
+  }
+  final flags = chunk[0];
+  if ((flags & _alphaReservedFlags) != 0) {
+    throw const InvalidImageException('Invalid WebP ALPH flags.');
+  }
+  final compression = flags & 0x03;
+  if (compression > 1) {
+    throw const InvalidImageException('Invalid WebP ALPH compression method.');
+  }
 }
 
 Uint8List _unfilterAlpha(Uint8List data, int width, int height, int filter) {
