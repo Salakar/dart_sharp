@@ -11,6 +11,7 @@ import 'deflate_codec.dart';
 import 'encoder_options.dart';
 import 'image_format.dart';
 import 'jpeg_decoder.dart';
+import 'jpeg_encoder.dart';
 import 'output.dart';
 
 part 'tiff_samples.dart';
@@ -37,11 +38,6 @@ final class TiffImageCodec implements ImageCodec {
     final tiffOptions = options is TiffEncoderOptions
         ? options
         : const TiffEncoderOptions();
-    if (tiffOptions.compression == TiffCompression.jpeg) {
-      throw const UnsupportedCodecException(
-        'TIFF JPEG compression is not implemented yet.',
-      );
-    }
     if (tiffOptions.bitDepth != 8) {
       throw const UnsupportedCodecException(
         'TIFF encoding currently supports 8-bit output only.',
@@ -57,28 +53,40 @@ final class TiffImageCodec implements ImageCodec {
         'TIFF pyramid encoding is not implemented yet.',
       );
     }
-    if (tiffOptions.quality != 80) {
+    if (tiffOptions.compression != TiffCompression.jpeg &&
+        tiffOptions.quality != 80) {
       throw const UnsupportedCodecException(
         'TIFF quality is only meaningful for compressed output.',
       );
     }
     final raw = image.firstFrame.pixels;
-    final channels = raw.channels == ChannelCount.three ? 3 : 4;
+    final channels = tiffOptions.compression == TiffCompression.jpeg
+        ? 3
+        : raw.channels == ChannelCount.three
+        ? 3
+        : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);
     final encodedPixels = switch (tiffOptions.compression) {
       TiffCompression.none => pixels,
       TiffCompression.lzw => _tiffLzwEncode(pixels),
       TiffCompression.packBits => _tiffPackBitsEncode(pixels),
       TiffCompression.deflate => zlibEncodeFixed(pixels),
-      TiffCompression.jpeg => throw StateError('unreachable'),
+      TiffCompression.jpeg => encodeJpegBytes(
+        raw,
+        quality: tiffOptions.quality,
+        chromaSubsampling: '4:4:4',
+      ),
     };
     final compressionTag = switch (tiffOptions.compression) {
       TiffCompression.none => 1,
       TiffCompression.lzw => 5,
       TiffCompression.packBits => 32773,
       TiffCompression.deflate => 8,
-      TiffCompression.jpeg => throw StateError('unreachable'),
+      TiffCompression.jpeg => 7,
     };
+    final photometricTag = tiffOptions.compression == TiffCompression.jpeg
+        ? 6
+        : 2;
     const entryCount = 10;
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
@@ -93,7 +101,7 @@ final class TiffImageCodec implements ImageCodec {
     _entry(writer, 257, 4, 1, raw.height);
     _entry(writer, 258, 3, channels, bitsOffset);
     _entry(writer, 259, 3, 1, compressionTag);
-    _entry(writer, 262, 3, 1, 2);
+    _entry(writer, 262, 3, 1, photometricTag);
     _entry(writer, 273, 4, 1, pixelOffset);
     _entry(writer, 277, 3, 1, channels);
     _entry(writer, 278, 4, 1, raw.height);

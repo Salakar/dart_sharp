@@ -21,6 +21,33 @@ void main() {
       expect(decoded.firstFrameBytes(), raw.bytes);
     }
   });
+
+  test('TIFF encoder writes JPEG compression', () async {
+    final raw = _solidRaw();
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.jpeg,
+            quality: 100,
+          ),
+        )
+        .toBytesWithInfo();
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+    final rgba = decoded.firstFrameBytes();
+
+    expect(encoded.info.format, ImageFormat.tiff);
+    expect(encoded.info.channels, 3);
+    expect(_tiffShortTagValue(encoded.bytes, 259), 7);
+    expect(_tiffShortTagValue(encoded.bytes, 262), 6);
+    expect(decoded.width, raw.width);
+    expect(decoded.height, raw.height);
+    for (var offset = 0; offset < rgba.length; offset += 4) {
+      expect(rgba[offset], closeTo(90, 2));
+      expect(rgba[offset + 1], closeTo(120, 2));
+      expect(rgba[offset + 2], closeTo(150, 2));
+      expect(rgba[offset + 3], 255);
+    }
+  });
 }
 
 RawPixels _raw() {
@@ -36,6 +63,17 @@ RawPixels _raw() {
     ]),
     width: 4,
     height: 1,
+    channels: ChannelCount.four,
+  );
+}
+
+RawPixels _solidRaw() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[
+      for (var i = 0; i < 16; i += 1) ...<int>[90, 120, 150, 255],
+    ]),
+    width: 4,
+    height: 4,
     channels: ChannelCount.four,
   );
 }
