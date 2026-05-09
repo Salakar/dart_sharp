@@ -49,6 +49,23 @@ void main() {
     }
   });
 
+  test('JPEG chromaSubsampling metadata reflects encoded output', () async {
+    final raw = _gradient();
+    final subsampled = await ImagePipeline.fromRawPixels(raw).jpeg().toBytes();
+    final full = await ImagePipeline.fromRawPixels(
+      raw,
+    ).jpeg(const JpegEncoderOptions(chromaSubsampling: '4:4:4')).toBytes();
+
+    expect(
+      (await ImagePipeline.fromBytes(subsampled).metadata()).chromaSubsampling,
+      '4:2:0',
+    );
+    expect(
+      (await ImagePipeline.fromBytes(full).metadata()).chromaSubsampling,
+      '4:4:4',
+    );
+  });
+
   test('JPEG advanced parity options validate and encode', () async {
     final pipeline = ImagePipeline.fromRawPixels(_raw());
 
@@ -81,6 +98,18 @@ void main() {
       throwsA(isA<OperationValidationException>()),
     );
   });
+}
+
+RawPixels _gradient() {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[
+      for (var y = 0; y < 16; y += 1)
+        for (var x = 0; x < 16; x += 1) ...[x * 16, y * 16, (x + y) * 8],
+    ]),
+    width: 16,
+    height: 16,
+    channels: ChannelCount.three,
+  );
 }
 
 RawPixels _raw() {
