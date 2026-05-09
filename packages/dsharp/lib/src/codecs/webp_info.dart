@@ -275,6 +275,15 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       'WebP VP8 alpha flag does not match ALPH chunk.',
     );
   }
+  if (parsed.compression == WebpCompression.extended &&
+      !parsed.isAnimated &&
+      imageCompression == WebpCompression.vp8l &&
+      embeddedPayload != null &&
+      parsed.hasAlpha != embeddedPayload.hasAlpha) {
+    throw const InvalidImageException(
+      'WebP VP8L alpha flag does not match payload.',
+    );
+  }
   for (final frame in frames) {
     if (frame.x + frame.width > parsed.width ||
         frame.y + frame.height > parsed.height) {

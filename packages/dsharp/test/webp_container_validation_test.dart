@@ -99,6 +99,41 @@ void main() {
     }
   });
 
+  test('rejects static VP8L alpha flag and payload mismatches', () async {
+    final alphaFlagWithoutPayloadAlpha = extendedVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    alphaFlagWithoutPayloadAlpha[20] |= 0x10;
+    final payloadAlphaWithoutFlag = extendedVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 127,
+    );
+    payloadAlphaWithoutFlag[20] &= 0xef;
+
+    for (final bytes in <Uint8List>[
+      alphaFlagWithoutPayloadAlpha,
+      payloadAlphaWithoutFlag,
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects animation frame ALPH chunks after VP8 image data', () async {
     final ordered = animatedVp8Webp(width: 1, height: 1, alpha: <int>[127]);
     final reordered = Uint8List.fromList(<int>[
