@@ -514,8 +514,6 @@ final class WebpEncoderOptions extends EncoderOptions {
   final String preset;
 
   /// Encoder effort from 0 to 6.
-  ///
-  /// Values other than `4` currently throw [UnsupportedCodecException].
   final int effort;
 
   /// Optional animation loop count, where 0 means infinite looping.

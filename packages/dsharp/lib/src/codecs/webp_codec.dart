@@ -127,11 +127,6 @@ void _rejectUnsupportedWebpOptions(WebpEncoderOptions options) {
       'WebP preset is not implemented yet.',
     );
   }
-  if (options.effort != 4) {
-    throw const UnsupportedCodecException(
-      'WebP effort is not implemented yet.',
-    );
-  }
 }
 
 PixelImage _applyAnimationOptions(
