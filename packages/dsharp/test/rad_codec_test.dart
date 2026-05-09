@@ -69,7 +69,7 @@ void main() {
     expect(ImageFormat.fromId('rgbe'), ImageFormat.rad);
     expect(support.canDecode, isTrue);
     expect(support.canEncode, isTrue);
-    expect(support.metadata, CodecAvailability.unsupported);
+    expect(support.metadata, CodecAvailability.supported);
   });
 
   test(

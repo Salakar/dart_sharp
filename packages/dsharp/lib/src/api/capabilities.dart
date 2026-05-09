@@ -11,7 +11,7 @@ final class DsharpCapabilities {
           format: ImageFormat.raw,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
-          metadata: CodecAvailability.unsupported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.png: CodecSupport(
           format: ImageFormat.png,
@@ -49,7 +49,7 @@ final class DsharpCapabilities {
           format: ImageFormat.ppm,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
-          metadata: CodecAvailability.unsupported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.avif: CodecSupport(
           format: ImageFormat.avif,
@@ -115,13 +115,13 @@ final class DsharpCapabilities {
           format: ImageFormat.fits,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
-          metadata: CodecAvailability.unsupported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.rad: CodecSupport(
           format: ImageFormat.rad,
           input: CodecAvailability.supported,
           output: CodecAvailability.supported,
-          metadata: CodecAvailability.unsupported,
+          metadata: CodecAvailability.supported,
         ),
         ImageFormat.vips: CodecSupport(
           format: ImageFormat.vips,

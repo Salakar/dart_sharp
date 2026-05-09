@@ -13,11 +13,15 @@ void main() {
     expect(capabilities.supportFor(ImageFormat.webp).canEncode, isTrue);
     expect(capabilities.supportFor(ImageFormat.avif).canDecode, isFalse);
     for (final format in <ImageFormat>[
+      ImageFormat.raw,
       ImageFormat.png,
       ImageFormat.jpeg,
       ImageFormat.gif,
       ImageFormat.tiff,
       ImageFormat.webp,
+      ImageFormat.ppm,
+      ImageFormat.fits,
+      ImageFormat.rad,
     ]) {
       expect(
         capabilities.supportFor(format).metadata,

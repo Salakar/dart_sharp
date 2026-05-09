@@ -21,6 +21,33 @@ void main() {
     expect(metadata.hasAlpha, isTrue);
   });
 
+  test('metadata falls back through decoded PPM FITS and RAD images', () async {
+    final raw = RawPixels(
+      bytes: Uint8List.fromList(<int>[10, 20, 30, 255, 40, 50, 60, 255]),
+      width: 2,
+      height: 1,
+      channels: ChannelCount.four,
+    );
+
+    for (final format in <ImageFormat>[
+      ImageFormat.ppm,
+      ImageFormat.fits,
+      ImageFormat.rad,
+    ]) {
+      final encoded = await ImagePipeline.fromRawPixels(
+        raw,
+      ).toBytes(format: format);
+      final metadata = await ImagePipeline.fromBytes(encoded).metadata();
+
+      expect(metadata.format, format);
+      expect(metadata.size, encoded.length);
+      expect(metadata.width, 2);
+      expect(metadata.height, 1);
+      expect(metadata.channels, 4);
+      expect(metadata.hasAlpha, isTrue);
+    }
+  });
+
   test('metadata includes encoded source size and sniffed format', () async {
     final encoded = await ImagePipeline.create(
       const CreateImage(
