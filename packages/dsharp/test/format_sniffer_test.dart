@@ -110,11 +110,80 @@ void main() {
       ImageFormat.unknown,
     );
   });
+
+  test(
+    'sniffed unsupported buffers fail with format-specific errors',
+    () async {
+      final cases = <(ImageFormat, Uint8List)>[
+        (ImageFormat.avif, _ftypBytes('avif')),
+        (ImageFormat.heif, _ftypBytes('heic')),
+        (
+          ImageFormat.jxl,
+          Uint8List.fromList(<int>[
+            0x00,
+            0x00,
+            0x00,
+            0x0c,
+            0x4a,
+            0x58,
+            0x4c,
+            0x20,
+            0x0d,
+            0x0a,
+            0x87,
+            0x0a,
+          ]),
+        ),
+        (
+          ImageFormat.jp2,
+          Uint8List.fromList(<int>[
+            0x00,
+            0x00,
+            0x00,
+            0x0c,
+            0x6a,
+            0x50,
+            0x20,
+            0x20,
+            0x0d,
+            0x0a,
+            0x87,
+            0x0a,
+          ]),
+        ),
+        (ImageFormat.svg, _bytes('<svg/>')),
+        (ImageFormat.pdf, _bytes('%PDF-1.7')),
+        (ImageFormat.exr, Uint8List.fromList(<int>[0x76, 0x2f, 0x31, 0x01])),
+      ];
+
+      for (final (format, bytes) in cases) {
+        expect(sniffImageFormat(bytes), format);
+        await expectLater(
+          ImagePipeline.fromBytes(bytes).toPixelImage(),
+          throwsA(
+            isA<UnsupportedCodecException>().having(
+              (error) => error.message,
+              'message',
+              contains('${format.id} decode is unsupported'),
+            ),
+          ),
+          reason: format.id,
+        );
+      }
+    },
+  );
 }
 
 Uint8List _bytes(String value) => Uint8List.fromList(value.codeUnits);
 
 ImageFormat _ftyp(String major, {List<String> compatible = const <String>[]}) {
+  return sniffImageFormat(_ftypBytes(major, compatible: compatible));
+}
+
+Uint8List _ftypBytes(
+  String major, {
+  List<String> compatible = const <String>[],
+}) {
   final bytes = <int>[];
   final size = 16 + compatible.length * 4;
   bytes
@@ -130,5 +199,5 @@ ImageFormat _ftyp(String major, {List<String> compatible = const <String>[]}) {
   for (final brand in compatible) {
     bytes.addAll(brand.codeUnits);
   }
-  return sniffImageFormat(Uint8List.fromList(bytes));
+  return Uint8List.fromList(bytes);
 }
