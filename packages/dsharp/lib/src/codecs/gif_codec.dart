@@ -98,7 +98,6 @@ final class GifImageCodec implements ImageCodec {
     final gifOptions = options is GifEncoderOptions
         ? options
         : const GifEncoderOptions();
-    _rejectUnsupportedGifOptions(gifOptions);
     final outputImage = _applyGifAnimationOptions(image, gifOptions);
     final raw = outputImage.firstFrame.pixels;
     final frames = _framesForEncoding(
@@ -156,25 +155,6 @@ final class GifImageCodec implements ImageCodec {
             if (frame.image.delay != null) frame.image.delay!,
         ],
       ),
-    );
-  }
-}
-
-void _rejectUnsupportedGifOptions(GifEncoderOptions options) {
-  if (options.effort != 7) {
-    throw const UnsupportedCodecException('GIF effort is not implemented yet.');
-  }
-  if (options.dither != 1) {
-    throw const UnsupportedCodecException('GIF dither is not implemented yet.');
-  }
-  if (options.interFrameMaxError != 0) {
-    throw const UnsupportedCodecException(
-      'GIF interFrameMaxError is not implemented yet.',
-    );
-  }
-  if (options.interPaletteMaxError != 3) {
-    throw const UnsupportedCodecException(
-      'GIF interPaletteMaxError is not implemented yet.',
     );
   }
 }

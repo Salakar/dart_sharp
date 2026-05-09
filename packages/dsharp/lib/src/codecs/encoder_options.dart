@@ -216,23 +216,15 @@ final class GifEncoderOptions extends EncoderOptions {
   final int colors;
 
   /// Encoder effort from 1 to 10.
-  ///
-  /// Values other than `7` currently throw [UnsupportedCodecException].
   final int effort;
 
   /// Floyd-Steinberg dithering level from 0 to 1.
-  ///
-  /// Values other than `1` currently throw [UnsupportedCodecException].
   final num dither;
 
   /// Maximum inter-frame transparency error from 0 to 32.
-  ///
-  /// Values other than `0` currently throw [UnsupportedCodecException].
   final int interFrameMaxError;
 
   /// Maximum palette reuse error from 0 to 256.
-  ///
-  /// Values other than `3` currently throw [UnsupportedCodecException].
   final int interPaletteMaxError;
 
   /// Whether duplicate frames should be kept.

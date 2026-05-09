@@ -130,20 +130,28 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
-  test('GIF advanced parity options fail clearly when unsupported', () {
+  test('GIF advanced parity options validate and encode', () async {
     final pipeline = ImagePipeline.fromRawPixels(_twoColorRaw());
 
-    for (final options in <GifEncoderOptions>[
-      const GifEncoderOptions(effort: 1),
-      const GifEncoderOptions(dither: 0.5),
-      const GifEncoderOptions(interFrameMaxError: 8),
-      const GifEncoderOptions(interPaletteMaxError: 0),
+    for (final options in const <GifEncoderOptions>[
+      GifEncoderOptions(effort: 1),
+      GifEncoderOptions(effort: 10),
+      GifEncoderOptions(dither: 0),
+      GifEncoderOptions(dither: 0.5),
+      GifEncoderOptions(interFrameMaxError: 8),
+      GifEncoderOptions(interFrameMaxError: 32),
+      GifEncoderOptions(interPaletteMaxError: 0),
+      GifEncoderOptions(interPaletteMaxError: 256),
     ]) {
-      expect(
-        pipeline.gif(options).toBytes(),
-        throwsA(isA<UnsupportedCodecException>()),
-      );
+      final encoded = await pipeline.gif(options).toBytes();
+      final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+      expect(decoded.firstFrameBytes(), _twoColorRaw().bytes);
     }
+  });
+
+  test('GIF advanced parity options fail clearly when invalid', () {
+    final pipeline = ImagePipeline.fromRawPixels(_twoColorRaw());
 
     for (final options in <GifEncoderOptions>[
       const GifEncoderOptions(effort: 0),
