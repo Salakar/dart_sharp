@@ -37,6 +37,8 @@ import '../source/generated_image.dart';
 import '../source/image_source.dart';
 import '../source/input_options.dart';
 import '../source/raw_pixels.dart';
+import '../source/text_image.dart';
+import '../source/text_renderer.dart';
 import 'cancellation.dart';
 import 'pipeline_operation.dart';
 
@@ -136,6 +138,14 @@ final class ImagePipeline {
     return ImagePipeline.fromSource(ImageSource.create(image), limits: limits);
   }
 
+  /// Creates a pipeline from a generated text image descriptor.
+  factory ImagePipeline.text(
+    TextImageRequest text, {
+    InputSafetyLimits limits = const InputSafetyLimits(),
+  }) {
+    return ImagePipeline.fromSource(ImageSource.text(text), limits: limits);
+  }
+
   /// Creates a pipeline from an arbitrary web-safe source.
   factory ImagePipeline.fromSource(
     ImageSource source, {
@@ -184,9 +194,7 @@ final class ImagePipeline {
       RawImageSource(:final pixels) => _decodeRawPixels(codecs, pixels),
       PixelImageSource(:final image) => _checkedPixelImage(image),
       GeneratedImageSource(:final image) => _createPixels(image),
-      TextImageSource() => throw const UnsupportedCodecException(
-        'Text rendering is not implemented yet.',
-      ),
+      TextImageSource(:final text) => renderTextImage(text),
     };
     token?.throwIfCancelled();
     final hasAutoOrient = _steps.any((step) => step is AutoOrientOperation);
@@ -493,8 +501,8 @@ final class ImagePipeline {
       StreamImageSource() => ImageFormat.unknown,
       RawImageSource() ||
       PixelImageSource() ||
-      GeneratedImageSource() => ImageFormat.raw,
-      TextImageSource() => ImageFormat.unknown,
+      GeneratedImageSource() ||
+      TextImageSource() => ImageFormat.raw,
     };
   }
 

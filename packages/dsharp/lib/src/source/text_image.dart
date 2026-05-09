@@ -25,7 +25,7 @@ enum TextWrap {
   none,
 }
 
-/// Descriptor for a future pure Dart text image renderer.
+/// Descriptor for the built-in pure Dart bitmap text renderer.
 final class TextImageRequest {
   /// Creates a text image descriptor.
   const TextImageRequest({

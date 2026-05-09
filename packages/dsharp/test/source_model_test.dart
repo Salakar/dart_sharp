@@ -136,7 +136,7 @@ void main() {
     );
   });
 
-  test('text source stores future renderer descriptor', () {
+  test('text source stores renderer descriptor', () {
     final source =
         ImageSource.text(
               const TextImageRequest(
