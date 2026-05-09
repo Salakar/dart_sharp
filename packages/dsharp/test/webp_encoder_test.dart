@@ -628,21 +628,22 @@ void main() {
       final pipeline = ImagePipeline.fromPixelImage(_animation());
 
       await expectLater(
-        pipeline
-            .webp(
-              const WebpEncoderOptions(
-                alphaQuality: 0,
-                smartSubsample: true,
-                smartDeblock: true,
-                preset: 'picture',
-                effort: 0,
-                minSize: true,
-                mixed: true,
-              ),
-            )
-            .toBytes(),
+        pipeline.webp(const WebpEncoderOptions(alphaQuality: 0)).toBytes(),
         completes,
       );
+      for (final options in <WebpEncoderOptions>[
+        const WebpEncoderOptions(smartSubsample: true),
+        const WebpEncoderOptions(smartDeblock: true),
+        const WebpEncoderOptions(preset: 'picture'),
+        const WebpEncoderOptions(effort: 0),
+        const WebpEncoderOptions(minSize: true),
+        const WebpEncoderOptions(mixed: true),
+      ]) {
+        expect(
+          pipeline.webp(options).toBytes(),
+          throwsA(isA<UnsupportedCodecException>()),
+        );
+      }
       expect(
         pipeline.webp(const WebpEncoderOptions(alphaQuality: -1)).toBytes(),
         throwsA(isA<OperationValidationException>()),
