@@ -138,6 +138,24 @@ Uint8List invalidColorCacheSizeVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP with an out-of-range distance prefix symbol.
+Uint8List invalidDistancePrefixSymbolVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeSingleSymbolCode(bits, 20);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeSingleSymbolCode(bits, 40);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP with a literal pixel followed by a color-cache code.
 Uint8List colorCacheVp8lWebp({
   required int red,

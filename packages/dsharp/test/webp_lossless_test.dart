@@ -188,6 +188,21 @@ void main() {
     );
   });
 
+  test('rejects invalid VP8L prefix symbols', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        invalidDistancePrefixSymbolVp8lWebp(),
+      ).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L prefix symbol'),
+        ),
+      ),
+    );
+  });
+
   test('decodes the VP8L subtract-green transform', () async {
     final bytes = subtractGreenVp8lWebp(
       width: 2,
