@@ -378,7 +378,61 @@ void main() {
     );
     animatedAfterFrame[20] |= 0x20;
 
-    for (final bytes in <Uint8List>[staticAfterImage, animatedAfterFrame]) {
+    final animatedAfterAnim = _insertChunkAfter(
+      animatedVp8Webp(width: 1, height: 1),
+      'ANIM',
+      'ICCP',
+      <int>[1],
+    );
+    animatedAfterAnim[20] |= 0x20;
+
+    for (final bytes in <Uint8List>[
+      staticAfterImage,
+      animatedAfterFrame,
+      animatedAfterAnim,
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
+  test('rejects duplicate WebP metadata chunks', () async {
+    final duplicateProfile = _insertChunkAfter(
+      _insertChunkAfter(
+        extendedSolidVp8Webp(width: 1, height: 1),
+        'VP8X',
+        'ICCP',
+        <int>[1],
+      ),
+      'ICCP',
+      'ICCP',
+      <int>[2],
+    );
+    duplicateProfile[20] |= 0x20;
+    final duplicateExif = _appendChunk(
+      _appendChunk(extendedSolidVp8Webp(width: 1, height: 1), 'EXIF', <int>[1]),
+      'EXIF',
+      <int>[2],
+    );
+    duplicateExif[20] |= 0x08;
+    final duplicateXmp = _appendChunk(
+      _appendChunk(extendedSolidVp8Webp(width: 1, height: 1), 'XMP ', <int>[1]),
+      'XMP ',
+      <int>[2],
+    );
+    duplicateXmp[20] |= 0x04;
+
+    for (final bytes in <Uint8List>[
+      duplicateProfile,
+      duplicateExif,
+      duplicateXmp,
+    ]) {
       await expectLater(
         ImagePipeline.fromBytes(bytes).metadata(),
         throwsA(isA<InvalidImageException>()),
@@ -510,15 +564,39 @@ void main() {
 }
 
 Uint8List _appendChunk(Uint8List webp, String type, List<int> payload) {
+  final chunk = _chunkBytes(type, payload);
+  final out = Uint8List(webp.length + chunk.length)
+    ..setAll(0, webp)
+    ..setAll(webp.length, chunk);
+  ByteData.sublistView(out).setUint32(4, out.length - 8, Endian.little);
+  return out;
+}
+
+Uint8List _insertChunkAfter(
+  Uint8List webp,
+  String afterType,
+  String type,
+  List<int> payload,
+) {
+  final riffEnd = _riffEnd(webp);
+  final after = _firstChunk(webp, afterType, start: 12, end: riffEnd);
+  final offset = after.end + (after.length.isOdd ? 1 : 0);
+  final chunk = _chunkBytes(type, payload);
+  final out = Uint8List(webp.length + chunk.length)
+    ..setAll(0, webp.sublist(0, offset))
+    ..setAll(offset, chunk)
+    ..setAll(offset + chunk.length, webp.sublist(offset));
+  ByteData.sublistView(out).setUint32(4, out.length - 8, Endian.little);
+  return out;
+}
+
+Uint8List _chunkBytes(String type, List<int> payload) {
   final padding = payload.length.isOdd ? 1 : 0;
-  final out = Uint8List(webp.length + 8 + payload.length + padding)
-    ..setAll(0, webp);
-  final offset = webp.length;
-  out.setAll(offset, type.codeUnits);
+  final out = Uint8List(8 + payload.length + padding);
+  out.setAll(0, type.codeUnits);
   final words = ByteData.sublistView(out);
-  words.setUint32(offset + 4, payload.length, Endian.little);
-  out.setAll(offset + 8, payload);
-  words.setUint32(4, out.length - 8, Endian.little);
+  words.setUint32(4, payload.length, Endian.little);
+  out.setAll(8, payload);
   return out;
 }
 
