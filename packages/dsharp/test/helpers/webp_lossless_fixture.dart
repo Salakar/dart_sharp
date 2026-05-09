@@ -188,6 +188,24 @@ Uint8List invalidEmptyPrefixCodeVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP whose distance code declares too many symbols.
+Uint8List invalidPrefixSymbolCountVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeSingleSymbolCode(bits, 20);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeInvalidPrefixSymbolCountCode(bits);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP with a literal pixel followed by a color-cache code.
 Uint8List colorCacheVp8lWebp({
   required int red,
@@ -285,6 +303,19 @@ void _writeEmptyPrefixCode(_BitWriter bits) {
     ..write(0, 3)
     ..write(0, 3)
     ..write(0, 3);
+}
+
+void _writeInvalidPrefixSymbolCountCode(_BitWriter bits) {
+  bits
+    ..write(0, 1)
+    ..write(0, 4)
+    ..write(0, 3)
+    ..write(0, 3)
+    ..write(1, 3)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(3, 3)
+    ..write(255, 8);
 }
 
 int _colorCacheIndex({

@@ -229,6 +229,21 @@ void main() {
     );
   });
 
+  test('rejects invalid VP8L prefix symbol counts', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        invalidPrefixSymbolCountVp8lWebp(),
+      ).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L prefix symbol count'),
+        ),
+      ),
+    );
+  });
+
   test('decodes the VP8L subtract-green transform', () async {
     final bytes = subtractGreenVp8lWebp(
       width: 2,
