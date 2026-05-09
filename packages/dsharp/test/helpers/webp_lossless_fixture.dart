@@ -85,6 +85,46 @@ Uint8List backrefVp8lWebp({
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP with a backward reference before any literal pixel.
+Uint8List invalidInitialBackrefVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeTwoSymbolNormalCode(bits, 20, 256);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeSingleSymbolCode(bits, 1);
+  bits.write(1, 1);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
+/// Builds a VP8L WebP with a backward reference that overruns the image.
+Uint8List invalidOverrunBackrefVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(1, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeTwoSymbolNormalCode(bits, 20, 258);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeSingleSymbolCode(bits, 1);
+  bits
+    ..write(0, 1)
+    ..write(1, 1);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP with a literal pixel followed by a color-cache code.
 Uint8List colorCacheVp8lWebp({
   required int red,

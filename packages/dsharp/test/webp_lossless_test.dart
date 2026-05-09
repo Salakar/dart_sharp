@@ -149,6 +149,24 @@ void main() {
     ]);
   });
 
+  test('rejects invalid VP8L backward references', () async {
+    for (final bytes in <List<int>>[
+      invalidInitialBackrefVp8lWebp(),
+      invalidOverrunBackrefVp8lWebp(),
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(
+          isA<InvalidImageException>().having(
+            (error) => error.message,
+            'message',
+            contains('Invalid VP8L backward reference'),
+          ),
+        ),
+      );
+    }
+  });
+
   test('decodes VP8L color-cache codes', () async {
     final bytes = colorCacheVp8lWebp(red: 91, green: 20, blue: 33, alpha: 244);
 
