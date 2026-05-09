@@ -244,6 +244,19 @@ void main() {
     );
   });
 
+  test('rejects invalid VP8L prefix codes', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(invalidPrefixCodeVp8lWebp()).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L prefix code'),
+        ),
+      ),
+    );
+  });
+
   test('decodes the VP8L subtract-green transform', () async {
     final bytes = subtractGreenVp8lWebp(
       width: 2,

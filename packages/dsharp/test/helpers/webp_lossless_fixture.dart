@@ -206,6 +206,25 @@ Uint8List invalidPrefixSymbolCountVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP whose pixel data does not match its prefix tree.
+Uint8List invalidPrefixCodeVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeTwoSymbolLengthTwoNormalCode(bits, 20, 21);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeSingleSymbolCode(bits, 0);
+  bits.write((1 << 15) - 1, 15);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP with a literal pixel followed by a color-cache code.
 Uint8List colorCacheVp8lWebp({
   required int red,
@@ -278,6 +297,27 @@ void _writeTwoSymbolNormalCode(_BitWriter bits, int first, int second) {
     ..write(1, 1)
     ..write(4, 3)
     ..write(second - 1, 10);
+  for (var symbol = 0; symbol <= second; symbol += 1) {
+    bits.write(symbol == first || symbol == second ? 1 : 0, 1);
+  }
+}
+
+void _writeTwoSymbolLengthTwoNormalCode(
+  _BitWriter bits,
+  int first,
+  int second,
+) {
+  bits
+    ..write(0, 1)
+    ..write(1, 4)
+    ..write(0, 3)
+    ..write(0, 3)
+    ..write(1, 3)
+    ..write(0, 3)
+    ..write(1, 3)
+    ..write(1, 1)
+    ..write(2, 3)
+    ..write(second - 1, 6);
   for (var symbol = 0; symbol <= second; symbol += 1) {
     bits.write(symbol == first || symbol == second ? 1 : 0, 1);
   }
