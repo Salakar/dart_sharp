@@ -211,6 +211,27 @@ void main() {
     );
   });
 
+  test('rejects animation frames with reserved flags', () async {
+    final bytes = animatedVp8Webp(width: 1, height: 1);
+    final frameOffset = _chunkOffset(bytes, 'ANMF');
+    bytes[frameOffset + 23] |= 0x04;
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid WebP animation frame flags'),
+        ),
+      ),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects animated WebP with top-level image chunks', () async {
     final bytes = animatedVp8lWebpWithTopLevelImageChunk();
 

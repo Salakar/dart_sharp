@@ -9,6 +9,8 @@ import 'webp_lossless.dart';
 import 'webp_riff.dart';
 import 'webp_vp8.dart';
 
+const _animationFrameReservedFlags = 0xfc;
+
 /// Decodes animated WebP frames whose frame payloads are VP8L or VP8.
 PixelImage decodeAnimatedWebp(Uint8List bytes) {
   final animation = _readAnimation(bytes);
@@ -187,6 +189,9 @@ _AnimationFrame _readFrame(Uint8List data) {
     throw const InvalidImageException('WebP VP8L animation frame has ALPH.');
   }
   final flags = data[15];
+  if ((flags & _animationFrameReservedFlags) != 0) {
+    throw const InvalidImageException('Invalid WebP animation frame flags.');
+  }
   return _AnimationFrame(
     x: _uint24Le(data, 0) * 2,
     y: _uint24Le(data, 3) * 2,
