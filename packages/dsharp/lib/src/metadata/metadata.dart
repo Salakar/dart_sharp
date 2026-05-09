@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../codecs/image_format.dart';
+import '../pixels/color.dart';
 import '../pixels/pixel_image.dart';
 import 'xmp_metadata.dart';
 
@@ -19,6 +20,7 @@ final class ImageMetadata {
     this.loopCount,
     List<Duration> frameDelays = const <Duration>[],
     this.density,
+    this.background,
     bool hasProfile = false,
     bool hasExif = false,
     bool hasXmp = false,
@@ -85,6 +87,9 @@ final class ImageMetadata {
 
   /// Optional pixel density in DPI.
   final double? density;
+
+  /// Default encoded background color when present.
+  final RgbaColor? background;
 
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;

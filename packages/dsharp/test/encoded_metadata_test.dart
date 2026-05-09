@@ -24,6 +24,9 @@ void main() {
     expect(metadata.density, closeTo(300, 0.05));
     expect(metadata.hasProfile, isTrue);
     expect(metadata.iccProfile, <int>[1, 2, 3]);
+    expect(metadata.background?.red, 0x12);
+    expect(metadata.background?.green, 0xab);
+    expect(metadata.background?.blue, 0xfe);
     expect(metadata.hasExif, isTrue);
     expect(metadata.exif, isNotNull);
     expect(metadata.orientation, 6);
@@ -71,6 +74,9 @@ void main() {
     expect(metadata.pages, 2);
     expect(metadata.loopCount, 3);
     expect(metadata.loop, 3);
+    expect(metadata.background?.red, 255);
+    expect(metadata.background?.green, 255);
+    expect(metadata.background?.blue, 255);
     expect(metadata.frameDelays, <Duration>[
       Duration(milliseconds: 30),
       Duration(milliseconds: 40),
@@ -320,6 +326,7 @@ Uint8List _pngMetadataBytes() {
   final writer = ByteWriter()
     ..writeBytes(<int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   _pngChunk(writer, 'IHDR', <int>[0, 0, 0, 3, 0, 0, 0, 2, 16, 6, 0, 0, 1]);
+  _pngChunk(writer, 'bKGD', <int>[0x12, 0x34, 0xab, 0xcd, 0xfe, 0xdc]);
   _pngChunk(writer, 'pHYs', <int>[0, 0, 0x2e, 0x23, 0, 0, 0x2e, 0x23, 1]);
   _pngChunk(writer, 'iCCP', <int>[
     ...ascii.encode('test'),
@@ -394,7 +401,7 @@ Uint8List _gifMetadataBytes() {
     ..writeUint16Le(1)
     ..writeUint16Le(1)
     ..writeByte(0x80)
-    ..writeByte(0)
+    ..writeByte(1)
     ..writeByte(0)
     ..writeBytes(<int>[0, 0, 0, 255, 255, 255])
     ..writeBytes(<int>[0x21, 0xff, 0x0b])

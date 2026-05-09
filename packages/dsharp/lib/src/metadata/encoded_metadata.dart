@@ -4,10 +4,13 @@ import '../api/exceptions.dart';
 import '../codecs/binary_io.dart';
 import '../codecs/image_format.dart';
 import '../codecs/webp_info.dart';
+import '../pixels/color.dart';
 import '../source/input_options.dart';
 import 'encoded_metadata_payloads.dart';
 import 'metadata.dart';
 import 'simple_encoded_metadata.dart';
+
+part 'encoded_metadata_background.dart';
 
 /// Reads container metadata without decoding pixels when that is safe.
 ImageMetadata? readEncodedImageMetadata(Uint8List bytes, ImageFormat format) {
@@ -46,6 +49,8 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
   var hasProfile = false;
   var hasExif = false;
   var hasXmp = false;
+  Uint8List? backgroundChunk;
+  Uint8List? palette;
   double? density;
   int? orientation;
   while (offset + 12 <= bytes.length) {
@@ -73,6 +78,10 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
       }
     } else if (type == 'tRNS') {
       hasTransparency = true;
+    } else if (type == 'PLTE') {
+      palette = data;
+    } else if (type == 'bKGD') {
+      backgroundChunk = data;
     } else if (type == 'iCCP') {
       hasProfile = true;
     } else if (type == 'eXIf') {
@@ -116,6 +125,12 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     channels: channels,
     hasAlpha: hasTransparency || colorType == 4 || colorType == 6,
     density: density,
+    background: _pngBackgroundColor(
+      colorType: colorType,
+      bitDepth: bitDepth,
+      background: backgroundChunk,
+      palette: palette,
+    ),
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,
@@ -244,12 +259,15 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
   final height = readUint16Le(bytes, 8);
   _checkMetadataLimits(width, height);
   final packed = bytes[10];
+  final backgroundIndex = bytes[11];
   var offset = 13;
+  Uint8List? globalColorTable;
   if ((packed & 0x80) != 0) {
     final size = 3 * (1 << ((packed & 0x07) + 1));
     if (offset + size > bytes.length) {
       throw const InvalidImageException('Truncated GIF global color table.');
     }
+    globalColorTable = bytes.sublist(offset, offset + size);
     offset += size;
   }
   var frames = 0;
@@ -338,6 +356,7 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
     frames: frames == 0 ? 1 : frames,
     loopCount: loopCount,
     frameDelays: frameDelays,
+    background: _gifBackgroundColor(globalColorTable, backgroundIndex),
     bitDepth: (packed & 0x07) + 1,
     isProgressive: progressive,
     isPalette: true,
