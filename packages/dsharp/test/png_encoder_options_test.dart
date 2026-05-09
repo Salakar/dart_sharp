@@ -37,6 +37,35 @@ void main() {
     }
   });
 
+  test('PNG advanced parity options fail clearly when unsupported', () {
+    final pipeline = ImagePipeline.fromRawPixels(_paletteRaw());
+
+    for (final options in <PngEncoderOptions>[
+      const PngEncoderOptions(quality: 90),
+      const PngEncoderOptions(effort: 1),
+      const PngEncoderOptions(dither: 0.5),
+    ]) {
+      expect(
+        pipeline.png(options).toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
+
+    for (final options in <PngEncoderOptions>[
+      const PngEncoderOptions(quality: 0),
+      const PngEncoderOptions(quality: 101),
+      const PngEncoderOptions(effort: 0),
+      const PngEncoderOptions(effort: 11),
+      const PngEncoderOptions(dither: -0.1),
+      const PngEncoderOptions(dither: 1.1),
+    ]) {
+      expect(
+        pipeline.png(options).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
+    }
+  });
+
   test(
     'PNG adaptiveFiltering writes filtered rows that decode correctly',
     () async {

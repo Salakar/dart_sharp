@@ -97,6 +97,9 @@ final class PngEncoderOptions extends EncoderOptions {
     this.adaptiveFiltering = false,
     this.palette = false,
     this.bitDepth = 8,
+    this.quality,
+    this.effort,
+    this.dither = 1,
     int? colors,
     int? colours,
     super.force,
@@ -116,6 +119,21 @@ final class PngEncoderOptions extends EncoderOptions {
 
   /// Bit depth.
   final int bitDepth;
+
+  /// Optional palette quality request from 1 to 100.
+  ///
+  /// Non-null values currently throw [UnsupportedCodecException].
+  final int? quality;
+
+  /// Optional palette effort request from 1 to 10.
+  ///
+  /// Non-null values currently throw [UnsupportedCodecException].
+  final int? effort;
+
+  /// Floyd-Steinberg dithering level from 0 to 1.
+  ///
+  /// Values other than `1` currently throw [UnsupportedCodecException].
+  final num dither;
 
   /// Optional maximum palette entry count.
   final int? colors;
@@ -145,6 +163,21 @@ final class PngEncoderOptions extends EncoderOptions {
     final colorCount = colors;
     if (colorCount != null && (colorCount < 2 || colorCount > 256)) {
       throw const OperationValidationException('PNG colors must be 2..256.');
+    }
+    final qualityValue = quality;
+    if (qualityValue != null && (qualityValue < 1 || qualityValue > 100)) {
+      throw const OperationValidationException(
+        'PNG quality must be between 1 and 100.',
+      );
+    }
+    final effortValue = effort;
+    if (effortValue != null && (effortValue < 1 || effortValue > 10)) {
+      throw const OperationValidationException('PNG effort must be 1..10.');
+    }
+    if (dither < 0 || dither > 1) {
+      throw const OperationValidationException(
+        'PNG dither must be between 0 and 1.',
+      );
     }
   }
 }
