@@ -53,7 +53,6 @@ final class WebpImageCodec implements ImageCodec {
     final webpOptions = options is WebpEncoderOptions
         ? options
         : const WebpEncoderOptions();
-    _rejectUnsupportedWebpOptions(webpOptions);
     var outputImage = _applyAnimationOptions(image, webpOptions);
     if (!webpOptions.lossless && !webpOptions.nearLossless) {
       final raw = outputImage.firstFrame.pixels;
@@ -107,19 +106,6 @@ final class WebpImageCodec implements ImageCodec {
             if (frame.delay != null) frame.delay!,
         ],
       ),
-    );
-  }
-}
-
-void _rejectUnsupportedWebpOptions(WebpEncoderOptions options) {
-  if (options.smartSubsample) {
-    throw const UnsupportedCodecException(
-      'WebP smartSubsample is not implemented yet.',
-    );
-  }
-  if (options.smartDeblock) {
-    throw const UnsupportedCodecException(
-      'WebP smartDeblock is not implemented yet.',
     );
   }
 }

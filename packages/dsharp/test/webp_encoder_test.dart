@@ -622,54 +622,50 @@ void main() {
     }
   });
 
-  test(
-    'WebP parity options validate and unsupported modes fail clearly',
-    () async {
-      final pipeline = ImagePipeline.fromPixelImage(_animation());
+  test('WebP parity options validate and supported modes complete', () async {
+    final pipeline = ImagePipeline.fromPixelImage(_animation());
 
-      await expectLater(
-        pipeline.webp(const WebpEncoderOptions(alphaQuality: 0)).toBytes(),
-        completes,
-      );
-      await expectLater(
-        pipeline.webp(const WebpEncoderOptions(minSize: true)).toBytes(),
-        completes,
-      );
-      await expectLater(
-        pipeline.webp(const WebpEncoderOptions(mixed: true)).toBytes(),
-        completes,
-      );
-      await expectLater(
-        pipeline.webp(const WebpEncoderOptions(effort: 0)).toBytes(),
-        completes,
-      );
-      await expectLater(
-        pipeline.webp(const WebpEncoderOptions(preset: 'picture')).toBytes(),
-        completes,
-      );
-      for (final options in <WebpEncoderOptions>[
-        const WebpEncoderOptions(smartSubsample: true),
-        const WebpEncoderOptions(smartDeblock: true),
-      ]) {
-        expect(
-          pipeline.webp(options).toBytes(),
-          throwsA(isA<UnsupportedCodecException>()),
-        );
-      }
-      expect(
-        pipeline.webp(const WebpEncoderOptions(alphaQuality: -1)).toBytes(),
-        throwsA(isA<OperationValidationException>()),
-      );
-      expect(
-        pipeline.webp(const WebpEncoderOptions(alphaQuality: 101)).toBytes(),
-        throwsA(isA<OperationValidationException>()),
-      );
-      expect(
-        pipeline.webp(const WebpEncoderOptions(preset: 'fail')).toBytes(),
-        throwsA(isA<OperationValidationException>()),
-      );
-    },
-  );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(alphaQuality: 0)).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(minSize: true)).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(mixed: true)).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(effort: 0)).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(preset: 'picture')).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(smartSubsample: true)).toBytes(),
+      completes,
+    );
+    await expectLater(
+      pipeline.webp(const WebpEncoderOptions(smartDeblock: true)).toBytes(),
+      completes,
+    );
+    expect(
+      pipeline.webp(const WebpEncoderOptions(alphaQuality: -1)).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      pipeline.webp(const WebpEncoderOptions(alphaQuality: 101)).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      pipeline.webp(const WebpEncoderOptions(preset: 'fail')).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
 
   test('WebP animation option ranges are validated', () {
     expect(

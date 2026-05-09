@@ -499,13 +499,9 @@ final class WebpEncoderOptions extends EncoderOptions {
   final bool nearLossless;
 
   /// Whether to request higher-quality chroma subsampling.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool smartSubsample;
 
   /// Whether to request automatic deblocking.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool smartDeblock;
 
   /// Named WebP preprocessing preset.
