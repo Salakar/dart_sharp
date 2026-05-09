@@ -356,6 +356,20 @@ void main() {
     }
   });
 
+  test('rejects VP8X chunks with invalid length', () async {
+    final bytes = extendedSolidVp8Webp(width: 1, height: 1);
+    ByteData.sublistView(bytes).setUint32(16, 9, Endian.little);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects VP8X chunks with reserved bytes', () async {
     for (final offset in <int>[21, 22, 23]) {
       final bytes = extendedSolidVp8Webp(width: 1, height: 1);
