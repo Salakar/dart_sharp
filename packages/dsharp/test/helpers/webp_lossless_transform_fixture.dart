@@ -153,6 +153,36 @@ Uint8List predictorVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP with a predictor mode outside the valid range.
+Uint8List invalidPredictorModeVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(1, 14)
+    ..write(1, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(1, 1)
+    ..write(0, 2)
+    ..write(0, 3);
+  _writeSolidImageData(
+    bits,
+    red: 0,
+    green: 14,
+    blue: 0,
+    alpha: 255,
+    writeMetaPrefix: false,
+  );
+  bits.write(0, 1);
+  _writeSolidImageData(
+    bits,
+    red: 10,
+    green: 20,
+    blue: 30,
+    alpha: 0,
+    writeMetaPrefix: true,
+  );
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP using an unpacked color-indexing transform.
 Uint8List colorIndexingVp8lWebp({
   required int width,

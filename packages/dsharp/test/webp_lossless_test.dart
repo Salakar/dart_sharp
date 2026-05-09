@@ -339,6 +339,19 @@ void main() {
     ]);
   });
 
+  test('rejects invalid VP8L predictor modes', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(invalidPredictorModeVp8lWebp()).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L predictor mode'),
+        ),
+      ),
+    );
+  });
+
   test('decodes an unpacked VP8L color-indexing transform', () async {
     final bytes = colorIndexingVp8lWebp(
       width: 2,
