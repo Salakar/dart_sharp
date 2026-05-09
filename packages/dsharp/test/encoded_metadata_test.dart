@@ -98,6 +98,66 @@ void main() {
     expect(metadata.isPalette, isFalse);
   });
 
+  test('reads PPM FITS and RAD metadata without raster data', () async {
+    final ppmBytes = _ascii('P6\n2 1\n255\n');
+    final fitsBytes = _fitsMetadataBytes();
+    final radBytes = _ascii(
+      '#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n',
+    );
+
+    final ppm = await ImagePipeline.fromBytes(ppmBytes).metadata();
+    final fits = await ImagePipeline.fromBytes(fitsBytes).metadata();
+    final rad = await ImagePipeline.fromBytes(radBytes).metadata();
+
+    expect(ppm.format, ImageFormat.ppm);
+    expect(ppm.width, 2);
+    expect(ppm.height, 1);
+    expect(ppm.channels, 3);
+    expect(ppm.hasAlpha, isFalse);
+    expect(ppm.bitDepth, 8);
+    expect(fits.format, ImageFormat.fits);
+    expect(fits.width, 2);
+    expect(fits.height, 1);
+    expect(fits.channels, 3);
+    expect(fits.hasAlpha, isFalse);
+    expect(fits.bitDepth, 16);
+    expect(rad.format, ImageFormat.rad);
+    expect(rad.width, 2);
+    expect(rad.height, 1);
+    expect(rad.channels, 3);
+    expect(rad.hasAlpha, isFalse);
+    expect(rad.bitDepth, 8);
+    await expectLater(
+      ImagePipeline.fromBytes(ppmBytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(fitsBytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(radBytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects malformed simple format metadata headers', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(_ascii('P6\n0 1\n255\n')).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(
+        _ascii('SIMPLE  =                    T'),
+      ).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(_ascii('#?RADIANCE\n\n-Y 1 +X 1\n')).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('transformed WebP metadata reflects transformed pixels', () async {
     final bytes = solidVp8lWebp(
       width: 2,
@@ -355,6 +415,28 @@ Uint8List _tiffMetadataBytes() {
   _writeIfd(writer, nextOffset: firstIfd + ifdSize);
   _writeIfd(writer, nextOffset: 0);
   return writer.toBytes();
+}
+
+Uint8List _fitsMetadataBytes() {
+  final bytes = <int>[
+    ..._fitsCard('SIMPLE  =                    T'),
+    ..._fitsCard('BITPIX  =                   16'),
+    ..._fitsCard('NAXIS   =                    3'),
+    ..._fitsCard('NAXIS1  =                    2'),
+    ..._fitsCard('NAXIS2  =                    1'),
+    ..._fitsCard('NAXIS3  =                    3'),
+    ..._fitsCard('END'),
+  ];
+  while (bytes.length % 2880 != 0) {
+    bytes.add(0x20);
+  }
+  return Uint8List.fromList(bytes);
+}
+
+Uint8List _ascii(String value) => Uint8List.fromList(ascii.encode(value));
+
+List<int> _fitsCard(String text) {
+  return ascii.encode(text.padRight(80).substring(0, 80));
 }
 
 void _pngChunk(ByteWriter writer, String type, List<int> data) {

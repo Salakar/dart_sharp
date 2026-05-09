@@ -7,6 +7,7 @@ import '../codecs/webp_info.dart';
 import '../source/input_options.dart';
 import 'encoded_metadata_payloads.dart';
 import 'metadata.dart';
+import 'simple_encoded_metadata.dart';
 
 /// Reads container metadata without decoding pixels when that is safe.
 ImageMetadata? readEncodedImageMetadata(Uint8List bytes, ImageFormat format) {
@@ -16,6 +17,9 @@ ImageMetadata? readEncodedImageMetadata(Uint8List bytes, ImageFormat format) {
     ImageFormat.gif => _gifMetadata(bytes),
     ImageFormat.webp => _webpMetadata(bytes),
     ImageFormat.tiff => _tiffMetadata(bytes),
+    ImageFormat.ppm ||
+    ImageFormat.fits ||
+    ImageFormat.rad => readSimpleEncodedImageMetadata(bytes, format),
     _ => null,
   };
 }

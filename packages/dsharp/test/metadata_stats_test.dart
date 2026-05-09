@@ -21,19 +21,21 @@ void main() {
     expect(metadata.hasAlpha, isTrue);
   });
 
-  test('metadata falls back through decoded PPM FITS and RAD images', () async {
+  test('metadata reads simple encoded format headers', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[10, 20, 30, 255, 40, 50, 60, 255]),
       width: 2,
       height: 1,
       channels: ChannelCount.four,
     );
+    const expected = <ImageFormat, ({int channels, bool hasAlpha})>{
+      ImageFormat.ppm: (channels: 3, hasAlpha: false),
+      ImageFormat.fits: (channels: 1, hasAlpha: false),
+      ImageFormat.rad: (channels: 3, hasAlpha: false),
+    };
 
-    for (final format in <ImageFormat>[
-      ImageFormat.ppm,
-      ImageFormat.fits,
-      ImageFormat.rad,
-    ]) {
+    for (final entry in expected.entries) {
+      final format = entry.key;
       final encoded = await ImagePipeline.fromRawPixels(
         raw,
       ).toBytes(format: format);
@@ -43,8 +45,9 @@ void main() {
       expect(metadata.size, encoded.length);
       expect(metadata.width, 2);
       expect(metadata.height, 1);
-      expect(metadata.channels, 4);
-      expect(metadata.hasAlpha, isTrue);
+      expect(metadata.channels, entry.value.channels);
+      expect(metadata.hasAlpha, entry.value.hasAlpha);
+      expect(metadata.bitDepth, 8);
     }
   });
 
