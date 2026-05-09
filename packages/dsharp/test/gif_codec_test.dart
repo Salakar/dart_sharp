@@ -37,6 +37,24 @@ void main() {
     expect(image.frames[2].pixels.bytes, _rgba(<int>[3, 0]));
   });
 
+  test('uses GIF logical-screen background color', () async {
+    final image = await ImagePipeline.fromBytes(
+      _gif(<_GifFrame>[
+        const _GifFrame(
+          left: 1,
+          width: 1,
+          height: 1,
+          indices: <int>[2],
+          disposalMethod: 2,
+        ),
+        const _GifFrame(width: 1, height: 1, indices: <int>[1]),
+      ], backgroundIndex: 3),
+    ).toPixelImage();
+
+    expect(image.frames[0].pixels.bytes, _rgba(<int>[3, 2]));
+    expect(image.frames[1].pixels.bytes, _rgba(<int>[1, 3]));
+  });
+
   test('restores previous canvas for GIF disposal-previous frames', () async {
     final image = await ImagePipeline.fromBytes(
       _gif(<_GifFrame>[
@@ -431,13 +449,13 @@ final class _GifFrame {
   final int disposalMethod;
 }
 
-Uint8List _gif(List<_GifFrame> frames) {
+Uint8List _gif(List<_GifFrame> frames, {int backgroundIndex = 0}) {
   final writer = ByteWriter()
     ..writeAscii('GIF89a')
     ..writeUint16Le(2)
     ..writeUint16Le(1)
     ..writeByte(0xf1)
-    ..writeByte(0)
+    ..writeByte(backgroundIndex)
     ..writeByte(0)
     ..writeBytes(const <int>[0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 255, 0]);
   for (final frame in frames) {
@@ -476,7 +494,7 @@ List<int> _rgba(List<int> indices) {
   return <int>[
     for (final index in indices)
       ...switch (index) {
-        0 => <int>[0, 0, 0, 0],
+        0 => <int>[0, 0, 0, 255],
         1 => <int>[255, 0, 0, 255],
         2 => <int>[0, 0, 255, 255],
         _ => <int>[0, 255, 0, 255],

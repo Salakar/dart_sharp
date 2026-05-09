@@ -29,6 +29,7 @@ final class GifImageCodec implements ImageCodec {
     final width = readUint16Le(bytes, 6);
     final height = readUint16Le(bytes, 8);
     final packed = bytes[10];
+    final backgroundIndex = bytes[11];
     var offset = 13;
     List<int>? globalPalette;
     if ((packed & 0x80) != 0) {
@@ -39,8 +40,10 @@ final class GifImageCodec implements ImageCodec {
       globalPalette = bytes.sublist(offset, offset + size);
       offset += size;
     }
+    final background = _gifBackgroundColor(globalPalette, backgroundIndex);
     final frames = <ImageFrame>[];
     final canvas = Uint8List(width * height * 4);
+    _fillGifCanvas(canvas, background);
     var delay = Duration.zero;
     int? transparentIndex;
     var disposalMethod = 0;
@@ -77,6 +80,7 @@ final class GifImageCodec implements ImageCodec {
           canvas,
           image.bounds,
           screenWidth: width,
+          background: background,
           disposalMethod: disposalMethod,
           previousCanvas: previousCanvas,
         );
@@ -389,21 +393,59 @@ final class _GifBounds {
   final int height;
 }
 
+int _gifBackgroundColor(List<int>? palette, int backgroundIndex) {
+  if (palette == null) {
+    return 0;
+  }
+  final offset = backgroundIndex * 3;
+  if (offset + 2 >= palette.length) {
+    return 0;
+  }
+  return _rgbaColor(palette[offset], palette[offset + 1], palette[offset + 2]);
+}
+
+void _fillGifCanvas(Uint8List canvas, int rgba) {
+  final red = (rgba >> 24) & 0xff;
+  final green = (rgba >> 16) & 0xff;
+  final blue = (rgba >> 8) & 0xff;
+  final alpha = rgba & 0xff;
+  for (var offset = 0; offset < canvas.length; offset += 4) {
+    canvas[offset] = red;
+    canvas[offset + 1] = green;
+    canvas[offset + 2] = blue;
+    canvas[offset + 3] = alpha;
+  }
+}
+
 void _disposeGifFrame(
   Uint8List canvas,
   _GifBounds bounds, {
   required int screenWidth,
+  required int background,
   required int disposalMethod,
   required Uint8List? previousCanvas,
 }) {
   if (disposalMethod == 2) {
     for (var y = 0; y < bounds.height; y += 1) {
       final start = ((bounds.top + y) * screenWidth + bounds.left) * 4;
-      canvas.fillRange(start, start + bounds.width * 4, 0);
+      for (var x = 0; x < bounds.width; x += 1) {
+        _writeGifRgba(canvas, start + x * 4, background);
+      }
     }
   } else if (disposalMethod == 3 && previousCanvas != null) {
     canvas.setAll(0, previousCanvas);
   }
+}
+
+int _rgbaColor(int red, int green, int blue) {
+  return (red << 24) | (green << 16) | (blue << 8) | 0xff;
+}
+
+void _writeGifRgba(Uint8List canvas, int offset, int rgba) {
+  canvas[offset] = (rgba >> 24) & 0xff;
+  canvas[offset + 1] = (rgba >> 16) & 0xff;
+  canvas[offset + 2] = (rgba >> 8) & 0xff;
+  canvas[offset + 3] = rgba & 0xff;
 }
 
 ({Uint8List bytes, int offset}) _readSubBlocks(Uint8List bytes, int offset) {
