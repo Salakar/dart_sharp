@@ -281,15 +281,23 @@ final class WebpEncoderOptions extends EncoderOptions {
   final bool nearLossless;
 
   /// Whether to request higher-quality chroma subsampling.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
   final bool smartSubsample;
 
   /// Whether to request automatic deblocking.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
   final bool smartDeblock;
 
   /// Named WebP preprocessing preset.
+  ///
+  /// Values other than `default` currently throw [UnsupportedCodecException].
   final String preset;
 
   /// Encoder effort from 0 to 6.
+  ///
+  /// Values other than `4` currently throw [UnsupportedCodecException].
   final int effort;
 
   /// Optional animation loop count, where 0 means infinite looping.
@@ -302,9 +310,13 @@ final class WebpEncoderOptions extends EncoderOptions {
   final List<Duration> frameDelays;
 
   /// Whether to request minimum-size animation encoding.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
   final bool minSize;
 
   /// Whether to request mixed lossy/lossless animation encoding.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
   final bool mixed;
 
   @override
