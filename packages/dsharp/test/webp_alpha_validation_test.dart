@@ -32,18 +32,21 @@ void main() {
   });
 
   test('rejects uncompressed WebP ALPH payload length mismatches', () async {
-    final bytes = _truncatedUncompressedAlphaVp8Webp();
-
-    await expectLater(
-      ImagePipeline.fromBytes(bytes).toPixelImage(),
-      throwsA(
-        isA<InvalidImageException>().having(
-          (error) => error.message,
-          'message',
-          contains('Invalid WebP ALPH payload length'),
+    for (final bytes in <Uint8List>[
+      _truncatedUncompressedAlphaVp8Webp(),
+      _extendedUncompressedAlphaVp8Webp(),
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(
+          isA<InvalidImageException>().having(
+            (error) => error.message,
+            'message',
+            contains('Invalid WebP ALPH payload length'),
+          ),
         ),
-      ),
-    );
+      );
+    }
   });
 }
 
@@ -76,6 +79,15 @@ Uint8List _truncatedUncompressedAlphaVp8Webp() {
     ..setRange(removeStart, bytes.length - removed, bytes, removeEnd);
   _writeU32(out, 4, _readU32(bytes, 4) - removed);
   _writeU32(out, alphaOffset + 4, alphaLength - 1);
+  return out;
+}
+
+Uint8List _extendedUncompressedAlphaVp8Webp() {
+  final bytes = alphaSolidVp8Webp(width: 2, height: 1, alpha: <int>[0, 255]);
+  final alphaOffset = _chunkOffset(bytes, 'ALPH');
+  final alphaLength = _readU32(bytes, alphaOffset + 4);
+  final out = Uint8List.fromList(bytes);
+  _writeU32(out, alphaOffset + 4, alphaLength + 1);
   return out;
 }
 
