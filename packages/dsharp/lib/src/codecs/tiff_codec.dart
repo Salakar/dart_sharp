@@ -46,6 +46,10 @@ final class TiffImageCodec implements ImageCodec {
         ? 3
         : 4;
     final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);
+    final predictorTag = _encodedTiffPredictor(tiffOptions);
+    if (predictorTag == 2) {
+      _applyHorizontalPredictor(pixels, raw.width, raw.height, channels);
+    }
     final encodedPixels = switch (tiffOptions.compression) {
       TiffCompression.none => pixels,
       TiffCompression.lzw => _tiffLzwEncode(pixels),
@@ -73,7 +77,7 @@ final class TiffImageCodec implements ImageCodec {
     final photometricTag = tiffOptions.compression == TiffCompression.jpeg
         ? 6
         : 2;
-    const entryCount = 13;
+    final entryCount = 13 + (predictorTag == null ? 0 : 1);
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
     final extraOffset = bitsOffset + channels * 2;
@@ -106,6 +110,9 @@ final class TiffImageCodec implements ImageCodec {
     _entry(writer, 283, 5, 1, yresOffset);
     _entry(writer, 284, 3, 1, 1);
     _entry(writer, 296, 3, 1, _resolutionUnitTag(tiffOptions.resolutionUnit));
+    if (predictorTag != null) {
+      _entry(writer, 317, 3, 1, predictorTag);
+    }
     writer.writeUint32Le(0);
     for (var i = 0; i < channels; i += 1) {
       writer.writeUint16Le(8);
@@ -141,7 +148,7 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
       'BigTIFF encoding is not implemented yet.',
     );
   }
-  if (options.predictor != TiffPredictor.horizontal) {
+  if (options.predictor == TiffPredictor.float) {
     throw const UnsupportedCodecException(
       'TIFF predictor is not implemented yet.',
     );
@@ -183,6 +190,35 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
     throw const UnsupportedCodecException(
       'TIFF quality is only meaningful for JPEG compression.',
     );
+  }
+}
+
+int? _encodedTiffPredictor(TiffEncoderOptions options) {
+  final supportsPredictor =
+      options.compression == TiffCompression.lzw ||
+      options.compression == TiffCompression.deflate;
+  if (!supportsPredictor) {
+    return null;
+  }
+  return switch (options.predictor) {
+    TiffPredictor.none => 1,
+    TiffPredictor.horizontal => 2,
+    TiffPredictor.float => null,
+  };
+}
+
+void _applyHorizontalPredictor(
+  Uint8List bytes,
+  int width,
+  int height,
+  int samples,
+) {
+  final rowBytes = width * samples;
+  for (var y = 0; y < height; y += 1) {
+    final row = y * rowBytes;
+    for (var x = rowBytes - 1; x >= samples; x -= 1) {
+      bytes[row + x] = (bytes[row + x] - bytes[row + x - samples]) & 0xff;
+    }
   }
 }
 

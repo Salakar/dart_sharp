@@ -375,9 +375,6 @@ final class TiffEncoderOptions extends EncoderOptions {
   final bool bigTiff;
 
   /// Compression predictor.
-  ///
-  /// Values other than [TiffPredictor.horizontal] currently throw
-  /// [UnsupportedCodecException].
   final TiffPredictor predictor;
 
   /// Whether to write tiled TIFF.

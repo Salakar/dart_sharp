@@ -51,6 +51,35 @@ void main() {
     expect(metadata.density, closeTo(50.8, 0.0001));
   });
 
+  test('TIFF encoder writes predictor tags for LZW output', () async {
+    final raw = _raw();
+    final horizontal = await ImagePipeline.fromRawPixels(raw)
+        .tiff(const TiffEncoderOptions(compression: TiffCompression.lzw))
+        .toBytes();
+    final none = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.lzw,
+            predictor: TiffPredictor.none,
+          ),
+        )
+        .toBytes();
+
+    expect(_tiffShortTagValue(horizontal, 317), 2);
+    expect(_tiffShortTagValue(none, 317), 1);
+    expect(
+      (await ImagePipeline.fromBytes(
+        horizontal,
+      ).toPixelImage()).firstFrameBytes(),
+      raw.bytes,
+    );
+    expect(
+      (await ImagePipeline.fromBytes(none).toPixelImage()).firstFrameBytes(),
+      raw.bytes,
+    );
+    expect(horizontal, isNot(none));
+  });
+
   test('TIFF advanced parity options fail clearly when unsupported', () {
     final pipeline = ImagePipeline.fromRawPixels(_raw());
 
@@ -59,7 +88,7 @@ void main() {
       const TiffEncoderOptions(bitdepth: 4),
       const TiffEncoderOptions(bigTiff: true),
       const TiffEncoderOptions(bigtiff: true),
-      const TiffEncoderOptions(predictor: TiffPredictor.none),
+      const TiffEncoderOptions(predictor: TiffPredictor.float),
       const TiffEncoderOptions(tile: true),
       const TiffEncoderOptions(pyramid: true),
       const TiffEncoderOptions(tileWidth: 128),
