@@ -165,6 +165,10 @@ void main() {
       _gifWithTruncatedGraphicControlExtension(),
       _gifWithTruncatedImageDescriptor(),
       _gifWithTruncatedImageDataBlock(),
+      _gifWithoutPalette(),
+      _gif(<_GifFrame>[
+        const _GifFrame(left: 2, width: 1, height: 1, indices: <int>[1]),
+      ]),
     ];
 
     for (final bytes in cases) {
@@ -308,6 +312,18 @@ Uint8List _gifWithTruncatedLocalColorTable() {
     ..writeByte(0);
   _writeImageDescriptor(writer, localPacked: 0x80);
   writer.writeBytes(const <int>[0, 0, 0]);
+  return writer.toBytes();
+}
+
+Uint8List _gifWithoutPalette() {
+  final writer = ByteWriter()
+    ..writeAscii('GIF89a')
+    ..writeUint16Le(1)
+    ..writeUint16Le(1)
+    ..writeByte(0)
+    ..writeByte(0)
+    ..writeByte(0);
+  _writeImageDescriptor(writer, localPacked: 0);
   return writer.toBytes();
 }
 
