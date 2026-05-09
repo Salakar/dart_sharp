@@ -21,6 +21,7 @@ final class ImageMetadata {
     List<Duration> frameDelays = const <Duration>[],
     this.density,
     this.background,
+    this.chromaSubsampling,
     bool hasProfile = false,
     bool hasExif = false,
     bool hasXmp = false,
@@ -90,6 +91,9 @@ final class ImageMetadata {
 
   /// Default encoded background color when present.
   final RgbaColor? background;
+
+  /// Encoded chroma subsampling description when present.
+  final String? chromaSubsampling;
 
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;

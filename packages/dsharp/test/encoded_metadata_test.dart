@@ -50,6 +50,7 @@ void main() {
     expect(metadata.bitDepth, 8);
     expect(metadata.bitsPerSample, 8);
     expect(metadata.density, 72);
+    expect(metadata.chromaSubsampling, '4:4:4');
     expect(metadata.orientation, 6);
     expect(metadata.autoOrient.width, 4);
     expect(metadata.autoOrient.height, 5);

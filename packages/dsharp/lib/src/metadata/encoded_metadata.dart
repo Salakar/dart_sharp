@@ -11,6 +11,7 @@ import 'metadata.dart';
 import 'simple_encoded_metadata.dart';
 
 part 'encoded_metadata_background.dart';
+part 'encoded_metadata_jpeg.dart';
 
 /// Reads container metadata without decoding pixels when that is safe.
 ImageMetadata? readEncodedImageMetadata(Uint8List bytes, ImageFormat format) {
@@ -246,6 +247,7 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     bitDepth: parsed.precision,
     orientation: orientation,
     isProgressive: parsed.progressive,
+    chromaSubsampling: parsed.chromaSubsampling,
   );
 }
 
@@ -491,6 +493,7 @@ _JpegFrameInfo _jpegFrameInfo(int marker, Uint8List data) {
     components: data[5],
     precision: data[0],
     progressive: marker == 0xc2,
+    chromaSubsampling: _jpegChromaSubsampling(data),
   );
 }
 
@@ -701,6 +704,7 @@ final class _JpegFrameInfo {
     required this.components,
     required this.precision,
     required this.progressive,
+    required this.chromaSubsampling,
   });
 
   final int width;
@@ -708,6 +712,7 @@ final class _JpegFrameInfo {
   final int components;
   final int precision;
   final bool progressive;
+  final String? chromaSubsampling;
 }
 
 final class _GifSubBlocks {
