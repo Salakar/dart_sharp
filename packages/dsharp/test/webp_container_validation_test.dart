@@ -56,6 +56,32 @@ void main() {
     }
   });
 
+  test('rejects VP8L WebP with unsupported version', () async {
+    final bytes = solidVp8lWebp(
+      width: 1,
+      height: 1,
+      red: 1,
+      green: 2,
+      blue: 3,
+      alpha: 255,
+    );
+    final words = ByteData.sublistView(bytes);
+    words.setUint32(
+      21,
+      words.getUint32(21, Endian.little) | (1 << 29),
+      Endian.little,
+    );
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects static ALPH chunks after VP8 image data', () async {
     final ordered = alphaSolidVp8Webp(width: 1, height: 1, alpha: <int>[127]);
     final reordered = Uint8List.fromList(<int>[

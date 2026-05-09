@@ -366,6 +366,9 @@ WebpImageInfo _vp8lInfo(Uint8List data) {
     throw const InvalidImageException('Invalid VP8L header.');
   }
   final bits = readUint32Le(data, 1);
+  if (((bits >> 29) & 0x07) != 0) {
+    throw const InvalidImageException('Unsupported VP8L version.');
+  }
   return WebpImageInfo(
     width: (bits & 0x3fff) + 1,
     height: ((bits >> 14) & 0x3fff) + 1,
