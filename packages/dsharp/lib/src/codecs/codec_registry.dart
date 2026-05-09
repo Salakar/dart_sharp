@@ -86,7 +86,7 @@ final class CodecRegistry {
       ),
       const UnsupportedImageCodec(
         ImageFormat.deepZoom,
-        reason: 'Deep zoom tile output is not implemented yet.',
+        reason: 'Tile output requires an in-house archive/container writer.',
       ),
     ]);
   }
