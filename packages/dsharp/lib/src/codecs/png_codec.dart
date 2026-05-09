@@ -15,6 +15,7 @@ import 'image_format.dart';
 import 'output.dart';
 
 part 'png_samples.dart';
+part 'png_container.dart';
 
 /// First-party PNG codec for interlaced, palette, and truecolour images.
 final class PngImageCodec implements ImageCodec {
@@ -40,85 +41,48 @@ final class PngImageCodec implements ImageCodec {
     if (bytes.length < 33 || !_matchesSignature(bytes)) {
       throw const InvalidImageException('Invalid PNG signature.');
     }
-    final idat = <int>[];
-    var offset = 8;
-    var width = 0;
-    var height = 0;
-    var bitDepth = 0;
-    var colorType = 0;
-    var interlace = 0;
-    List<int>? palette;
-    List<int>? transparency;
-    while (offset + 12 <= bytes.length) {
-      final length = readUint32Be(bytes, offset);
-      final type = ascii.decode(bytes.sublist(offset + 4, offset + 8));
-      final dataStart = offset + 8;
-      final dataEnd = dataStart + length;
-      if (dataEnd + 4 > bytes.length) {
-        throw const InvalidImageException('Truncated PNG chunk.');
-      }
-      final data = bytes.sublist(dataStart, dataEnd);
-      _verifyCrc(type, data, readUint32Be(bytes, dataEnd));
-      if (type == 'IHDR') {
-        width = readUint32Be(data, 0);
-        height = readUint32Be(data, 4);
-        bitDepth = data[8];
-        colorType = data[9];
-        interlace = data[12];
-        if (data[10] != 0 || data[11] != 0 || interlace > 1) {
-          throw const UnsupportedCodecException(
-            'Only standard PNG compression, filtering, and interlace are supported.',
-          );
-        }
-      } else if (type == 'PLTE') {
-        palette = data;
-      } else if (type == 'tRNS') {
-        transparency = data;
-      } else if (type == 'IDAT') {
-        idat.addAll(data);
-      } else if (type == 'IEND') {
-        break;
-      }
-      offset = dataEnd + 4;
-    }
-    if (width <= 0 || height <= 0) {
+    final container = _readPngContainer(bytes);
+    if (container.width <= 0 || container.height <= 0) {
       throw const InvalidImageException('Invalid PNG dimensions.');
     }
     const InputSafetyLimits().checkImage(
-      width: width,
-      height: height,
+      width: container.width,
+      height: container.height,
       frames: 1,
     );
-    if (!_supportsPngBitDepth(colorType, bitDepth)) {
+    if (!_supportsPngBitDepth(container.colorType, container.bitDepth)) {
       throw const UnsupportedCodecException(
         'Unsupported PNG colour type or bit depth.',
       );
     }
-    final inflated = zlibDecode(Uint8List.fromList(idat));
-    final rgba = interlace == 1
+    if (container.idat.isEmpty) {
+      throw const InvalidImageException('PNG missing image data.');
+    }
+    final inflated = zlibDecode(Uint8List.fromList(container.idat));
+    final rgba = container.interlace == 1
         ? _decodeAdam7(
             inflated,
-            width,
-            height,
-            bitDepth,
-            colorType,
-            palette,
-            transparency,
+            container.width,
+            container.height,
+            container.bitDepth,
+            container.colorType,
+            container.palette,
+            container.transparency,
           )
         : _decodeScanlines(
             inflated,
-            width,
-            height,
-            bitDepth,
-            colorType,
-            palette,
-            transparency,
+            container.width,
+            container.height,
+            container.bitDepth,
+            container.colorType,
+            container.palette,
+            container.transparency,
           );
     return PixelImage.fromRawPixels(
       RawPixels(
         bytes: rgba,
-        width: width,
-        height: height,
+        width: container.width,
+        height: container.height,
         channels: ChannelCount.four,
       ),
     );
@@ -313,6 +277,7 @@ Uint8List _decodeScanlines(
   var sourceOffset = 0;
   var previous = Uint8List(rowLength);
   for (var y = 0; y < height; y += 1) {
+    _checkPngImageData(inflated, sourceOffset, 1 + rowLength);
     final filter = inflated[sourceOffset++];
     final row = Uint8List.fromList(
       inflated.sublist(sourceOffset, sourceOffset + rowLength),
@@ -360,6 +325,7 @@ Uint8List _decodeAdam7(
     final bpp = _filterBytesPerPixel(channels, bitDepth);
     var previous = Uint8List(rowLength);
     for (var rowIndex = 0; rowIndex < passHeight; rowIndex += 1) {
+      _checkPngImageData(inflated, sourceOffset, 1 + rowLength);
       final filter = inflated[sourceOffset++];
       final row = Uint8List.fromList(
         inflated.sublist(sourceOffset, sourceOffset + rowLength),

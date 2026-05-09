@@ -145,6 +145,62 @@ void main() {
 
     expect(image.firstFrameBytes(), <int>[255, 0, 0, 255, 18, 86, 154, 0]);
   });
+
+  test('rejects malformed PNG containers with typed errors', () async {
+    final scanline = zlibEncodeStored(Uint8List.fromList(<int>[0, 0]));
+    final cases = <Uint8List>[
+      _withLastByteFlipped(
+        _png(
+          width: 1,
+          height: 1,
+          bitDepth: 8,
+          colorType: 0,
+          samples: const <int>[0],
+        ),
+      ),
+      _pngChunks(<(String, List<int>)>[
+        ('IHDR', _ihdrData(1, 1).sublist(0, 12)),
+        ('IDAT', scanline),
+        ('IEND', const <int>[]),
+      ]),
+      _pngChunks(<(String, List<int>)>[
+        ('IDAT', scanline),
+        ('IEND', const <int>[]),
+      ]),
+      _pngChunks(<(String, List<int>)>[
+        ('IHDR', _ihdrData(1, 1, colorType: 3)),
+        ('IDAT', scanline),
+        ('IEND', const <int>[]),
+      ]),
+      _pngChunks(<(String, List<int>)>[
+        ('IHDR', _ihdrData(1, 1, colorType: 3)),
+        ('PLTE', const <int>[0, 0]),
+        ('IDAT', scanline),
+        ('IEND', const <int>[]),
+      ]),
+      _withoutIend(
+        _png(
+          width: 1,
+          height: 1,
+          bitDepth: 8,
+          colorType: 0,
+          samples: const <int>[0],
+        ),
+      ),
+      _pngChunks(<(String, List<int>)>[
+        ('IHDR', _ihdrData(1, 1)),
+        ('IDAT', zlibEncodeStored(Uint8List.fromList(<int>[0]))),
+        ('IEND', const <int>[]),
+      ]),
+    ];
+
+    for (final bytes in cases) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
 }
 
 Uint8List _png({
@@ -229,6 +285,42 @@ Uint8List _pngHeaderOnly({required int width, required int height}) {
   _writeChunk(writer, 'IHDR', ihdr.toBytes());
   _writeChunk(writer, 'IEND', Uint8List(0));
   return writer.toBytes();
+}
+
+Uint8List _pngChunks(List<(String, List<int>)> chunks) {
+  final writer = ByteWriter()
+    ..writeBytes(const <int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (final (type, data) in chunks) {
+    _writeChunk(writer, type, Uint8List.fromList(data));
+  }
+  return writer.toBytes();
+}
+
+List<int> _ihdrData(
+  int width,
+  int height, {
+  int bitDepth = 8,
+  int colorType = 0,
+}) {
+  return (ByteWriter()
+        ..writeUint32Be(width)
+        ..writeUint32Be(height)
+        ..writeByte(bitDepth)
+        ..writeByte(colorType)
+        ..writeByte(0)
+        ..writeByte(0)
+        ..writeByte(0))
+      .toBytes();
+}
+
+Uint8List _withoutIend(Uint8List bytes) {
+  return Uint8List.fromList(bytes.sublist(0, bytes.length - 12));
+}
+
+Uint8List _withLastByteFlipped(Uint8List bytes) {
+  final copy = Uint8List.fromList(bytes);
+  copy[copy.length - 1] ^= 0xff;
+  return copy;
 }
 
 void _writeChunk(ByteWriter writer, String type, Uint8List data) {
