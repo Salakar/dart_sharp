@@ -178,7 +178,7 @@ void main() {
         255,
         255,
       ]),
-    ).webp().toBytes();
+    ).webp(const WebpEncoderOptions(lossless: true)).toBytes();
     final bytes = _withWebpExifOrientation(webp, width: 3, height: 2);
 
     final sourceMetadata = await ImagePipeline.fromBytes(bytes).metadata();

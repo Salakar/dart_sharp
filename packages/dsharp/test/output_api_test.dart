@@ -280,7 +280,9 @@ void main() {
       await ImagePipeline.fromRawPixels(raw()).png().toBytes(),
     );
     final webpSource = _withWebpExif(
-      await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+      await ImagePipeline.fromRawPixels(
+        raw(),
+      ).webp(const WebpEncoderOptions(lossless: true)).toBytes(),
       width: 1,
       height: 1,
     );
@@ -317,7 +319,9 @@ void main() {
       profile,
     );
     final webpSource = _withWebpIcc(
-      await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+      await ImagePipeline.fromRawPixels(
+        raw(),
+      ).webp(const WebpEncoderOptions(lossless: true)).toBytes(),
       profile,
       width: 1,
       height: 1,
@@ -372,7 +376,9 @@ void main() {
         profile,
       );
       final webpSource = _withWebpMetadata(
-        await ImagePipeline.fromRawPixels(raw()).webp().toBytes(),
+        await ImagePipeline.fromRawPixels(
+          raw(),
+        ).webp(const WebpEncoderOptions(lossless: true)).toBytes(),
         profile: profile,
         exif: _exifTiffOrientation(6),
         xmp: xmp.xmlText,

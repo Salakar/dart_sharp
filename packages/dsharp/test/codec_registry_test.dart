@@ -524,7 +524,7 @@ void main() {
         channels: 4,
         background: RgbaColor(red: 10, green: 20, blue: 30, alpha: 40),
       ),
-    ).toBytesWithInfo(format: ImageFormat.webp);
+    ).webp(const WebpEncoderOptions(lossless: true)).toBytesWithInfo();
 
     final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
 

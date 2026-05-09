@@ -9,7 +9,7 @@ void main() {
 
     final encoded = await ImagePipeline.fromPixelImage(
       image,
-    ).webp().toBytesWithInfo();
+    ).webp(const WebpEncoderOptions(lossless: true)).toBytesWithInfo();
     final metadata = await ImagePipeline.fromBytes(encoded.bytes).metadata();
     final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
 
@@ -614,7 +614,7 @@ void main() {
 
     for (final (raw, expected) in cases) {
       final decoded = await ImagePipeline.fromRawPixels(raw)
-          .webp()
+          .webp(const WebpEncoderOptions(lossless: true))
           .toBytes()
           .then((bytes) => ImagePipeline.fromBytes(bytes).toPixelImage());
 

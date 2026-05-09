@@ -249,7 +249,7 @@ final class WebpEncoderOptions extends EncoderOptions {
   const WebpEncoderOptions({
     this.quality = 80,
     this.alphaQuality = 100,
-    this.lossless = true,
+    this.lossless = false,
     this.nearLossless = false,
     this.smartSubsample = false,
     this.smartDeblock = false,
@@ -274,7 +274,7 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Alpha-layer quality from 0 to 100.
   final int alphaQuality;
 
-  /// Whether to encode losslessly.
+  /// Whether to encode losslessly. Defaults to `false`.
   final bool lossless;
 
   /// Whether to request near-lossless preprocessing.
