@@ -330,6 +330,32 @@ void main() {
     }
   });
 
+  test('rejects duplicate WebP required chunks', () async {
+    final duplicateVp8x = _insertChunkAfter(
+      extendedSolidVp8Webp(width: 1, height: 1),
+      'VP8X',
+      'VP8X',
+      <int>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    );
+    final duplicateAnim = _insertChunkAfter(
+      animatedVp8Webp(width: 1, height: 1),
+      'ANIM',
+      'ANIM',
+      <int>[0, 0, 0, 0, 0, 0],
+    );
+
+    for (final bytes in <Uint8List>[duplicateVp8x, duplicateAnim]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects VP8X chunks with reserved bytes', () async {
     for (final offset in <int>[21, 22, 23]) {
       final bytes = extendedSolidVp8Webp(width: 1, height: 1);
@@ -385,11 +411,19 @@ void main() {
       <int>[1],
     );
     animatedAfterAnim[20] |= 0x20;
+    final staticAfterAlpha = _insertChunkAfter(
+      alphaSolidVp8Webp(width: 1, height: 1, alpha: <int>[127]),
+      'ALPH',
+      'ICCP',
+      <int>[1],
+    );
+    staticAfterAlpha[20] |= 0x20;
 
     for (final bytes in <Uint8List>[
       staticAfterImage,
       animatedAfterFrame,
       animatedAfterAnim,
+      staticAfterAlpha,
     ]) {
       await expectLater(
         ImagePipeline.fromBytes(bytes).metadata(),
