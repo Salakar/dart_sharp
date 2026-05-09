@@ -11,8 +11,12 @@ PixelImage _decodeTiffImage(Uint8List bytes) {
     throw const InvalidImageException('Invalid TIFF header.');
   }
   final frames = <ImageFrame>[];
+  final seenIfdOffsets = <int>{};
   var offset = endian.readUint32(bytes, 4);
   while (offset != 0) {
+    if (!seenIfdOffsets.add(offset)) {
+      throw const InvalidImageException('TIFF IFD loop detected.');
+    }
     final tags = _readIfd(bytes, offset, endian);
     if (frames.isNotEmpty &&
         (tags.value(256) != frames.first.width ||

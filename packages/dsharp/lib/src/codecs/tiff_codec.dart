@@ -172,7 +172,14 @@ final class _Ifd {
 }
 
 _Ifd _readIfd(Uint8List bytes, int offset, _TiffEndian endian) {
+  if (offset < 8 || offset + 2 > bytes.length) {
+    throw const InvalidImageException('Invalid TIFF IFD offset.');
+  }
   final count = endian.readUint16(bytes, offset);
+  final directoryEnd = offset + 2 + count * 12 + 4;
+  if (directoryEnd > bytes.length) {
+    throw const InvalidImageException('Truncated TIFF IFD.');
+  }
   final tags = <int, _IfdEntry>{};
   for (var i = 0; i < count; i += 1) {
     final entry = offset + 2 + i * 12;
