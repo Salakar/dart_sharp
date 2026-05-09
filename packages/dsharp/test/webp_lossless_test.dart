@@ -175,6 +175,19 @@ void main() {
     expect(image.firstFrameBytes(), <int>[91, 20, 33, 244, 91, 20, 33, 244]);
   });
 
+  test('rejects invalid VP8L color-cache sizes', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(invalidColorCacheSizeVp8lWebp()).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L color cache size'),
+        ),
+      ),
+    );
+  });
+
   test('decodes the VP8L subtract-green transform', () async {
     final bytes = subtractGreenVp8lWebp(
       width: 2,
