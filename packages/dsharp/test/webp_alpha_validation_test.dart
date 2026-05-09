@@ -6,6 +6,31 @@ import 'package:test/test.dart';
 import 'helpers/webp_lossy_fixture.dart';
 
 void main() {
+  test('rejects empty WebP ALPH chunks', () async {
+    final bytes = _emptyAlphaVp8Webp();
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid WebP ALPH chunk'),
+        ),
+      ),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid WebP ALPH chunk'),
+        ),
+      ),
+    );
+  });
+
   test('rejects uncompressed WebP ALPH payload length mismatches', () async {
     final bytes = _truncatedUncompressedAlphaVp8Webp();
 
@@ -20,6 +45,22 @@ void main() {
       ),
     );
   });
+}
+
+Uint8List _emptyAlphaVp8Webp() {
+  final bytes = alphaSolidVp8Webp(width: 1, height: 1, alpha: <int>[127]);
+  final alphaOffset = _chunkOffset(bytes, 'ALPH');
+  final alphaLength = _readU32(bytes, alphaOffset + 4);
+  final payloadStart = alphaOffset + 8;
+  final payloadEnd = payloadStart + alphaLength;
+  final removeEnd = payloadEnd + (alphaLength.isOdd ? 1 : 0);
+  final removed = removeEnd - payloadStart;
+  final out = Uint8List(bytes.length - removed)
+    ..setRange(0, payloadStart, bytes)
+    ..setRange(payloadStart, bytes.length - removed, bytes, removeEnd);
+  _writeU32(out, 4, _readU32(bytes, 4) - removed);
+  _writeU32(out, alphaOffset + 4, 0);
+  return out;
 }
 
 Uint8List _truncatedUncompressedAlphaVp8Webp() {
