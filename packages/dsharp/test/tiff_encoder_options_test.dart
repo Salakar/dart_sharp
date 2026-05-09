@@ -51,6 +51,25 @@ void main() {
     expect(metadata.density, closeTo(50.8, 0.0001));
   });
 
+  test('TIFF encoder writes one-channel grayscale output', () async {
+    final raw = _grayOneRaw(<int>[0, 85, 170, 255]);
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.none,
+            predictor: TiffPredictor.none,
+          ),
+        )
+        .toBytesWithInfo();
+    final decoded = await ImagePipeline.fromBytes(encoded.bytes).toPixelImage();
+
+    expect(encoded.info.channels, 1);
+    expect(_tiffShortTagValue(encoded.bytes, 258), 8);
+    expect(_tiffShortTagValue(encoded.bytes, 262), 1);
+    expect(_tiffShortTagValue(encoded.bytes, 277), 1);
+    expect(decoded.firstFrameBytes(), _grayRgba(<int>[0, 85, 170, 255]));
+  });
+
   test('TIFF encoder writes predictor tags for LZW output', () async {
     final raw = _raw();
     final horizontal = await ImagePipeline.fromRawPixels(raw)
@@ -279,6 +298,21 @@ RawPixels _grayRaw(List<int> values) {
     height: 1,
     channels: ChannelCount.four,
   );
+}
+
+RawPixels _grayOneRaw(List<int> values) {
+  return RawPixels(
+    bytes: Uint8List.fromList(values),
+    width: values.length,
+    height: 1,
+    channels: ChannelCount.one,
+  );
+}
+
+List<int> _grayRgba(List<int> values) {
+  return <int>[
+    for (final value in values) ...<int>[value, value, value, 255],
+  ];
 }
 
 int _tiffShortTagValue(Uint8List bytes, int tag) {

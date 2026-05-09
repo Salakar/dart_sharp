@@ -40,16 +40,21 @@ final class TiffImageCodec implements ImageCodec {
         : const TiffEncoderOptions();
     _rejectUnsupportedTiffOptions(tiffOptions);
     final raw = image.firstFrame.pixels;
+    final jpegCompression = tiffOptions.compression == TiffCompression.jpeg;
     final lowBitDepth = tiffOptions.bitDepth < 8;
-    final channels = lowBitDepth
+    final grayscale =
+        !lowBitDepth && !jpegCompression && raw.channels == ChannelCount.one;
+    final channels = lowBitDepth || grayscale
         ? 1
-        : tiffOptions.compression == TiffCompression.jpeg
+        : jpegCompression
         ? 3
         : raw.channels == ChannelCount.three
         ? 3
         : 4;
     final pixels = lowBitDepth
         ? _lowBitTiffPixels(raw, tiffOptions.bitDepth, tiffOptions.miniswhite)
+        : grayscale
+        ? raw.bytes
         : channels == 3
         ? rawToRgb(raw)
         : rawToRgba(raw);
@@ -85,7 +90,9 @@ final class TiffImageCodec implements ImageCodec {
         ? tiffOptions.miniswhite
               ? 0
               : 1
-        : tiffOptions.compression == TiffCompression.jpeg
+        : grayscale
+        ? 1
+        : jpegCompression
         ? 6
         : 2;
     final entryCount =
