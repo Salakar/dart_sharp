@@ -363,6 +363,33 @@ void main() {
     }
   });
 
+  test('rejects ICCP chunks after image data', () async {
+    final staticAfterImage = _appendChunk(
+      extendedSolidVp8Webp(width: 1, height: 1),
+      'ICCP',
+      <int>[1],
+    );
+    staticAfterImage[20] |= 0x20;
+
+    final animatedAfterFrame = _appendChunk(
+      animatedVp8Webp(width: 1, height: 1),
+      'ICCP',
+      <int>[1],
+    );
+    animatedAfterFrame[20] |= 0x20;
+
+    for (final bytes in <Uint8List>[staticAfterImage, animatedAfterFrame]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).metadata(),
+        throwsA(isA<InvalidImageException>()),
+      );
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<InvalidImageException>()),
+      );
+    }
+  });
+
   test('rejects VP8X metadata flag and chunk mismatches', () async {
     for (final (flag, type) in <(int, String)>[
       (0x20, 'ICCP'),

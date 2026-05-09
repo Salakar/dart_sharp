@@ -169,6 +169,12 @@ WebpImageInfo readWebpInfo(Uint8List bytes) {
       if (hasProfileChunk) {
         throw const InvalidImageException('WebP has multiple ICCP chunks.');
       }
+      if (hasAlphaChunk ||
+          imageChunkCount > 0 ||
+          hasAnimationHeader ||
+          frames.isNotEmpty) {
+        throw const InvalidImageException('WebP ICCP chunk is out of order.');
+      }
       hasProfileChunk = true;
     } else if (type == 'EXIF') {
       if (hasExifChunk) {
