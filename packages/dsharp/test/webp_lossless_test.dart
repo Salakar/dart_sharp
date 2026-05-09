@@ -203,6 +203,19 @@ void main() {
     );
   });
 
+  test('rejects invalid VP8L code length repeats', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(invalidCodeLengthRepeatVp8lWebp()).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('Invalid VP8L code length repeat'),
+        ),
+      ),
+    );
+  });
+
   test('decodes the VP8L subtract-green transform', () async {
     final bytes = subtractGreenVp8lWebp(
       width: 2,

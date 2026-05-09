@@ -156,6 +156,24 @@ Uint8List invalidDistancePrefixSymbolVp8lWebp() {
   return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
 }
 
+/// Builds a VP8L WebP with a prefix code-length repeat that overruns.
+Uint8List invalidCodeLengthRepeatVp8lWebp() {
+  final bits = _BitWriter()
+    ..write(0, 14)
+    ..write(0, 14)
+    ..write(0, 1)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(0, 1)
+    ..write(0, 1);
+  _writeSingleSymbolCode(bits, 20);
+  _writeSingleSymbolCode(bits, 9);
+  _writeSingleSymbolCode(bits, 30);
+  _writeSingleSymbolCode(bits, 255);
+  _writeInvalidCodeLengthRepeatCode(bits);
+  return _webpContainer(Uint8List.fromList(<int>[0x2f, ...bits.finish()]));
+}
+
 /// Builds a VP8L WebP with a literal pixel followed by a color-cache code.
 Uint8List colorCacheVp8lWebp({
   required int red,
@@ -231,6 +249,18 @@ void _writeTwoSymbolNormalCode(_BitWriter bits, int first, int second) {
   for (var symbol = 0; symbol <= second; symbol += 1) {
     bits.write(symbol == first || symbol == second ? 1 : 0, 1);
   }
+}
+
+void _writeInvalidCodeLengthRepeatCode(_BitWriter bits) {
+  bits
+    ..write(0, 1)
+    ..write(0, 4)
+    ..write(0, 3)
+    ..write(1, 3)
+    ..write(0, 3)
+    ..write(0, 3)
+    ..write(0, 1)
+    ..write(127, 7);
 }
 
 int _colorCacheIndex({
