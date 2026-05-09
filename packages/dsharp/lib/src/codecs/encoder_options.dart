@@ -509,8 +509,6 @@ final class WebpEncoderOptions extends EncoderOptions {
   final bool smartDeblock;
 
   /// Named WebP preprocessing preset.
-  ///
-  /// Values other than `default` currently throw [UnsupportedCodecException].
   final String preset;
 
   /// Encoder effort from 0 to 6.

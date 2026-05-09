@@ -643,10 +643,13 @@ void main() {
         pipeline.webp(const WebpEncoderOptions(effort: 0)).toBytes(),
         completes,
       );
+      await expectLater(
+        pipeline.webp(const WebpEncoderOptions(preset: 'picture')).toBytes(),
+        completes,
+      );
       for (final options in <WebpEncoderOptions>[
         const WebpEncoderOptions(smartSubsample: true),
         const WebpEncoderOptions(smartDeblock: true),
-        const WebpEncoderOptions(preset: 'picture'),
       ]) {
         expect(
           pipeline.webp(options).toBytes(),

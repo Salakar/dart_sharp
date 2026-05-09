@@ -122,11 +122,6 @@ void _rejectUnsupportedWebpOptions(WebpEncoderOptions options) {
       'WebP smartDeblock is not implemented yet.',
     );
   }
-  if (options.preset != 'default') {
-    throw const UnsupportedCodecException(
-      'WebP preset is not implemented yet.',
-    );
-  }
 }
 
 PixelImage _applyAnimationOptions(
