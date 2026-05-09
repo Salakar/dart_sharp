@@ -163,21 +163,6 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
       'TIFF pyramid encoding is not implemented yet.',
     );
   }
-  if (options.tileWidth != 256) {
-    throw const UnsupportedCodecException(
-      'TIFF tileWidth is not implemented yet.',
-    );
-  }
-  if (options.tileHeight != 256) {
-    throw const UnsupportedCodecException(
-      'TIFF tileHeight is not implemented yet.',
-    );
-  }
-  if (options.miniswhite) {
-    throw const UnsupportedCodecException(
-      'TIFF miniswhite is not implemented yet.',
-    );
-  }
   if (options.compression == TiffCompression.ccittFax4 ||
       options.compression == TiffCompression.webp ||
       options.compression == TiffCompression.zstd ||

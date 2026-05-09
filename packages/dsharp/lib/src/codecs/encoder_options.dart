@@ -384,13 +384,9 @@ final class TiffEncoderOptions extends EncoderOptions {
   final bool pyramid;
 
   /// Horizontal tile size.
-  ///
-  /// Values other than `256` currently throw [UnsupportedCodecException].
   final int tileWidth;
 
   /// Vertical tile size.
-  ///
-  /// Values other than `256` currently throw [UnsupportedCodecException].
   final int tileHeight;
 
   /// Horizontal resolution in pixels per millimetre.
@@ -403,8 +399,6 @@ final class TiffEncoderOptions extends EncoderOptions {
   final TiffResolutionUnit resolutionUnit;
 
   /// Whether to write 1-bit images as miniswhite.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool miniswhite;
 
   @override

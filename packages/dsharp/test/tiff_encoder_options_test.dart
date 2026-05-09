@@ -80,6 +80,25 @@ void main() {
     expect(horizontal, isNot(none));
   });
 
+  test('TIFF accepts inert tile sizing and miniswhite options', () async {
+    final raw = _raw();
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.none,
+            tileWidth: 512,
+            tileHeight: 512,
+            miniswhite: true,
+          ),
+        )
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 259), 1);
+    expect(_tiffShortTagValue(encoded, 262), 2);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('TIFF advanced parity options fail clearly when unsupported', () {
     final pipeline = ImagePipeline.fromRawPixels(_raw());
 
@@ -91,9 +110,6 @@ void main() {
       const TiffEncoderOptions(predictor: TiffPredictor.float),
       const TiffEncoderOptions(tile: true),
       const TiffEncoderOptions(pyramid: true),
-      const TiffEncoderOptions(tileWidth: 128),
-      const TiffEncoderOptions(tileHeight: 128),
-      const TiffEncoderOptions(miniswhite: true),
       const TiffEncoderOptions(compression: TiffCompression.ccittFax4),
       const TiffEncoderOptions(compression: TiffCompression.webp),
       const TiffEncoderOptions(compression: TiffCompression.zstd),
