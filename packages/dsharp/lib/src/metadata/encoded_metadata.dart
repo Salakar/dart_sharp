@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../api/exceptions.dart';
 import '../codecs/binary_io.dart';
+import '../codecs/deflate_codec.dart';
 import '../codecs/image_format.dart';
 import '../codecs/webp_info.dart';
 import '../pixels/color.dart';
@@ -12,6 +14,7 @@ import 'simple_encoded_metadata.dart';
 
 part 'encoded_metadata_background.dart';
 part 'encoded_metadata_jpeg.dart';
+part 'encoded_metadata_png.dart';
 
 /// Reads container metadata without decoding pixels when that is safe.
 ImageMetadata? readEncodedImageMetadata(Uint8List bytes, ImageFormat format) {
@@ -109,6 +112,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     );
   }
   final payloads = readEncodedMetadataPayloads(bytes, ImageFormat.png);
+  final comments = _pngTextComments(bytes);
   final channels = switch (colorType) {
     0 => 1,
     2 || 3 => hasTransparency ? 4 : 3,
@@ -132,6 +136,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
       background: backgroundChunk,
       palette: palette,
     ),
+    comments: comments,
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,

@@ -22,6 +22,7 @@ final class ImageMetadata {
     this.density,
     this.background,
     this.chromaSubsampling,
+    List<ImageMetadataComment> comments = const <ImageMetadataComment>[],
     bool hasProfile = false,
     bool hasExif = false,
     bool hasXmp = false,
@@ -33,6 +34,7 @@ final class ImageMetadata {
     this.isProgressive = false,
     this.isPalette = false,
   }) : _frameDelays = frameDelays,
+       _comments = comments,
        _iccProfile = iccProfile,
        _exif = exif,
        hasProfile = hasProfile || iccProfile != null,
@@ -94,6 +96,13 @@ final class ImageMetadata {
 
   /// Encoded chroma subsampling description when present.
   final String? chromaSubsampling;
+
+  final List<ImageMetadataComment> _comments;
+
+  /// PNG text comments when present.
+  List<ImageMetadataComment> get comments {
+    return List<ImageMetadataComment>.unmodifiable(_comments);
+  }
 
   /// Whether an ICC or similar color profile is present.
   final bool hasProfile;
@@ -185,6 +194,18 @@ final class ImageMetadata {
       bitDepth: 8,
     );
   }
+}
+
+/// PNG text metadata.
+final class ImageMetadataComment {
+  /// Creates PNG text metadata.
+  const ImageMetadataComment({required this.keyword, required this.text});
+
+  /// PNG text keyword.
+  final String keyword;
+
+  /// PNG text value.
+  final String text;
 }
 
 /// Pixel dimensions.
