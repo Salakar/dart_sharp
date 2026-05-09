@@ -73,11 +73,21 @@ final class TiffImageCodec implements ImageCodec {
     final photometricTag = tiffOptions.compression == TiffCompression.jpeg
         ? 6
         : 2;
-    const entryCount = 10;
+    const entryCount = 13;
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
     final extraOffset = bitsOffset + channels * 2;
-    final pixelOffset = extraOffset + (channels == 4 ? 2 : 0);
+    final xresOffset = extraOffset + (channels == 4 ? 2 : 0);
+    final yresOffset = xresOffset + 8;
+    final pixelOffset = yresOffset + 8;
+    final xres = _resolutionRational(
+      tiffOptions.xres,
+      tiffOptions.resolutionUnit,
+    );
+    final yres = _resolutionRational(
+      tiffOptions.yres,
+      tiffOptions.resolutionUnit,
+    );
     final writer = ByteWriter()
       ..writeAscii('II')
       ..writeUint16Le(42)
@@ -92,7 +102,10 @@ final class TiffImageCodec implements ImageCodec {
     _entry(writer, 277, 3, 1, channels);
     _entry(writer, 278, 4, 1, raw.height);
     _entry(writer, 279, 4, 1, encodedPixels.length);
+    _entry(writer, 282, 5, 1, xresOffset);
+    _entry(writer, 283, 5, 1, yresOffset);
     _entry(writer, 284, 3, 1, 1);
+    _entry(writer, 296, 3, 1, _resolutionUnitTag(tiffOptions.resolutionUnit));
     writer.writeUint32Le(0);
     for (var i = 0; i < channels; i += 1) {
       writer.writeUint16Le(8);
@@ -100,6 +113,8 @@ final class TiffImageCodec implements ImageCodec {
     if (channels == 4) {
       writer.writeUint16Le(2);
     }
+    _writeRational(writer, xres);
+    _writeRational(writer, yres);
     writer.writeBytes(encodedPixels);
     final bytes = writer.toBytes();
     return EncodedImage(
@@ -151,17 +166,6 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
       'TIFF tileHeight is not implemented yet.',
     );
   }
-  if (options.xres != 1) {
-    throw const UnsupportedCodecException('TIFF xres is not implemented yet.');
-  }
-  if (options.yres != 1) {
-    throw const UnsupportedCodecException('TIFF yres is not implemented yet.');
-  }
-  if (options.resolutionUnit != TiffResolutionUnit.inch) {
-    throw const UnsupportedCodecException(
-      'TIFF resolutionUnit is not implemented yet.',
-    );
-  }
   if (options.miniswhite) {
     throw const UnsupportedCodecException(
       'TIFF miniswhite is not implemented yet.',
@@ -180,6 +184,46 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
       'TIFF quality is only meaningful for JPEG compression.',
     );
   }
+}
+
+({int numerator, int denominator}) _resolutionRational(
+  num pixelsPerMillimetre,
+  TiffResolutionUnit unit,
+) {
+  final pixelsPerUnit =
+      pixelsPerMillimetre *
+      switch (unit) {
+        TiffResolutionUnit.inch => 25.4,
+        TiffResolutionUnit.cm => 10,
+      };
+  const denominator = 10000;
+  var numerator = (pixelsPerUnit * denominator).round();
+  if (numerator <= 0) {
+    numerator = 1;
+  }
+  if (numerator > 0xffffffff) {
+    throw const OperationValidationException(
+      'TIFF resolution is too large to encode.',
+    );
+  }
+  final divisor = numerator.gcd(denominator);
+  return (numerator: numerator ~/ divisor, denominator: denominator ~/ divisor);
+}
+
+int _resolutionUnitTag(TiffResolutionUnit unit) {
+  return switch (unit) {
+    TiffResolutionUnit.inch => 2,
+    TiffResolutionUnit.cm => 3,
+  };
+}
+
+void _writeRational(
+  ByteWriter writer,
+  ({int numerator, int denominator}) value,
+) {
+  writer
+    ..writeUint32Le(value.numerator)
+    ..writeUint32Le(value.denominator);
 }
 
 final class _Ifd {

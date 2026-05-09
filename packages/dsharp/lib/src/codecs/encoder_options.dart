@@ -397,19 +397,12 @@ final class TiffEncoderOptions extends EncoderOptions {
   final int tileHeight;
 
   /// Horizontal resolution in pixels per millimetre.
-  ///
-  /// Values other than `1` currently throw [UnsupportedCodecException].
   final num xres;
 
   /// Vertical resolution in pixels per millimetre.
-  ///
-  /// Values other than `1` currently throw [UnsupportedCodecException].
   final num yres;
 
   /// TIFF resolution unit.
-  ///
-  /// Values other than [TiffResolutionUnit.inch] currently throw
-  /// [UnsupportedCodecException].
   final TiffResolutionUnit resolutionUnit;
 
   /// Whether to write 1-bit images as miniswhite.

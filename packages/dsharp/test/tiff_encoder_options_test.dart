@@ -32,6 +32,25 @@ void main() {
     }
   });
 
+  test('TIFF encoder writes resolution tags', () async {
+    final encoded = await ImagePipeline.fromRawPixels(_raw())
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.none,
+            xres: 2,
+            yres: 3,
+            resolutionUnit: TiffResolutionUnit.cm,
+          ),
+        )
+        .toBytes();
+    final metadata = await ImagePipeline.fromBytes(encoded).metadata();
+
+    expect(_tiffShortTagValue(encoded, 296), 3);
+    expect(_tiffRationalTagValue(encoded, 282), closeTo(20, 0.0001));
+    expect(_tiffRationalTagValue(encoded, 283), closeTo(30, 0.0001));
+    expect(metadata.density, closeTo(50.8, 0.0001));
+  });
+
   test('TIFF advanced parity options fail clearly when unsupported', () {
     final pipeline = ImagePipeline.fromRawPixels(_raw());
 
@@ -45,9 +64,6 @@ void main() {
       const TiffEncoderOptions(pyramid: true),
       const TiffEncoderOptions(tileWidth: 128),
       const TiffEncoderOptions(tileHeight: 128),
-      const TiffEncoderOptions(xres: 2),
-      const TiffEncoderOptions(yres: 2),
-      const TiffEncoderOptions(resolutionUnit: TiffResolutionUnit.cm),
       const TiffEncoderOptions(miniswhite: true),
       const TiffEncoderOptions(compression: TiffCompression.ccittFax4),
       const TiffEncoderOptions(compression: TiffCompression.webp),
@@ -141,6 +157,21 @@ int _tiffShortTagValue(Uint8List bytes, int tag) {
     final entry = ifdOffset + 2 + i * 12;
     if (readUint16Le(bytes, entry) == tag) {
       return readUint16Le(bytes, entry + 8);
+    }
+  }
+  throw StateError('Missing TIFF tag $tag.');
+}
+
+double _tiffRationalTagValue(Uint8List bytes, int tag) {
+  final ifdOffset = readUint32Le(bytes, 4);
+  final count = readUint16Le(bytes, ifdOffset);
+  for (var i = 0; i < count; i += 1) {
+    final entry = ifdOffset + 2 + i * 12;
+    if (readUint16Le(bytes, entry) == tag) {
+      final valueOffset = readUint32Le(bytes, entry + 8);
+      final numerator = readUint32Le(bytes, valueOffset);
+      final denominator = readUint32Le(bytes, valueOffset + 4);
+      return numerator / denominator;
     }
   }
   throw StateError('Missing TIFF tag $tag.');
