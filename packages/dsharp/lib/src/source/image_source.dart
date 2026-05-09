@@ -12,7 +12,7 @@ sealed class ImageSource {
   const ImageSource();
 
   /// Creates a source from encoded image bytes.
-  factory ImageSource.bytes(Uint8List bytes) = BytesImageSource;
+  factory ImageSource.bytes(List<int> bytes) = BytesImageSource;
 
   /// Creates a source from a byte buffer.
   factory ImageSource.byteBuffer(ByteBuffer buffer) {
@@ -56,7 +56,7 @@ final class PixelImageSource extends ImageSource {
 /// Encoded image bytes.
 final class BytesImageSource extends ImageSource {
   /// Creates a byte source with a defensive copy.
-  BytesImageSource(Uint8List bytes) : _bytes = Uint8List.fromList(bytes);
+  BytesImageSource(List<int> bytes) : _bytes = Uint8List.fromList(bytes);
 
   final Uint8List _bytes;
 

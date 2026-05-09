@@ -5,8 +5,8 @@ import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('byte source defensively copies Uint8List input', () {
-    final bytes = Uint8List.fromList(<int>[1, 2, 3]);
+  test('byte source defensively copies byte-list input', () {
+    final bytes = <int>[1, 2, 3];
     final source = ImageSource.bytes(bytes) as BytesImageSource;
 
     bytes[0] = 9;
@@ -104,29 +104,38 @@ void main() {
     );
   });
 
-  test('pipeline accepts byte buffer, byte data, and stream sources', () async {
-    final encoded = await ImagePipeline.fromRawPixels(_raw()).png().toBytes();
-    final byteDataBytes = Uint8List.fromList(<int>[9, ...encoded, 9]);
-    final byteData = ByteData.sublistView(
-      byteDataBytes,
-      1,
-      byteDataBytes.length - 1,
-    );
-    final stream = Stream<List<int>>.fromIterable(<List<int>>[
-      encoded.sublist(0, 8),
-      encoded.sublist(8),
-    ]);
+  test(
+    'pipeline accepts byte lists, buffers, byte data, and streams',
+    () async {
+      final encoded = await ImagePipeline.fromRawPixels(_raw()).png().toBytes();
+      final byteDataBytes = Uint8List.fromList(<int>[9, ...encoded, 9]);
+      final byteData = ByteData.sublistView(
+        byteDataBytes,
+        1,
+        byteDataBytes.length - 1,
+      );
+      final stream = Stream<List<int>>.fromIterable(<List<int>>[
+        encoded.sublist(0, 8),
+        encoded.sublist(8),
+      ]);
 
-    final fromBuffer = await ImagePipeline.fromByteBuffer(
-      Uint8List.fromList(encoded).buffer,
-    ).toPixelImage();
-    final fromData = await ImagePipeline.fromByteData(byteData).toPixelImage();
-    final fromStream = await ImagePipeline.fromStream(stream).toPixelImage();
+      final fromList = await ImagePipeline.fromBytes(<int>[
+        ...encoded,
+      ]).toPixelImage();
+      final fromBuffer = await ImagePipeline.fromByteBuffer(
+        Uint8List.fromList(encoded).buffer,
+      ).toPixelImage();
+      final fromData = await ImagePipeline.fromByteData(
+        byteData,
+      ).toPixelImage();
+      final fromStream = await ImagePipeline.fromStream(stream).toPixelImage();
 
-    expect(fromBuffer.firstFrameBytes(), _raw().bytes);
-    expect(fromData.firstFrameBytes(), _raw().bytes);
-    expect(fromStream.firstFrameBytes(), _raw().bytes);
-  });
+      expect(fromList.firstFrameBytes(), _raw().bytes);
+      expect(fromBuffer.firstFrameBytes(), _raw().bytes);
+      expect(fromData.firstFrameBytes(), _raw().bytes);
+      expect(fromStream.firstFrameBytes(), _raw().bytes);
+    },
+  );
 
   test('channel count validates integer input', () {
     expect(ChannelCount.fromInt(3), ChannelCount.three);

@@ -77,7 +77,7 @@ final class ImagePipeline {
 
   /// Creates a pipeline from encoded bytes.
   factory ImagePipeline.fromBytes(
-    Uint8List bytes, {
+    List<int> bytes, {
     InputSafetyLimits limits = const InputSafetyLimits(),
   }) {
     return ImagePipeline.fromSource(ImageSource.bytes(bytes), limits: limits);
