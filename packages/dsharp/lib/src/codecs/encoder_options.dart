@@ -24,6 +24,8 @@ final class JpegEncoderOptions extends EncoderOptions {
     bool progressive = false,
     bool? optimizeScans,
     bool? optimiseScans,
+    bool optimizeCoding = true,
+    bool? optimiseCoding,
     this.chromaSubsampling = '4:2:0',
     bool trellisQuantisation = false,
     bool? trellisQuantization,
@@ -32,10 +34,12 @@ final class JpegEncoderOptions extends EncoderOptions {
     int? quantizationTable,
     this.mozjpeg = false,
     super.force,
-  }) : optimizeScans = optimizeScans ?? optimiseScans ?? false,
+  }) : optimizeScans = optimizeScans ?? optimiseScans ?? mozjpeg,
+       optimizeCoding = optimiseCoding ?? optimizeCoding,
        trellisQuantisation = trellisQuantization ?? trellisQuantisation,
        quantizationTable = quantizationTable ?? quantisationTable ?? 0,
-       progressive = progressive || (optimizeScans ?? optimiseScans ?? false);
+       progressive =
+           progressive || mozjpeg || (optimizeScans ?? optimiseScans ?? false);
 
   /// Quality from 1 to 100.
   final int quality;
@@ -46,27 +50,22 @@ final class JpegEncoderOptions extends EncoderOptions {
   /// Whether to optimize progressive scan output.
   final bool optimizeScans;
 
+  /// Whether to optimize entropy coding tables.
+  final bool optimizeCoding;
+
   /// Chroma subsampling mode.
   final String chromaSubsampling;
 
   /// Whether to request trellis quantisation.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool trellisQuantisation;
 
   /// Whether to request overshoot deringing.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool overshootDeringing;
 
   /// Quantization table selector from 0 to 8.
-  ///
-  /// Values other than `0` currently throw [UnsupportedCodecException].
   final int quantizationTable;
 
   /// Whether to request mozjpeg-style defaults.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
   final bool mozjpeg;
 
   @override

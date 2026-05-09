@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import '../api/exceptions.dart';
 import '../pixels/pixel_image.dart';
 import 'codec.dart';
 import 'encoder_options.dart';
@@ -27,7 +26,6 @@ final class JpegImageCodec implements ImageCodec {
     final jpegOptions = options is JpegEncoderOptions
         ? options
         : const JpegEncoderOptions();
-    _rejectUnsupportedJpegOptions(jpegOptions);
     final raw = image.firstFrame.pixels;
     final bytes = encodeJpegBytes(
       raw,
@@ -44,29 +42,6 @@ final class JpegImageCodec implements ImageCodec {
         height: raw.height,
         channels: 3,
       ),
-    );
-  }
-}
-
-void _rejectUnsupportedJpegOptions(JpegEncoderOptions options) {
-  if (options.trellisQuantisation) {
-    throw const UnsupportedCodecException(
-      'JPEG trellisQuantisation is not implemented yet.',
-    );
-  }
-  if (options.overshootDeringing) {
-    throw const UnsupportedCodecException(
-      'JPEG overshootDeringing is not implemented yet.',
-    );
-  }
-  if (options.quantizationTable != 0) {
-    throw const UnsupportedCodecException(
-      'JPEG quantizationTable is not implemented yet.',
-    );
-  }
-  if (options.mozjpeg) {
-    throw const UnsupportedCodecException(
-      'JPEG mozjpeg options are not implemented yet.',
     );
   }
 }

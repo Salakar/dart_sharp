@@ -22,22 +22,55 @@ void main() {
     );
   });
 
-  test('JPEG advanced parity options fail clearly when unsupported', () async {
-    final pipeline = ImagePipeline.fromRawPixels(_raw());
+  test('JPEG mozjpeg option enables progressive output', () async {
+    final bytes = await ImagePipeline.fromRawPixels(
+      _raw(),
+    ).jpeg(const JpegEncoderOptions(mozjpeg: true)).toBytes();
 
-    for (final options in <JpegEncoderOptions>[
-      const JpegEncoderOptions(trellisQuantisation: true),
-      const JpegEncoderOptions(trellisQuantization: true),
-      const JpegEncoderOptions(overshootDeringing: true),
-      const JpegEncoderOptions(quantisationTable: 3),
-      const JpegEncoderOptions(quantizationTable: 3),
-      const JpegEncoderOptions(mozjpeg: true),
+    expect(
+      (await ImagePipeline.fromBytes(bytes).metadata()).isProgressive,
+      isTrue,
+    );
+  });
+
+  test('JPEG optimizeCoding aliases are accepted', () async {
+    for (final options in const <JpegEncoderOptions>[
+      JpegEncoderOptions(optimizeCoding: false),
+      JpegEncoderOptions(optimiseCoding: false),
     ]) {
+      final bytes = await ImagePipeline.fromRawPixels(
+        _raw(),
+      ).jpeg(options).toBytes();
+
       expect(
-        pipeline.jpeg(options).toBytes(),
-        throwsA(isA<UnsupportedCodecException>()),
+        (await ImagePipeline.fromBytes(bytes).metadata()).format,
+        ImageFormat.jpeg,
       );
     }
+  });
+
+  test('JPEG advanced parity options validate and encode', () async {
+    final pipeline = ImagePipeline.fromRawPixels(_raw());
+
+    for (final options in const <JpegEncoderOptions>[
+      JpegEncoderOptions(trellisQuantisation: true),
+      JpegEncoderOptions(trellisQuantization: true),
+      JpegEncoderOptions(overshootDeringing: true),
+      JpegEncoderOptions(quantisationTable: 3),
+      JpegEncoderOptions(quantizationTable: 3),
+      JpegEncoderOptions(mozjpeg: true),
+    ]) {
+      final bytes = await pipeline.jpeg(options).toBytes();
+
+      expect(
+        (await ImagePipeline.fromBytes(bytes).metadata()).format,
+        ImageFormat.jpeg,
+      );
+    }
+  });
+
+  test('JPEG advanced parity options fail clearly when invalid', () {
+    final pipeline = ImagePipeline.fromRawPixels(_raw());
 
     expect(
       pipeline.jpeg(const JpegEncoderOptions(quantizationTable: -1)).toBytes(),
