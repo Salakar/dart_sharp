@@ -100,6 +100,20 @@ void main() {
     );
   });
 
+  test('rejects non-zero top-level chunk padding bytes', () async {
+    final bytes = alphaSolidVp8Webp(width: 2, height: 1, alpha: <int>[0, 255]);
+    _poisonFirstChunkPadding(bytes, 'ALPH', start: 12, end: _riffEnd(bytes));
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
   test('rejects static VP8 alpha flag and chunk mismatches', () async {
     final alphaFlagWithoutChunk = extendedSolidVp8Webp(width: 1, height: 1);
     alphaFlagWithoutChunk[20] |= 0x10;
@@ -174,6 +188,26 @@ void main() {
     );
     await expectLater(
       ImagePipeline.fromBytes(reordered).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects non-zero animation frame chunk padding bytes', () async {
+    final bytes = animatedVp8Webp(width: 2, height: 1, alpha: <int>[0, 255]);
+    final frame = _firstChunk(bytes, 'ANMF', start: 12, end: _riffEnd(bytes));
+    _poisonFirstChunkPadding(
+      bytes,
+      'ALPH',
+      start: frame.start + 16,
+      end: frame.end,
+    );
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
     );
   });
@@ -400,3 +434,43 @@ Uint8List _appendChunk(Uint8List webp, String type, List<int> payload) {
   words.setUint32(4, out.length - 8, Endian.little);
   return out;
 }
+
+({int start, int end, int length}) _firstChunk(
+  Uint8List bytes,
+  String type, {
+  required int start,
+  required int end,
+}) {
+  final words = ByteData.sublistView(bytes);
+  var offset = start;
+  while (offset + 8 <= end) {
+    final chunkType = String.fromCharCodes(bytes.sublist(offset, offset + 4));
+    final length = words.getUint32(offset + 4, Endian.little);
+    final payloadStart = offset + 8;
+    final payloadEnd = payloadStart + length;
+    if (payloadEnd > end) {
+      break;
+    }
+    if (chunkType == type) {
+      return (start: payloadStart, end: payloadEnd, length: length);
+    }
+    offset = payloadEnd + (length.isOdd ? 1 : 0);
+  }
+  throw StateError('No $type chunk found.');
+}
+
+void _poisonFirstChunkPadding(
+  Uint8List bytes,
+  String type, {
+  required int start,
+  required int end,
+}) {
+  final chunk = _firstChunk(bytes, type, start: start, end: end);
+  if (chunk.length.isEven || chunk.end >= end) {
+    throw StateError('No $type padding byte found.');
+  }
+  bytes[chunk.end] = 1;
+}
+
+int _riffEnd(Uint8List bytes) =>
+    8 + ByteData.sublistView(bytes).getUint32(4, Endian.little);

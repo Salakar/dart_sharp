@@ -85,10 +85,7 @@ _Animation _readAnimation(Uint8List bytes) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final start = offset + 8;
-    final end = start + length;
-    if (end > riffEnd) {
-      throw const InvalidImageException('Truncated WebP chunk.');
-    }
+    final end = webpChunkPayloadEnd(bytes, offset, riffEnd);
     final data = bytes.sublist(start, end);
     if (type == 'VP8X') {
       if (data.length != 10) {
@@ -109,7 +106,12 @@ _Animation _readAnimation(Uint8List bytes) {
     } else if (type == 'ANMF') {
       frames.add(_readFrame(data));
     }
-    offset = end + (length.isOdd ? 1 : 0);
+    offset = webpNextChunkOffset(
+      bytes,
+      payloadEnd: end,
+      payloadLength: length,
+      containerEnd: riffEnd,
+    );
   }
   if (offset != riffEnd) {
     throw const InvalidImageException('Truncated WebP chunk.');
@@ -143,10 +145,7 @@ _AnimationFrame _readFrame(Uint8List data) {
     final type = String.fromCharCodes(data.sublist(offset, offset + 4));
     final length = readUint32Le(data, offset + 4);
     final start = offset + 8;
-    final end = start + length;
-    if (end > data.length) {
-      throw const InvalidImageException('Truncated WebP animation frame.');
-    }
+    final end = webpChunkPayloadEnd(data, offset, data.length);
     if (type == 'VP8L') {
       if (vp8l != null || vp8 != null) {
         throw const InvalidImageException(
@@ -169,7 +168,12 @@ _AnimationFrame _readFrame(Uint8List data) {
       }
       alpha = data.sublist(start, end);
     }
-    offset = end + (length.isOdd ? 1 : 0);
+    offset = webpNextChunkOffset(
+      data,
+      payloadEnd: end,
+      payloadLength: length,
+      containerEnd: data.length,
+    );
   }
   if (offset != data.length) {
     throw const InvalidImageException('Truncated WebP animation frame.');

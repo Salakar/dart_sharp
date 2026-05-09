@@ -19,3 +19,31 @@ int webpRiffEnd(Uint8List bytes) {
   }
   return riffEnd;
 }
+
+/// Returns the exclusive end offset of a chunk payload.
+int webpChunkPayloadEnd(Uint8List bytes, int offset, int containerEnd) {
+  final end = offset + 8 + readUint32Le(bytes, offset + 4);
+  if (end > containerEnd) {
+    throw const InvalidImageException('Truncated WebP chunk.');
+  }
+  return end;
+}
+
+/// Returns the offset of the next chunk, validating RIFF padding when present.
+int webpNextChunkOffset(
+  Uint8List bytes, {
+  required int payloadEnd,
+  required int payloadLength,
+  required int containerEnd,
+}) {
+  if (payloadLength.isEven) {
+    return payloadEnd;
+  }
+  if (payloadEnd >= containerEnd) {
+    throw const InvalidImageException('Truncated WebP chunk.');
+  }
+  if (bytes[payloadEnd] != 0) {
+    throw const InvalidImageException('Invalid WebP chunk padding.');
+  }
+  return payloadEnd + 1;
+}

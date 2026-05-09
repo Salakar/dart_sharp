@@ -189,14 +189,16 @@ bool _containsWebpChunk(Uint8List bytes, String target) {
   while (offset + 8 <= riffEnd) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
-    final end = offset + 8 + length;
-    if (end > riffEnd) {
-      return false;
-    }
+    final end = webpChunkPayloadEnd(bytes, offset, riffEnd);
     if (type == target) {
       return true;
     }
-    offset = end + (length.isOdd ? 1 : 0);
+    offset = webpNextChunkOffset(
+      bytes,
+      payloadEnd: end,
+      payloadLength: length,
+      containerEnd: riffEnd,
+    );
   }
   if (offset != riffEnd) {
     return false;

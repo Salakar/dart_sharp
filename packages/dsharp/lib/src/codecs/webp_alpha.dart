@@ -123,14 +123,16 @@ Uint8List? _findWebpChunk(Uint8List bytes, String target) {
     final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
     final length = readUint32Le(bytes, offset + 4);
     final start = offset + 8;
-    final end = start + length;
-    if (end > riffEnd) {
-      throw const InvalidImageException('Truncated WebP chunk.');
-    }
+    final end = webpChunkPayloadEnd(bytes, offset, riffEnd);
     if (type == target) {
       return bytes.sublist(start, end);
     }
-    offset = end + (length.isOdd ? 1 : 0);
+    offset = webpNextChunkOffset(
+      bytes,
+      payloadEnd: end,
+      payloadLength: length,
+      containerEnd: riffEnd,
+    );
   }
   if (offset != riffEnd) {
     throw const InvalidImageException('Truncated WebP chunk.');
