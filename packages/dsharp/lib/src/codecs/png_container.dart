@@ -102,6 +102,9 @@ _PngContainer _readPngContainer(Uint8List bytes) {
         seenEnd = true;
       default:
         _requireHeaderBefore(type, seenHeader);
+        if (_isCriticalChunk(type)) {
+          throw InvalidImageException('Unsupported PNG critical chunk $type.');
+        }
         if (seenImageData) {
           seenNonImageDataAfterIdat = true;
         }
@@ -142,6 +145,10 @@ String _pngChunkType(Uint8List bytes, int offset) {
     }
   }
   return ascii.decode(bytes.sublist(offset, offset + 4));
+}
+
+bool _isCriticalChunk(String type) {
+  return type.codeUnitAt(0) >= 0x41 && type.codeUnitAt(0) <= 0x5a;
 }
 
 void _validateTransparencyChunk(

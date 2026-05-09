@@ -178,6 +178,12 @@ void main() {
         ('IDAT', scanline),
         ('IEND', const <int>[]),
       ]),
+      _pngChunks(<(String, List<int>)>[
+        ('IHDR', _ihdrData(1, 1)),
+        ('ABCD', const <int>[]),
+        ('IDAT', scanline),
+        ('IEND', const <int>[]),
+      ]),
       _withoutIend(
         _png(
           width: 1,
