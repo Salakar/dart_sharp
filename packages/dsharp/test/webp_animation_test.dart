@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dsharp/dsharp.dart';
 import 'package:test/test.dart';
 
@@ -235,6 +237,33 @@ void main() {
     );
   });
 
+  test('rejects animation frames without image payloads', () async {
+    final bytes = animatedVp8Webp(width: 1, height: 1);
+    final frameOffset = _chunkOffset(bytes, 'ANMF');
+    _writeU32(bytes, frameOffset + 4, 16);
+
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).metadata(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('WebP animation frame has no image data'),
+        ),
+      ),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(bytes).toPixelImage(),
+      throwsA(
+        isA<InvalidImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('WebP animation frame has no image data'),
+        ),
+      ),
+    );
+  });
+
   test('rejects animated WebP missing ANIM header', () async {
     final bytes = animatedVp8lWebpWithoutAnimHeader();
 
@@ -273,4 +302,31 @@ void main() {
       throwsA(isA<InvalidImageException>()),
     );
   });
+}
+
+int _chunkOffset(Uint8List bytes, String type) {
+  var offset = 12;
+  while (offset + 8 <= bytes.length) {
+    final chunkType = String.fromCharCodes(bytes.sublist(offset, offset + 4));
+    final length = _readU32(bytes, offset + 4);
+    if (chunkType == type) {
+      return offset;
+    }
+    offset += 8 + length + (length.isOdd ? 1 : 0);
+  }
+  throw StateError('Missing $type chunk.');
+}
+
+int _readU32(Uint8List bytes, int offset) {
+  return bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
+}
+
+void _writeU32(Uint8List bytes, int offset, int value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >> 8) & 0xff;
+  bytes[offset + 2] = (value >> 16) & 0xff;
+  bytes[offset + 3] = (value >> 24) & 0xff;
 }
