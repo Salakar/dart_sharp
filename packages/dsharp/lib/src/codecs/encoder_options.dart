@@ -530,9 +530,7 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Whether to reduce lossy animation size by encoding changed regions.
   final bool minSize;
 
-  /// Whether to request mixed lossy/lossless animation encoding.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
+  /// Whether lossy animation frames may use VP8L when smaller.
   final bool mixed;
 
   @override

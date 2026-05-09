@@ -32,6 +32,7 @@ Uint8List encodeAnimatedWebpVp8(
   required int quality,
   required int alphaQuality,
   bool minimizeSize = false,
+  bool mixed = false,
 }) {
   final content = ByteWriter()
     ..writeAscii('WEBP')
@@ -50,15 +51,16 @@ Uint8List encodeAnimatedWebpVp8(
   );
   Uint8List? previousRgba;
   for (final frame in image.frames) {
-    if (minimizeSize) {
-      final minimized = _lossyMinimizedFramePayload(
+    if (minimizeSize || mixed) {
+      final encoded = _encodedAnimationFrame(
         frame,
-        previousRgba: previousRgba,
+        previousRgba: minimizeSize ? previousRgba : null,
         quality: quality,
         alphaQuality: alphaQuality,
+        mixed: mixed,
       );
-      previousRgba = minimized.rgba;
-      _writeWebpChunk(content, 'ANMF', minimized.payload);
+      previousRgba = encoded.rgba;
+      _writeWebpChunk(content, 'ANMF', encoded.payload);
       continue;
     }
     _writeWebpChunk(
@@ -145,11 +147,12 @@ Uint8List _lossyFramePayload(
   );
 }
 
-({Uint8List payload, Uint8List rgba}) _lossyMinimizedFramePayload(
+({Uint8List payload, Uint8List rgba}) _encodedAnimationFrame(
   ImageFrame frame, {
   required Uint8List? previousRgba,
   required int quality,
   required int alphaQuality,
+  required bool mixed,
 }) {
   _validateLossyDimensions(frame.pixels);
   final rgba = rawToRgba(frame.pixels);
@@ -161,13 +164,18 @@ Uint8List _lossyFramePayload(
           width: frame.width,
           height: frame.height,
         );
+  final lossy = _lossyFrameRectPayload(
+    rect,
+    delay: frame.delay,
+    quality: quality,
+    alphaQuality: alphaQuality,
+  );
+  if (!mixed) {
+    return (payload: lossy, rgba: rgba);
+  }
+  final lossless = _losslessFrameRectPayload(rect, delay: frame.delay);
   return (
-    payload: _lossyFrameRectPayload(
-      rect,
-      delay: frame.delay,
-      quality: quality,
-      alphaQuality: alphaQuality,
-    ),
+    payload: lossless.length < lossy.length ? lossless : lossy,
     rgba: rgba,
   );
 }
@@ -262,6 +270,23 @@ Uint8List _lossyFrameRectPayload(
   }
   _writeWebpChunk(writer, 'VP8 ', vp8);
   return writer.toBytes();
+}
+
+Uint8List _losslessFrameRectPayload(
+  _LossyFrameRect rect, {
+  required Duration? delay,
+}) {
+  return encodeWebpLosslessAnimationFramePayload(
+    RawPixels(
+      bytes: rect.rgba,
+      width: rect.width,
+      height: rect.height,
+      channels: ChannelCount.four,
+    ),
+    x: rect.x,
+    y: rect.y,
+    delay: delay,
+  );
 }
 
 Uint8List _copyRgbaRect(

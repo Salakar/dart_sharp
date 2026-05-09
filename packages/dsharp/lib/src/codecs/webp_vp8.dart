@@ -5,6 +5,7 @@ import '../pixels/pixel_image.dart';
 import '../source/raw_pixels.dart';
 import 'binary_io.dart';
 import 'codec_pixels.dart';
+import 'webp_lossless_encoder.dart';
 import 'webp_riff.dart';
 import 'webp_vp8_bool.dart';
 

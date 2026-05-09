@@ -635,12 +635,15 @@ void main() {
         pipeline.webp(const WebpEncoderOptions(minSize: true)).toBytes(),
         completes,
       );
+      await expectLater(
+        pipeline.webp(const WebpEncoderOptions(mixed: true)).toBytes(),
+        completes,
+      );
       for (final options in <WebpEncoderOptions>[
         const WebpEncoderOptions(smartSubsample: true),
         const WebpEncoderOptions(smartDeblock: true),
         const WebpEncoderOptions(preset: 'picture'),
         const WebpEncoderOptions(effort: 0),
-        const WebpEncoderOptions(mixed: true),
       ]) {
         expect(
           pipeline.webp(options).toBytes(),

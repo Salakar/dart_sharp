@@ -89,15 +89,30 @@ Uint8List _animationPayload(int loopCount) {
 }
 
 Uint8List _framePayload(ImageFrame frame) {
-  _validateDimensions(frame.pixels);
+  return encodeWebpLosslessAnimationFramePayload(
+    frame.pixels,
+    x: 0,
+    y: 0,
+    delay: frame.delay,
+  );
+}
+
+/// Encodes a VP8L animation frame payload.
+Uint8List encodeWebpLosslessAnimationFramePayload(
+  RawPixels pixels, {
+  required int x,
+  required int y,
+  required Duration? delay,
+}) {
+  _validateDimensions(pixels);
   final writer = ByteWriter();
-  _writeUint24Le(writer, 0);
-  _writeUint24Le(writer, 0);
-  _writeUint24Le(writer, frame.width - 1);
-  _writeUint24Le(writer, frame.height - 1);
-  _writeUint24Le(writer, frame.delay?.inMilliseconds ?? 0);
+  _writeUint24Le(writer, x ~/ 2);
+  _writeUint24Le(writer, y ~/ 2);
+  _writeUint24Le(writer, pixels.width - 1);
+  _writeUint24Le(writer, pixels.height - 1);
+  _writeUint24Le(writer, delay?.inMilliseconds ?? 0);
   writer.writeByte(0x02);
-  _writeChunk(writer, 'VP8L', _encodeVp8lPayload(frame.pixels));
+  _writeChunk(writer, 'VP8L', _encodeVp8lPayload(pixels));
   return writer.toBytes();
 }
 
