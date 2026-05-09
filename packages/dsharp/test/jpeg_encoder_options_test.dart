@@ -21,6 +21,33 @@ void main() {
       isTrue,
     );
   });
+
+  test('JPEG advanced parity options fail clearly when unsupported', () async {
+    final pipeline = ImagePipeline.fromRawPixels(_raw());
+
+    for (final options in <JpegEncoderOptions>[
+      const JpegEncoderOptions(trellisQuantisation: true),
+      const JpegEncoderOptions(trellisQuantization: true),
+      const JpegEncoderOptions(overshootDeringing: true),
+      const JpegEncoderOptions(quantisationTable: 3),
+      const JpegEncoderOptions(quantizationTable: 3),
+      const JpegEncoderOptions(mozjpeg: true),
+    ]) {
+      expect(
+        pipeline.jpeg(options).toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
+
+    expect(
+      pipeline.jpeg(const JpegEncoderOptions(quantizationTable: -1)).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+    expect(
+      pipeline.jpeg(const JpegEncoderOptions(quantizationTable: 9)).toBytes(),
+      throwsA(isA<OperationValidationException>()),
+    );
+  });
 }
 
 RawPixels _raw() {

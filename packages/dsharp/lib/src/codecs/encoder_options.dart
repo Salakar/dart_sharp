@@ -25,8 +25,16 @@ final class JpegEncoderOptions extends EncoderOptions {
     bool? optimizeScans,
     bool? optimiseScans,
     this.chromaSubsampling = '4:2:0',
+    bool trellisQuantisation = false,
+    bool? trellisQuantization,
+    this.overshootDeringing = false,
+    int? quantisationTable,
+    int? quantizationTable,
+    this.mozjpeg = false,
     super.force,
   }) : optimizeScans = optimizeScans ?? optimiseScans ?? false,
+       trellisQuantisation = trellisQuantization ?? trellisQuantisation,
+       quantizationTable = quantizationTable ?? quantisationTable ?? 0,
        progressive = progressive || (optimizeScans ?? optimiseScans ?? false);
 
   /// Quality from 1 to 100.
@@ -41,6 +49,26 @@ final class JpegEncoderOptions extends EncoderOptions {
   /// Chroma subsampling mode.
   final String chromaSubsampling;
 
+  /// Whether to request trellis quantisation.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
+  final bool trellisQuantisation;
+
+  /// Whether to request overshoot deringing.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
+  final bool overshootDeringing;
+
+  /// Quantization table selector from 0 to 8.
+  ///
+  /// Values other than `0` currently throw [UnsupportedCodecException].
+  final int quantizationTable;
+
+  /// Whether to request mozjpeg-style defaults.
+  ///
+  /// `true` currently throws [UnsupportedCodecException].
+  final bool mozjpeg;
+
   @override
   ImageFormat get format => ImageFormat.jpeg;
 
@@ -50,6 +78,11 @@ final class JpegEncoderOptions extends EncoderOptions {
     if (chromaSubsampling != '4:2:0' && chromaSubsampling != '4:4:4') {
       throw const OperationValidationException(
         'JPEG chromaSubsampling must be 4:2:0 or 4:4:4.',
+      );
+    }
+    if (quantizationTable < 0 || quantizationTable > 8) {
+      throw const OperationValidationException(
+        'JPEG quantizationTable must be 0..8.',
       );
     }
   }
