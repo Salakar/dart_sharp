@@ -99,6 +99,18 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
+  test('TIFF encoder writes alpha extra sample tag', () async {
+    final raw = _raw();
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(const TiffEncoderOptions(compression: TiffCompression.none))
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 277), 4);
+    expect(_tiffShortTagValue(encoded, 338), 2);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('TIFF encoder writes low-bit grayscale output', () async {
     for (final entry in <(int, RawPixels)>[
       (1, _grayRaw(<int>[0, 255, 0, 255])),

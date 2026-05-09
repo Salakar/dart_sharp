@@ -88,11 +88,11 @@ final class TiffImageCodec implements ImageCodec {
         : tiffOptions.compression == TiffCompression.jpeg
         ? 6
         : 2;
-    final entryCount = 13 + (predictorTag == null ? 0 : 1);
+    final entryCount =
+        13 + (predictorTag == null ? 0 : 1) + (channels == 4 ? 1 : 0);
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
-    final extraOffset = bitsOffset + (channels == 1 ? 0 : channels * 2);
-    final xresOffset = extraOffset + (channels == 4 ? 2 : 0);
+    final xresOffset = bitsOffset + (channels == 1 ? 0 : channels * 2);
     final yresOffset = xresOffset + 8;
     final pixelOffset = yresOffset + 8;
     final xres = _resolutionRational(
@@ -130,12 +130,12 @@ final class TiffImageCodec implements ImageCodec {
     if (predictorTag != null) {
       _entry(writer, 317, 3, 1, predictorTag);
     }
+    if (channels == 4) {
+      _entry(writer, 338, 3, 1, 2);
+    }
     writer.writeUint32Le(0);
     for (var i = 0; i < (channels == 1 ? 0 : channels); i += 1) {
       writer.writeUint16Le(tiffOptions.bitDepth);
-    }
-    if (channels == 4) {
-      writer.writeUint16Le(2);
     }
     _writeRational(writer, xres);
     _writeRational(writer, yres);
