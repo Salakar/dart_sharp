@@ -130,6 +130,38 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
+  test('GIF advanced parity options fail clearly when unsupported', () {
+    final pipeline = ImagePipeline.fromRawPixels(_twoColorRaw());
+
+    for (final options in <GifEncoderOptions>[
+      const GifEncoderOptions(effort: 1),
+      const GifEncoderOptions(dither: 0.5),
+      const GifEncoderOptions(interFrameMaxError: 8),
+      const GifEncoderOptions(interPaletteMaxError: 0),
+    ]) {
+      expect(
+        pipeline.gif(options).toBytes(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
+
+    for (final options in <GifEncoderOptions>[
+      const GifEncoderOptions(effort: 0),
+      const GifEncoderOptions(effort: 11),
+      const GifEncoderOptions(dither: -0.1),
+      const GifEncoderOptions(dither: 1.1),
+      const GifEncoderOptions(interFrameMaxError: -1),
+      const GifEncoderOptions(interFrameMaxError: 33),
+      const GifEncoderOptions(interPaletteMaxError: -1),
+      const GifEncoderOptions(interPaletteMaxError: 257),
+    ]) {
+      expect(
+        pipeline.gif(options).toBytes(),
+        throwsA(isA<OperationValidationException>()),
+      );
+    }
+  });
+
   test('GIF animation option ranges are validated', () {
     expect(
       ImagePipeline.fromPixelImage(

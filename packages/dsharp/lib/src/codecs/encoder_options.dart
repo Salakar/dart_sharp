@@ -190,6 +190,10 @@ final class GifEncoderOptions extends EncoderOptions {
     this.progressive = false,
     int colors = 256,
     int? colours,
+    this.effort = 7,
+    this.dither = 1,
+    this.interFrameMaxError = 0,
+    this.interPaletteMaxError = 3,
     this.keepDuplicateFrames = false,
     int? loopCount,
     int? loop,
@@ -212,6 +216,26 @@ final class GifEncoderOptions extends EncoderOptions {
   /// Palette size.
   final int colors;
 
+  /// Encoder effort from 1 to 10.
+  ///
+  /// Values other than `7` currently throw [UnsupportedCodecException].
+  final int effort;
+
+  /// Floyd-Steinberg dithering level from 0 to 1.
+  ///
+  /// Values other than `1` currently throw [UnsupportedCodecException].
+  final num dither;
+
+  /// Maximum inter-frame transparency error from 0 to 32.
+  ///
+  /// Values other than `0` currently throw [UnsupportedCodecException].
+  final int interFrameMaxError;
+
+  /// Maximum palette reuse error from 0 to 256.
+  ///
+  /// Values other than `3` currently throw [UnsupportedCodecException].
+  final int interPaletteMaxError;
+
   /// Whether duplicate frames should be kept.
   final bool keepDuplicateFrames;
 
@@ -231,6 +255,24 @@ final class GifEncoderOptions extends EncoderOptions {
   void validate() {
     if (colors < 2 || colors > 256) {
       throw const OperationValidationException('GIF colors must be 2..256.');
+    }
+    if (effort < 1 || effort > 10) {
+      throw const OperationValidationException('GIF effort must be 1..10.');
+    }
+    if (dither < 0 || dither > 1) {
+      throw const OperationValidationException(
+        'GIF dither must be between 0 and 1.',
+      );
+    }
+    if (interFrameMaxError < 0 || interFrameMaxError > 32) {
+      throw const OperationValidationException(
+        'GIF interFrameMaxError must be 0..32.',
+      );
+    }
+    if (interPaletteMaxError < 0 || interPaletteMaxError > 256) {
+      throw const OperationValidationException(
+        'GIF interPaletteMaxError must be 0..256.',
+      );
     }
     final loop = loopCount;
     if (loop != null && (loop < 0 || loop > 0xffff)) {
