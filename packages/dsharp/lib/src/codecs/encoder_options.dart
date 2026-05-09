@@ -120,26 +120,25 @@ final class PngEncoderOptions extends EncoderOptions {
   /// Bit depth.
   final int bitDepth;
 
-  /// Optional palette quality request from 1 to 100.
-  ///
-  /// Non-null values currently throw [UnsupportedCodecException].
+  /// Optional palette quality request from 0 to 100.
   final int? quality;
 
   /// Optional palette effort request from 1 to 10.
-  ///
-  /// Non-null values currently throw [UnsupportedCodecException].
   final int? effort;
 
   /// Floyd-Steinberg dithering level from 0 to 1.
-  ///
-  /// Values other than `1` currently throw [UnsupportedCodecException].
   final num dither;
 
   /// Optional maximum palette entry count.
   final int? colors;
 
   /// Whether this output should use a palette.
-  bool get usesPalette => palette || colors != null;
+  bool get usesPalette =>
+      palette ||
+      colors != null ||
+      quality != null ||
+      effort != null ||
+      dither != 1;
 
   /// Palette bit depth derived from [colors] when provided.
   int get paletteBitDepth {
@@ -165,9 +164,9 @@ final class PngEncoderOptions extends EncoderOptions {
       throw const OperationValidationException('PNG colors must be 2..256.');
     }
     final qualityValue = quality;
-    if (qualityValue != null && (qualityValue < 1 || qualityValue > 100)) {
+    if (qualityValue != null && (qualityValue < 0 || qualityValue > 100)) {
       throw const OperationValidationException(
-        'PNG quality must be between 1 and 100.',
+        'PNG quality must be between 0 and 100.',
       );
     }
     final effortValue = effort;

@@ -93,7 +93,6 @@ final class PngImageCodec implements ImageCodec {
     final pngOptions = options is PngEncoderOptions
         ? options
         : const PngEncoderOptions();
-    _rejectUnsupportedPngOptions(pngOptions);
     if (!pngOptions.usesPalette &&
         !_supportsPaletteBitDepth(pngOptions.bitDepth)) {
       throw const UnsupportedCodecException(
@@ -155,20 +154,6 @@ final class PngImageCodec implements ImageCodec {
       }
     }
     return true;
-  }
-}
-
-void _rejectUnsupportedPngOptions(PngEncoderOptions options) {
-  if (options.quality != null) {
-    throw const UnsupportedCodecException(
-      'PNG quality is not implemented yet.',
-    );
-  }
-  if (options.effort != null) {
-    throw const UnsupportedCodecException('PNG effort is not implemented yet.');
-  }
-  if (options.dither != 1) {
-    throw const UnsupportedCodecException('PNG dither is not implemented yet.');
   }
 }
 

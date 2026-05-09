@@ -37,22 +37,32 @@ void main() {
     }
   });
 
-  test('PNG advanced parity options fail clearly when unsupported', () {
+  test(
+    'PNG palette parity options validate and select indexed output',
+    () async {
+      final pipeline = ImagePipeline.fromRawPixels(_paletteRaw());
+
+      for (final options in const <PngEncoderOptions>[
+        PngEncoderOptions(quality: 0),
+        PngEncoderOptions(quality: 90),
+        PngEncoderOptions(effort: 1),
+        PngEncoderOptions(effort: 10),
+        PngEncoderOptions(dither: 0),
+        PngEncoderOptions(dither: 0.5),
+      ]) {
+        final encoded = await pipeline.png(options).toBytes();
+        final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+        expect(_pngColorType(encoded), 3);
+        expect(decoded.firstFrameBytes(), _paletteRaw().bytes);
+      }
+    },
+  );
+
+  test('PNG advanced parity options fail clearly when invalid', () {
     final pipeline = ImagePipeline.fromRawPixels(_paletteRaw());
 
     for (final options in <PngEncoderOptions>[
-      const PngEncoderOptions(quality: 90),
-      const PngEncoderOptions(effort: 1),
-      const PngEncoderOptions(dither: 0.5),
-    ]) {
-      expect(
-        pipeline.png(options).toBytes(),
-        throwsA(isA<UnsupportedCodecException>()),
-      );
-    }
-
-    for (final options in <PngEncoderOptions>[
-      const PngEncoderOptions(quality: 0),
       const PngEncoderOptions(quality: 101),
       const PngEncoderOptions(effort: 0),
       const PngEncoderOptions(effort: 11),
