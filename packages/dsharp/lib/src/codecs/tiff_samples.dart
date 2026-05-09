@@ -151,3 +151,49 @@ Uint8List _scale16BitSamples(
   }
   return output;
 }
+
+Uint8List _lowBitTiffPixels(RawPixels raw, int bitDepth, bool miniswhite) {
+  final rgba = rawToRgba(raw);
+  final writer = ByteWriter();
+  final maxSample = (1 << bitDepth) - 1;
+  for (var y = 0; y < raw.height; y += 1) {
+    var byte = 0;
+    var bits = 0;
+    for (var x = 0; x < raw.width; x += 1) {
+      final sample = _lowBitTiffSample(
+        rgba,
+        y * raw.width + x,
+        maxSample,
+        miniswhite,
+      );
+      byte = (byte << bitDepth) | sample;
+      bits += bitDepth;
+      if (bits == 8) {
+        writer.writeByte(byte);
+        byte = 0;
+        bits = 0;
+      }
+    }
+    if (bits > 0) {
+      writer.writeByte(byte << (8 - bits));
+    }
+  }
+  return writer.toBytes();
+}
+
+int _lowBitTiffSample(
+  Uint8List rgba,
+  int pixel,
+  int maxSample,
+  bool miniswhite,
+) {
+  final offset = pixel * 4;
+  if (rgba[offset + 3] != 255) {
+    throw const UnsupportedCodecException('Opaque pixels required.');
+  }
+  final gray =
+      (rgba[offset] * 299 + rgba[offset + 1] * 587 + rgba[offset + 2] * 114) ~/
+      1000;
+  final sample = (gray * maxSample + 127) ~/ 255;
+  return miniswhite ? maxSample - sample : sample;
+}

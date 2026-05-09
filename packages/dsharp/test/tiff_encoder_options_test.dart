@@ -99,6 +99,69 @@ void main() {
     expect(decoded.firstFrameBytes(), raw.bytes);
   });
 
+  test('TIFF encoder writes low-bit grayscale output', () async {
+    for (final entry in <(int, RawPixels)>[
+      (1, _grayRaw(<int>[0, 255, 0, 255])),
+      (2, _grayRaw(<int>[0, 85, 170, 255])),
+      (4, _grayRaw(<int>[0, 17, 170, 255])),
+    ]) {
+      final encoded = await ImagePipeline.fromRawPixels(entry.$2)
+          .tiff(
+            TiffEncoderOptions(
+              compression: TiffCompression.none,
+              bitDepth: entry.$1,
+              predictor: TiffPredictor.none,
+            ),
+          )
+          .toBytesWithInfo();
+      final decoded = await ImagePipeline.fromBytes(
+        encoded.bytes,
+      ).toPixelImage();
+
+      expect(encoded.info.channels, 1);
+      expect(_tiffShortTagValue(encoded.bytes, 258), entry.$1);
+      expect(_tiffShortTagValue(encoded.bytes, 262), 1);
+      expect(_tiffShortTagValue(encoded.bytes, 277), 1);
+      expect(decoded.firstFrameBytes(), entry.$2.bytes);
+    }
+  });
+
+  test('TIFF encoder writes miniswhite low-bit grayscale output', () async {
+    final raw = _grayRaw(<int>[0, 255, 0, 255]);
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.none,
+            bitDepth: 1,
+            miniswhite: true,
+            predictor: TiffPredictor.none,
+          ),
+        )
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 258), 1);
+    expect(_tiffShortTagValue(encoded, 262), 0);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
+  test('TIFF low-bit grayscale output works with compression', () async {
+    final raw = _grayRaw(<int>[0, 85, 170, 255]);
+    final encoded = await ImagePipeline.fromRawPixels(raw)
+        .tiff(
+          const TiffEncoderOptions(
+            compression: TiffCompression.lzw,
+            bitDepth: 2,
+          ),
+        )
+        .toBytes();
+    final decoded = await ImagePipeline.fromBytes(encoded).toPixelImage();
+
+    expect(_tiffShortTagValue(encoded, 258), 2);
+    expect(_tiffShortTagValue(encoded, 259), 5);
+    expect(decoded.firstFrameBytes(), raw.bytes);
+  });
+
   test('TIFF advanced parity options fail clearly when unsupported', () {
     final pipeline = ImagePipeline.fromRawPixels(_raw());
 
@@ -191,6 +254,17 @@ RawPixels _solidRaw() {
     ]),
     width: 4,
     height: 4,
+    channels: ChannelCount.four,
+  );
+}
+
+RawPixels _grayRaw(List<int> values) {
+  return RawPixels(
+    bytes: Uint8List.fromList(<int>[
+      for (final value in values) ...<int>[value, value, value, 255],
+    ]),
+    width: values.length,
+    height: 1,
     channels: ChannelCount.four,
   );
 }

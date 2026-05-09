@@ -40,12 +40,19 @@ final class TiffImageCodec implements ImageCodec {
         : const TiffEncoderOptions();
     _rejectUnsupportedTiffOptions(tiffOptions);
     final raw = image.firstFrame.pixels;
-    final channels = tiffOptions.compression == TiffCompression.jpeg
+    final lowBitDepth = tiffOptions.bitDepth < 8;
+    final channels = lowBitDepth
+        ? 1
+        : tiffOptions.compression == TiffCompression.jpeg
         ? 3
         : raw.channels == ChannelCount.three
         ? 3
         : 4;
-    final pixels = channels == 3 ? rawToRgb(raw) : rawToRgba(raw);
+    final pixels = lowBitDepth
+        ? _lowBitTiffPixels(raw, tiffOptions.bitDepth, tiffOptions.miniswhite)
+        : channels == 3
+        ? rawToRgb(raw)
+        : rawToRgba(raw);
     final predictorTag = _encodedTiffPredictor(tiffOptions);
     if (predictorTag == 2) {
       _applyHorizontalPredictor(pixels, raw.width, raw.height, channels);
@@ -74,13 +81,17 @@ final class TiffImageCodec implements ImageCodec {
         'Unsupported TIFF compression.',
       ),
     };
-    final photometricTag = tiffOptions.compression == TiffCompression.jpeg
+    final photometricTag = lowBitDepth
+        ? tiffOptions.miniswhite
+              ? 0
+              : 1
+        : tiffOptions.compression == TiffCompression.jpeg
         ? 6
         : 2;
     final entryCount = 13 + (predictorTag == null ? 0 : 1);
     const ifdOffset = 8;
     final bitsOffset = ifdOffset + 2 + entryCount * 12 + 4;
-    final extraOffset = bitsOffset + channels * 2;
+    final extraOffset = bitsOffset + (channels == 1 ? 0 : channels * 2);
     final xresOffset = extraOffset + (channels == 4 ? 2 : 0);
     final yresOffset = xresOffset + 8;
     final pixelOffset = yresOffset + 8;
@@ -99,7 +110,13 @@ final class TiffImageCodec implements ImageCodec {
       ..writeUint16Le(entryCount);
     _entry(writer, 256, 4, 1, raw.width);
     _entry(writer, 257, 4, 1, raw.height);
-    _entry(writer, 258, 3, channels, bitsOffset);
+    _entry(
+      writer,
+      258,
+      3,
+      channels,
+      channels == 1 ? tiffOptions.bitDepth : bitsOffset,
+    );
     _entry(writer, 259, 3, 1, compressionTag);
     _entry(writer, 262, 3, 1, photometricTag);
     _entry(writer, 273, 4, 1, pixelOffset);
@@ -114,8 +131,8 @@ final class TiffImageCodec implements ImageCodec {
       _entry(writer, 317, 3, 1, predictorTag);
     }
     writer.writeUint32Le(0);
-    for (var i = 0; i < channels; i += 1) {
-      writer.writeUint16Le(8);
+    for (var i = 0; i < (channels == 1 ? 0 : channels); i += 1) {
+      writer.writeUint16Le(tiffOptions.bitDepth);
     }
     if (channels == 4) {
       writer.writeUint16Le(2);
@@ -138,9 +155,9 @@ final class TiffImageCodec implements ImageCodec {
 }
 
 void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
-  if (options.bitDepth != 8) {
+  if (options.bitDepth != 8 && options.compression == TiffCompression.jpeg) {
     throw const UnsupportedCodecException(
-      'TIFF encoding currently supports 8-bit output only.',
+      'TIFF low-bit output requires non-JPEG compression.',
     );
   }
   if (options.bigTiff) {
@@ -180,8 +197,9 @@ void _rejectUnsupportedTiffOptions(TiffEncoderOptions options) {
 
 int? _encodedTiffPredictor(TiffEncoderOptions options) {
   final supportsPredictor =
-      options.compression == TiffCompression.lzw ||
-      options.compression == TiffCompression.deflate;
+      options.bitDepth == 8 &&
+      (options.compression == TiffCompression.lzw ||
+          options.compression == TiffCompression.deflate);
   if (!supportsPredictor) {
     return null;
   }
