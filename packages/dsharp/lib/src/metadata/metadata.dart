@@ -126,6 +126,21 @@ final class ImageMetadata {
   /// Sharp-style bits per sample when known.
   int? get bitsPerSample => bitDepth;
 
+  /// Sharp-style pixel depth description when known.
+  String? get depth {
+    final bits = bitDepth;
+    if (bits == null) {
+      return null;
+    }
+    if (bits <= 8) {
+      return 'uchar';
+    }
+    if (bits <= 16) {
+      return 'ushort';
+    }
+    return null;
+  }
+
   /// EXIF orientation value when present.
   final int? orientation;
 

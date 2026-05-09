@@ -48,6 +48,7 @@ void main() {
       expect(metadata.channels, entry.value.channels);
       expect(metadata.hasAlpha, entry.value.hasAlpha);
       expect(metadata.bitDepth, 8);
+      expect(metadata.depth, 'uchar');
     }
   });
 

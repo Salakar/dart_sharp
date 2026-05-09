@@ -21,6 +21,7 @@ void main() {
     expect(metadata.hasAlpha, isTrue);
     expect(metadata.bitDepth, 16);
     expect(metadata.bitsPerSample, 16);
+    expect(metadata.depth, 'ushort');
     expect(metadata.density, closeTo(300, 0.05));
     expect(metadata.hasProfile, isTrue);
     expect(metadata.iccProfile, <int>[1, 2, 3]);
@@ -49,6 +50,7 @@ void main() {
     expect(metadata.channels, 3);
     expect(metadata.bitDepth, 8);
     expect(metadata.bitsPerSample, 8);
+    expect(metadata.depth, 'uchar');
     expect(metadata.density, 72);
     expect(metadata.chromaSubsampling, '4:4:4');
     expect(metadata.orientation, 6);
@@ -85,6 +87,7 @@ void main() {
     expect(metadata.delay, <int>[30, 40]);
     expect(metadata.hasAlpha, isTrue);
     expect(metadata.bitsPerSample, 1);
+    expect(metadata.depth, 'uchar');
     expect(metadata.isPalette, isTrue);
   });
 
