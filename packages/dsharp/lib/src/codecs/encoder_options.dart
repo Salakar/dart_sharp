@@ -527,9 +527,7 @@ final class WebpEncoderOptions extends EncoderOptions {
   /// Optional per-frame display delays for encoded animation frames.
   final List<Duration> frameDelays;
 
-  /// Whether to request minimum-size animation encoding.
-  ///
-  /// `true` currently throws [UnsupportedCodecException].
+  /// Whether to reduce lossy animation size by encoding changed regions.
   final bool minSize;
 
   /// Whether to request mixed lossy/lossless animation encoding.

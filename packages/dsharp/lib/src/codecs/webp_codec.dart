@@ -62,6 +62,7 @@ final class WebpImageCodec implements ImageCodec {
               outputImage,
               quality: webpOptions.quality,
               alphaQuality: webpOptions.alphaQuality,
+              minimizeSize: webpOptions.minSize,
             )
           : encodeWebpVp8(
               raw,
@@ -128,11 +129,6 @@ void _rejectUnsupportedWebpOptions(WebpEncoderOptions options) {
   if (options.effort != 4) {
     throw const UnsupportedCodecException(
       'WebP effort is not implemented yet.',
-    );
-  }
-  if (options.minSize) {
-    throw const UnsupportedCodecException(
-      'WebP minSize is not implemented yet.',
     );
   }
   if (options.mixed) {

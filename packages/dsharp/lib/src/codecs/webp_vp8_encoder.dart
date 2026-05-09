@@ -26,11 +26,12 @@ Uint8List encodeWebpVp8(
   );
 }
 
-/// Encodes animation frames as simple lossy VP8 WebP keyframes.
+/// Encodes animation frames as simple lossy VP8 WebP frames.
 Uint8List encodeAnimatedWebpVp8(
   PixelImage image, {
   required int quality,
   required int alphaQuality,
+  bool minimizeSize = false,
 }) {
   final content = ByteWriter()
     ..writeAscii('WEBP')
@@ -47,7 +48,19 @@ Uint8List encodeAnimatedWebpVp8(
     'ANIM',
     _lossyAnimationPayload(image.loopCount ?? 0),
   );
+  Uint8List? previousRgba;
   for (final frame in image.frames) {
+    if (minimizeSize) {
+      final minimized = _lossyMinimizedFramePayload(
+        frame,
+        previousRgba: previousRgba,
+        quality: quality,
+        alphaQuality: alphaQuality,
+      );
+      previousRgba = minimized.rgba;
+      _writeWebpChunk(content, 'ANMF', minimized.payload);
+      continue;
+    }
     _writeWebpChunk(
       content,
       'ANMF',
@@ -124,18 +137,118 @@ Uint8List _lossyFramePayload(
 }) {
   _validateLossyDimensions(frame.pixels);
   final rgba = rawToRgba(frame.pixels);
+  return _lossyFrameRectPayload(
+    _LossyFrameRect(0, 0, frame.width, frame.height, rgba),
+    delay: frame.delay,
+    quality: quality,
+    alphaQuality: alphaQuality,
+  );
+}
+
+({Uint8List payload, Uint8List rgba}) _lossyMinimizedFramePayload(
+  ImageFrame frame, {
+  required Uint8List? previousRgba,
+  required int quality,
+  required int alphaQuality,
+}) {
+  _validateLossyDimensions(frame.pixels);
+  final rgba = rawToRgba(frame.pixels);
+  final rect = previousRgba == null
+      ? _LossyFrameRect(0, 0, frame.width, frame.height, rgba)
+      : _changedLossyFrameRect(
+          rgba,
+          previousRgba,
+          width: frame.width,
+          height: frame.height,
+        );
+  return (
+    payload: _lossyFrameRectPayload(
+      rect,
+      delay: frame.delay,
+      quality: quality,
+      alphaQuality: alphaQuality,
+    ),
+    rgba: rgba,
+  );
+}
+
+_LossyFrameRect _changedLossyFrameRect(
+  Uint8List current,
+  Uint8List previous, {
+  required int width,
+  required int height,
+}) {
+  var left = width;
+  var top = height;
+  var right = -1;
+  var bottom = -1;
+  for (var y = 0; y < height; y += 1) {
+    for (var x = 0; x < width; x += 1) {
+      final offset = (y * width + x) * 4;
+      if (current[offset] == previous[offset] &&
+          current[offset + 1] == previous[offset + 1] &&
+          current[offset + 2] == previous[offset + 2] &&
+          current[offset + 3] == previous[offset + 3]) {
+        continue;
+      }
+      if (x < left) {
+        left = x;
+      }
+      if (y < top) {
+        top = y;
+      }
+      if (x > right) {
+        right = x;
+      }
+      if (y > bottom) {
+        bottom = y;
+      }
+    }
+  }
+  if (right < left) {
+    return _LossyFrameRect(
+      0,
+      0,
+      1,
+      1,
+      _copyRgbaRect(current, width, 0, 0, 1, 1),
+    );
+  }
+  if (left.isOdd) {
+    left -= 1;
+  }
+  if (top.isOdd) {
+    top -= 1;
+  }
+  final rectWidth = right - left + 1;
+  final rectHeight = bottom - top + 1;
+  return _LossyFrameRect(
+    left,
+    top,
+    rectWidth,
+    rectHeight,
+    _copyRgbaRect(current, width, left, top, rectWidth, rectHeight),
+  );
+}
+
+Uint8List _lossyFrameRectPayload(
+  _LossyFrameRect rect, {
+  required Duration? delay,
+  required int quality,
+  required int alphaQuality,
+}) {
   final vp8 = _encodeVp8SolidFromRgba(
-    rgba,
-    width: frame.width,
-    height: frame.height,
+    rect.rgba,
+    width: rect.width,
+    height: rect.height,
     quality: quality,
   );
   final writer = ByteWriter();
-  _writeUint24Le(writer, 0);
-  _writeUint24Le(writer, 0);
-  _writeUint24Le(writer, frame.width - 1);
-  _writeUint24Le(writer, frame.height - 1);
-  final durationMs = frame.delay?.inMilliseconds ?? 0;
+  _writeUint24Le(writer, rect.x ~/ 2);
+  _writeUint24Le(writer, rect.y ~/ 2);
+  _writeUint24Le(writer, rect.width - 1);
+  _writeUint24Le(writer, rect.height - 1);
+  final durationMs = delay?.inMilliseconds ?? 0;
   if (durationMs < 0 || durationMs > 0xffffff) {
     throw const OperationValidationException(
       'WebP frame delay must be 0..16777215 ms.',
@@ -143,12 +256,39 @@ Uint8List _lossyFramePayload(
   }
   _writeUint24Le(writer, durationMs);
   writer.writeByte(0x02);
-  final alpha = _lossyAlphaPayload(rgba, alphaQuality);
+  final alpha = _lossyAlphaPayload(rect.rgba, alphaQuality);
   if (alpha != null) {
     _writeWebpChunk(writer, 'ALPH', alpha);
   }
   _writeWebpChunk(writer, 'VP8 ', vp8);
   return writer.toBytes();
+}
+
+Uint8List _copyRgbaRect(
+  Uint8List rgba,
+  int sourceWidth,
+  int left,
+  int top,
+  int width,
+  int height,
+) {
+  final output = Uint8List(width * height * 4);
+  for (var y = 0; y < height; y += 1) {
+    final sourceStart = ((top + y) * sourceWidth + left) * 4;
+    final targetStart = y * width * 4;
+    output.setRange(targetStart, targetStart + width * 4, rgba, sourceStart);
+  }
+  return output;
+}
+
+final class _LossyFrameRect {
+  const _LossyFrameRect(this.x, this.y, this.width, this.height, this.rgba);
+
+  final int x;
+  final int y;
+  final int width;
+  final int height;
+  final Uint8List rgba;
 }
 
 void _validateLossyDimensions(RawPixels raw) {
