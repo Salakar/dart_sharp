@@ -49,6 +49,7 @@ void main() {
     expect(_tiffRationalTagValue(encoded, 282), closeTo(20, 0.0001));
     expect(_tiffRationalTagValue(encoded, 283), closeTo(30, 0.0001));
     expect(metadata.density, closeTo(50.8, 0.0001));
+    expect(metadata.resolutionUnit, 'cm');
   });
 
   test('TIFF encoder writes one-channel grayscale output', () async {

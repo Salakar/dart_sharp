@@ -1,5 +1,21 @@
 part of 'encoded_metadata.dart';
 
+({double density, String unit})? _jpegJfifResolution(Uint8List data) {
+  if (data.length < 12 || !_startsWithAscii(data, 'JFIF')) {
+    return null;
+  }
+  final units = data[7];
+  final xDensity = readUint16Be(data, 8);
+  if (xDensity == 0) {
+    return null;
+  }
+  return switch (units) {
+    1 => (density: xDensity.toDouble(), unit: 'inch'),
+    2 => (density: xDensity * 2.54, unit: 'cm'),
+    _ => null,
+  };
+}
+
 String? _jpegChromaSubsampling(Uint8List data) {
   final components = data[5];
   if (components != 3 || data.length < 6 + components * 3) {

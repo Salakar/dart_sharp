@@ -20,6 +20,7 @@ final class ImageMetadata {
     this.loopCount,
     List<Duration> frameDelays = const <Duration>[],
     this.density,
+    this.resolutionUnit,
     this.background,
     this.chromaSubsampling,
     List<ImageMetadataComment> comments = const <ImageMetadataComment>[],
@@ -90,6 +91,9 @@ final class ImageMetadata {
 
   /// Optional pixel density in DPI.
   final double? density;
+
+  /// Unit used by encoded resolution metadata when present.
+  final String? resolutionUnit;
 
   /// Default encoded background color when present.
   final RgbaColor? background;

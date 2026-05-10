@@ -180,6 +180,7 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
   var offset = 2;
   _JpegFrameInfo? frame;
   double? density;
+  String? resolutionUnit;
   var hasProfile = false;
   var hasExif = false;
   var hasXmp = false;
@@ -213,7 +214,9 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     final dataEnd = offset + length;
     final data = bytes.sublist(dataStart, dataEnd);
     if (marker == 0xe0) {
-      density ??= _jfifDensity(data);
+      final resolution = _jpegJfifResolution(data);
+      density ??= resolution?.density;
+      resolutionUnit ??= resolution?.unit;
     } else if (marker == 0xe1) {
       if (_startsWithAscii(data, 'http://ns.adobe.com/xap/1.0/')) {
         hasXmp = true;
@@ -243,6 +246,7 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     channels: parsed.components,
     hasAlpha: false,
     density: density,
+    resolutionUnit: resolutionUnit,
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,
@@ -418,6 +422,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
   var hasProfile = false;
   var isPalette = false;
   double? density;
+  String? resolutionUnit;
   while (ifdOffset != 0) {
     if (ifdOffset < 8 ||
         ifdOffset + 2 > bytes.length ||
@@ -451,6 +456,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     hasAlpha = hasAlpha || _tiffHasExtraSamples(bytes, tags[338], little);
     hasProfile = hasProfile || tags.containsKey(34675);
     density ??= _tiffDensity(bytes, tags, little);
+    resolutionUnit ??= _tiffResolutionUnit(bytes, tags[296], little);
     frames += 1;
     ifdOffset = _tiffRead32(bytes, entriesEnd, little);
   }
@@ -470,6 +476,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     frames: frames,
     pageHeight: frames > 1 ? parsedHeight : null,
     density: density,
+    resolutionUnit: resolutionUnit,
     hasProfile: hasProfile,
     bitDepth: bitDepth == 0 ? null : bitDepth,
     isPalette: isPalette,
@@ -500,22 +507,6 @@ _JpegFrameInfo _jpegFrameInfo(int marker, Uint8List data) {
     progressive: marker == 0xc2,
     chromaSubsampling: _jpegChromaSubsampling(data),
   );
-}
-
-double? _jfifDensity(Uint8List data) {
-  if (data.length < 12 || !_startsWithAscii(data, 'JFIF')) {
-    return null;
-  }
-  final units = data[7];
-  final xDensity = readUint16Be(data, 8);
-  if (xDensity == 0) {
-    return null;
-  }
-  return switch (units) {
-    1 => xDensity.toDouble(),
-    2 => xDensity * 2.54,
-    _ => null,
-  };
 }
 
 int? _exifOrientation(Uint8List data) {
@@ -628,6 +619,14 @@ double? _tiffDensity(Uint8List bytes, Map<int, _TiffTag> tags, bool little) {
   return switch (unit) {
     2 => x,
     3 => x * 2.54,
+    _ => null,
+  };
+}
+
+String? _tiffResolutionUnit(Uint8List bytes, _TiffTag? tag, bool little) {
+  return switch (_tiffFirstInt(bytes, tag, little)) {
+    2 => 'inch',
+    3 => 'cm',
     _ => null,
   };
 }
