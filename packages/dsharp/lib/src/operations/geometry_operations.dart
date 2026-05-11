@@ -106,6 +106,7 @@ PixelImage _mapFrames(PixelImage image, RawPixels Function(RawPixels) apply) {
     frames: image.frames.map((frame) {
       return ImageFrame(pixels: apply(frame.pixels), delay: frame.delay);
     }),
+    loopCount: image.loopCount,
   );
 }
 

@@ -209,6 +209,29 @@ void main() {
     expect(image.firstFrameBytes().take(4), <int>[1, 0, 0, 255]);
   });
 
+  test(
+    'geometry operations preserve animation timing and loop count',
+    () async {
+      final animated = PixelImage(
+        frames: <ImageFrame>[
+          ImageFrame(pixels: raw2x2(), delay: const Duration(milliseconds: 10)),
+          ImageFrame(pixels: raw2x2(), delay: const Duration(milliseconds: 20)),
+        ],
+        loopCount: 9,
+      );
+
+      final image = await ImagePipeline.fromPixelImage(
+        animated,
+      ).extend(const Insets(left: 1)).toPixelImage();
+
+      expect(image.frames.length, 2);
+      expect(image.loopCount, 9);
+      expect(image.frames[0].delay, const Duration(milliseconds: 10));
+      expect(image.frames[1].delay, const Duration(milliseconds: 20));
+      expect(image.width, 3);
+    },
+  );
+
   test('trim removes matching border', () async {
     final raw = RawPixels(
       bytes: Uint8List.fromList(<int>[
