@@ -41,6 +41,45 @@ void main() {
     expect(decoded.firstFrameBytes(), <int>[0, 0, 0, 255, 255, 255, 255, 255]);
   });
 
+  test('decodes floating point FITS images with explicit ranges', () async {
+    final float32 = ByteData(8)
+      ..setFloat32(0, -1)
+      ..setFloat32(4, 1);
+    final float64 = ByteData(16)
+      ..setFloat64(0, -1)
+      ..setFloat64(8, 1);
+
+    for (final entry in <({int bitpix, ByteData data})>[
+      (bitpix: -32, data: float32),
+      (bitpix: -64, data: float64),
+    ]) {
+      final decoded = await ImagePipeline.fromBytes(
+        _fitsBytes(
+          cards: <String, Object>{
+            'BITPIX': entry.bitpix,
+            'NAXIS': 2,
+            'NAXIS1': 2,
+            'NAXIS2': 1,
+            'DATAMIN': -1.0,
+            'DATAMAX': 1.0,
+          },
+          data: entry.data.buffer.asUint8List().toList(),
+        ),
+      ).toPixelImage();
+
+      expect(decoded.firstFrameBytes(), <int>[
+        0,
+        0,
+        0,
+        255,
+        255,
+        255,
+        255,
+        255,
+      ], reason: 'BITPIX ${entry.bitpix}');
+    }
+  });
+
   test('decodes 3-plane RGB FITS images', () async {
     final decoded = await ImagePipeline.fromBytes(
       _fitsBytes(
@@ -120,6 +159,48 @@ void main() {
       ).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
     );
+  });
+
+  test('rejects unsupported FITS header shapes with typed errors', () async {
+    final unsupportedAxisCount = _fitsBytes(
+      cards: <String, Object>{
+        'BITPIX': 8,
+        'NAXIS': 4,
+        'NAXIS1': 1,
+        'NAXIS2': 1,
+      },
+      data: <int>[0],
+    );
+    final unsupportedPlaneCount = _fitsBytes(
+      cards: <String, Object>{
+        'BITPIX': 8,
+        'NAXIS': 3,
+        'NAXIS1': 1,
+        'NAXIS2': 1,
+        'NAXIS3': 2,
+      },
+      data: <int>[0, 0],
+    );
+    final unsupportedBitDepth = _fitsBytes(
+      cards: <String, Object>{
+        'BITPIX': 12,
+        'NAXIS': 2,
+        'NAXIS1': 1,
+        'NAXIS2': 1,
+      },
+      data: <int>[0],
+    );
+
+    for (final bytes in <Uint8List>[
+      unsupportedAxisCount,
+      unsupportedPlaneCount,
+      unsupportedBitDepth,
+    ]) {
+      await expectLater(
+        ImagePipeline.fromBytes(bytes).toPixelImage(),
+        throwsA(isA<UnsupportedCodecException>()),
+      );
+    }
   });
 }
 
