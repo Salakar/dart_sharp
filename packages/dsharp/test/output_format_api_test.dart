@@ -56,4 +56,43 @@ void main() {
       throwsA(isA<OperationValidationException>()),
     );
   });
+
+  test('unsupported output helpers fail with typed format errors', () async {
+    final cases = <({ImageFormat format, ImagePipeline pipeline})>[
+      (
+        format: ImageFormat.jp2,
+        pipeline: ImagePipeline.fromRawPixels(raw()).jp2(),
+      ),
+      (
+        format: ImageFormat.avif,
+        pipeline: ImagePipeline.fromRawPixels(raw()).avif(),
+      ),
+      (
+        format: ImageFormat.heif,
+        pipeline: ImagePipeline.fromRawPixels(raw()).heif(),
+      ),
+      (
+        format: ImageFormat.jxl,
+        pipeline: ImagePipeline.fromRawPixels(raw()).jxl(),
+      ),
+      (
+        format: ImageFormat.deepZoom,
+        pipeline: ImagePipeline.fromRawPixels(raw()).tile(),
+      ),
+    ];
+
+    for (final entry in cases) {
+      await expectLater(
+        entry.pipeline.toBytes(),
+        throwsA(
+          isA<UnsupportedCodecException>().having(
+            (error) => error.message,
+            'message',
+            contains('${entry.format.id} encode is unsupported'),
+          ),
+        ),
+        reason: entry.format.id,
+      );
+    }
+  });
 }
