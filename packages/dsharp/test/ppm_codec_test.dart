@@ -38,6 +38,28 @@ void main() {
     expect(decoded.firstFrameBytes(), <int>[0, 0, 0, 255, 255, 255, 255, 255]);
   });
 
+  test('decodes 16-bit binary PPM samples', () async {
+    final bytes = Uint8List.fromList(<int>[
+      ..._ascii('P6\n2 1\n1023\n'),
+      0x03,
+      0xff,
+      0,
+      0,
+      0x02,
+      0,
+      0,
+      0,
+      0x03,
+      0xff,
+      0,
+      0,
+    ]);
+
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(decoded.firstFrameBytes(), <int>[255, 0, 128, 255, 0, 255, 0, 255]);
+  });
+
   test('decodes binary PPM with CRLF header separator', () async {
     final bytes = Uint8List.fromList(<int>[
       ..._ascii('P6\r\n2 1\r\n255\r\n'),
@@ -149,6 +171,10 @@ void main() {
     );
     await expectLater(
       ImagePipeline.fromBytes(_ascii('P1\n1 1\n2\n')).toPixelImage(),
+      throwsA(isA<InvalidImageException>()),
+    );
+    await expectLater(
+      ImagePipeline.fromBytes(_ascii('P6\n1 1\n255')).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
     );
     await expectLater(
