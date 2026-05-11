@@ -75,4 +75,33 @@ void main() {
       );
     }
   });
+
+  test('unknown format remains unregistered and unsupported', () {
+    final registry = CodecRegistry.defaultRegistry();
+    final support = DsharpCapabilities.current.supportFor(ImageFormat.unknown);
+
+    expect(support.input, CodecAvailability.unsupported);
+    expect(support.output, CodecAvailability.unsupported);
+    expect(support.reason, 'Unknown image format.');
+    expect(
+      () => registry.codecFor(ImageFormat.unknown),
+      throwsA(
+        isA<UnsupportedCodecException>().having(
+          (error) => error.message,
+          'message',
+          contains('unknown is not registered'),
+        ),
+      ),
+    );
+    expect(
+      () => registry.decode(Uint8List(0)),
+      throwsA(
+        isA<UnsupportedCodecException>().having(
+          (error) => error.message,
+          'message',
+          contains('unknown is not registered'),
+        ),
+      ),
+    );
+  });
 }
