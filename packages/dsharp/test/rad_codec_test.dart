@@ -62,6 +62,49 @@ void main() {
     ]);
   });
 
+  test('applies Radiance HDR scanline orientation', () async {
+    final bytes = Uint8List.fromList(<int>[
+      ..._ascii('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n+Y 2 -X 2\n'),
+      10,
+      0,
+      0,
+      136,
+      0,
+      20,
+      0,
+      136,
+      0,
+      0,
+      30,
+      136,
+      40,
+      50,
+      60,
+      136,
+    ]);
+
+    final decoded = await ImagePipeline.fromBytes(bytes).toPixelImage();
+
+    expect(decoded.firstFrameBytes(), <int>[
+      40,
+      50,
+      60,
+      255,
+      0,
+      0,
+      30,
+      255,
+      0,
+      20,
+      0,
+      255,
+      10,
+      0,
+      0,
+      255,
+    ]);
+  });
+
   test('Radiance HDR aliases and capabilities are exposed', () {
     final support = DsharpCapabilities.current.supportFor(ImageFormat.rad);
 
@@ -135,6 +178,21 @@ void main() {
         ]),
       ).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
+    );
+  });
+
+  test('rejects unsupported Radiance HDR scanline order', () async {
+    await expectLater(
+      ImagePipeline.fromBytes(
+        Uint8List.fromList(<int>[
+          ..._ascii('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n+X 1 -Y 1\n'),
+          0,
+          0,
+          0,
+          0,
+        ]),
+      ).toPixelImage(),
+      throwsA(isA<UnsupportedCodecException>()),
     );
   });
 }
