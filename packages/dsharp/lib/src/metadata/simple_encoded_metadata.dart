@@ -44,6 +44,7 @@ ImageMetadata _ppmMetadata(Uint8List bytes) {
     height: height,
     channels: isGray ? 1 : 3,
     hasAlpha: false,
+    colorSpace: isGray ? (maxValue > 0xff ? 'grey16' : 'b-w') : 'srgb',
     bitDepth: maxValue.bitLength,
   );
 }
@@ -100,6 +101,7 @@ ImageMetadata _fitsMetadata(Uint8List bytes) {
     height: height,
     channels: planes,
     hasAlpha: planes == 4,
+    colorSpace: _fitsColorSpace(planes, bitpix),
     bitDepth: bitpix.abs(),
   );
 }
@@ -140,6 +142,7 @@ ImageMetadata _radMetadata(Uint8List bytes) {
       height: resolution.height,
       channels: 3,
       hasAlpha: false,
+      colorSpace: 'srgb',
       bitDepth: 8,
     );
   }
@@ -179,6 +182,13 @@ int _bytesPerFitsSample(int bitpix) {
       'Unsupported FITS BITPIX value.',
     ),
   };
+}
+
+String _fitsColorSpace(int planes, int bitpix) {
+  if (planes == 1) {
+    return bitpix.abs() > 8 ? 'grey16' : 'b-w';
+  }
+  return bitpix.abs() > 8 ? 'rgb16' : 'srgb';
 }
 
 ({int width, int height})? _parseRadResolution(String line) {

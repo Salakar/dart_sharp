@@ -1,5 +1,13 @@
 part of 'encoded_metadata.dart';
 
+String _pngColorSpace(int colorType, int bitDepth) {
+  return switch (colorType) {
+    0 || 4 => bitDepth > 8 ? 'grey16' : 'b-w',
+    2 || 6 => bitDepth > 8 ? 'rgb16' : 'srgb',
+    _ => 'srgb',
+  };
+}
+
 List<ImageMetadataComment> _pngTextComments(Uint8List bytes) {
   final comments = <ImageMetadataComment>[];
   var offset = 8;

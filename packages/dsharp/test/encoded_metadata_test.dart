@@ -22,6 +22,8 @@ void main() {
     expect(metadata.bitDepth, 16);
     expect(metadata.bitsPerSample, 16);
     expect(metadata.depth, 'ushort');
+    expect(metadata.colorSpace, 'rgb16');
+    expect(metadata.space, 'rgb16');
     expect(metadata.density, closeTo(300, 0.05));
     expect(metadata.hasProfile, isTrue);
     expect(metadata.iccProfile, <int>[1, 2, 3]);
@@ -51,6 +53,8 @@ void main() {
     expect(metadata.bitDepth, 8);
     expect(metadata.bitsPerSample, 8);
     expect(metadata.depth, 'uchar');
+    expect(metadata.colorSpace, 'srgb');
+    expect(metadata.space, 'srgb');
     expect(metadata.density, 72);
     expect(metadata.resolutionUnit, 'inch');
     expect(metadata.chromaSubsampling, '4:4:4');
@@ -89,6 +93,7 @@ void main() {
     expect(metadata.hasAlpha, isTrue);
     expect(metadata.bitsPerSample, 1);
     expect(metadata.depth, 'uchar');
+    expect(metadata.colorSpace, 'srgb');
     expect(metadata.isPalette, isTrue);
   });
 
@@ -106,6 +111,7 @@ void main() {
     expect(metadata.channels, 3);
     expect(metadata.bitDepth, 8);
     expect(metadata.bitsPerSample, 8);
+    expect(metadata.colorSpace, 'srgb');
     expect(metadata.isPalette, isFalse);
   });
 
@@ -126,18 +132,21 @@ void main() {
     expect(ppm.channels, 3);
     expect(ppm.hasAlpha, isFalse);
     expect(ppm.bitDepth, 8);
+    expect(ppm.colorSpace, 'srgb');
     expect(fits.format, ImageFormat.fits);
     expect(fits.width, 2);
     expect(fits.height, 1);
     expect(fits.channels, 3);
     expect(fits.hasAlpha, isFalse);
     expect(fits.bitDepth, 16);
+    expect(fits.colorSpace, 'rgb16');
     expect(rad.format, ImageFormat.rad);
     expect(rad.width, 2);
     expect(rad.height, 1);
     expect(rad.channels, 3);
     expect(rad.hasAlpha, isFalse);
     expect(rad.bitDepth, 8);
+    expect(rad.colorSpace, 'srgb');
     await expectLater(
       ImagePipeline.fromBytes(ppmBytes).toPixelImage(),
       throwsA(isA<InvalidImageException>()),
@@ -205,6 +214,7 @@ void main() {
     expect(metadata.hasXmp, isTrue);
     expect(metadata.xmpAsString, '<x:xmpmeta />');
     expect(metadata.orientation, 6);
+    expect(metadata.colorSpace, 'srgb');
   });
 
   test('reads WebP animation frame delay metadata', () async {

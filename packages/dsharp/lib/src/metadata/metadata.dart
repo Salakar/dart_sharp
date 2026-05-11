@@ -21,6 +21,7 @@ final class ImageMetadata {
     List<Duration> frameDelays = const <Duration>[],
     this.density,
     this.resolutionUnit,
+    this.colorSpace,
     this.background,
     this.chromaSubsampling,
     List<ImageMetadataComment> comments = const <ImageMetadataComment>[],
@@ -94,6 +95,12 @@ final class ImageMetadata {
 
   /// Unit used by encoded resolution metadata when present.
   final String? resolutionUnit;
+
+  /// Encoded or decoded colour space when known.
+  final String? colorSpace;
+
+  /// Sharp-style colour space name when known.
+  String? get space => colorSpace;
 
   /// Default encoded background color when present.
   final RgbaColor? background;
@@ -195,6 +202,7 @@ final class ImageMetadata {
         for (final frame in image.frames)
           if (frame.delay != null) frame.delay!,
       ],
+      colorSpace: _colorSpaceForChannels(image.channels.value),
       bitDepth: 8,
     );
   }
@@ -226,4 +234,12 @@ final class ImageDimensions {
 
 Uint8List? _copyBytes(Uint8List? bytes) {
   return bytes == null ? null : Uint8List.fromList(bytes);
+}
+
+String? _colorSpaceForChannels(int channels) {
+  return switch (channels) {
+    1 || 2 => 'b-w',
+    3 || 4 => 'srgb',
+    _ => null,
+  };
 }

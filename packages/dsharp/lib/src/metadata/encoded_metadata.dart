@@ -130,6 +130,7 @@ ImageMetadata _pngMetadata(Uint8List bytes) {
     channels: channels,
     hasAlpha: hasTransparency || colorType == 4 || colorType == 6,
     density: density,
+    colorSpace: _pngColorSpace(colorType, bitDepth),
     background: _pngBackgroundColor(
       colorType: colorType,
       bitDepth: bitDepth,
@@ -247,6 +248,7 @@ ImageMetadata _jpegMetadata(Uint8List bytes) {
     hasAlpha: false,
     density: density,
     resolutionUnit: resolutionUnit,
+    colorSpace: _jpegColorSpace(parsed.components),
     hasProfile: hasProfile,
     hasExif: hasExif,
     hasXmp: hasXmp,
@@ -368,6 +370,7 @@ ImageMetadata _gifMetadata(Uint8List bytes) {
     loopCount: loopCount,
     frameDelays: frameDelays,
     background: _gifBackgroundColor(globalColorTable, backgroundIndex),
+    colorSpace: 'srgb',
     bitDepth: (packed & 0x07) + 1,
     isProgressive: progressive,
     isPalette: true,
@@ -395,6 +398,7 @@ ImageMetadata _webpMetadata(Uint8List bytes) {
     iccProfile: payloads.iccProfile,
     exif: payloads.exif,
     xmp: payloads.xmp,
+    colorSpace: 'srgb',
     bitDepth: 8,
     orientation: payloads.exif == null
         ? null
@@ -423,6 +427,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
   var isPalette = false;
   double? density;
   String? resolutionUnit;
+  String? colorSpace;
   while (ifdOffset != 0) {
     if (ifdOffset < 8 ||
         ifdOffset + 2 > bytes.length ||
@@ -457,6 +462,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     hasProfile = hasProfile || tags.containsKey(34675);
     density ??= _tiffDensity(bytes, tags, little);
     resolutionUnit ??= _tiffResolutionUnit(bytes, tags[296], little);
+    colorSpace ??= _tiffColorSpace(photometric, bitDepth);
     frames += 1;
     ifdOffset = _tiffRead32(bytes, entriesEnd, little);
   }
@@ -477,6 +483,7 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
     pageHeight: frames > 1 ? parsedHeight : null,
     density: density,
     resolutionUnit: resolutionUnit,
+    colorSpace: colorSpace,
     hasProfile: hasProfile,
     bitDepth: bitDepth == 0 ? null : bitDepth,
     isPalette: isPalette,
@@ -485,28 +492,6 @@ ImageMetadata _tiffMetadata(Uint8List bytes) {
 
 bool _jpegStandaloneMarker(int marker) {
   return marker == 0x01 || marker >= 0xd0 && marker <= 0xd9;
-}
-
-bool _jpegSofMarker(int marker) {
-  return marker >= 0xc0 &&
-      marker <= 0xcf &&
-      marker != 0xc4 &&
-      marker != 0xc8 &&
-      marker != 0xcc;
-}
-
-_JpegFrameInfo _jpegFrameInfo(int marker, Uint8List data) {
-  if (data.length < 6) {
-    throw const InvalidImageException('Truncated JPEG frame header.');
-  }
-  return _JpegFrameInfo(
-    width: readUint16Be(data, 3),
-    height: readUint16Be(data, 1),
-    components: data[5],
-    precision: data[0],
-    progressive: marker == 0xc2,
-    chromaSubsampling: _jpegChromaSubsampling(data),
-  );
 }
 
 int? _exifOrientation(Uint8List data) {
@@ -673,6 +658,17 @@ int _tiffPhotometricChannels(int? photometric) {
   };
 }
 
+String? _tiffColorSpace(int? photometric, int bitDepth) {
+  return switch (photometric) {
+    0 || 1 => bitDepth > 8 ? 'grey16' : 'b-w',
+    2 => bitDepth > 8 ? 'rgb16' : 'srgb',
+    3 => 'srgb',
+    5 => 'cmyk',
+    8 => 'lab',
+    _ => null,
+  };
+}
+
 int _tiffRead16(Uint8List bytes, int offset, bool little) {
   return little ? readUint16Le(bytes, offset) : readUint16Be(bytes, offset);
 }
@@ -699,24 +695,6 @@ void _checkMetadataLimits(int width, int height, {int frames = 1}) {
     height: height,
     frames: frames,
   );
-}
-
-final class _JpegFrameInfo {
-  const _JpegFrameInfo({
-    required this.width,
-    required this.height,
-    required this.components,
-    required this.precision,
-    required this.progressive,
-    required this.chromaSubsampling,
-  });
-
-  final int width;
-  final int height;
-  final int components;
-  final int precision;
-  final bool progressive;
-  final String? chromaSubsampling;
 }
 
 final class _GifSubBlocks {
