@@ -128,6 +128,53 @@ void main() {
     },
   );
 
+  test('color operations preserve grayscale alpha samples', () async {
+    final grayAlpha = rawGrayAlpha(1, 1, <int>[10, 77]);
+    final gray = await pixels(
+      ImagePipeline.fromRawPixels(grayAlpha).grayscale(),
+    );
+    final negated = await pixels(
+      ImagePipeline.fromRawPixels(grayAlpha).negate(),
+    );
+    final negatedPreserveAlpha = await pixels(
+      ImagePipeline.fromRawPixels(
+        grayAlpha,
+      ).negate(const NegateOptions(alpha: false)),
+    );
+    final threshold = await pixels(
+      ImagePipeline.fromRawPixels(grayAlpha).threshold(20),
+    );
+    final colorThreshold = await pixels(
+      ImagePipeline.fromRawPixels(grayAlpha).threshold(20, false),
+    );
+    final gamma = await pixels(
+      ImagePipeline.fromRawPixels(rawGrayAlpha(1, 1, <int>[64, 77])).gamma(2),
+    );
+    final tinted = await pixels(
+      ImagePipeline.fromRawPixels(
+        grayAlpha,
+      ).tint(const RgbaColor(red: 110, green: 20, blue: 230)),
+    );
+    final normalized = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(2, 1, <int>[10, 77, 30, 99]),
+      ).normalize(),
+    );
+    final modulated = await pixels(
+      ImagePipeline.fromRawPixels(grayAlpha).modulate(brightness: 2),
+    );
+
+    expect(firstBytes(gray), <int>[10, 77]);
+    expect(firstBytes(negated), <int>[245, 178]);
+    expect(firstBytes(negatedPreserveAlpha), <int>[245, 77]);
+    expect(firstBytes(threshold), <int>[0, 77]);
+    expect(firstBytes(colorThreshold), <int>[0, 77]);
+    expect(firstBytes(gamma), <int>[128, 77]);
+    expect(firstBytes(tinted), <int>[60, 77]);
+    expect(firstBytes(normalized), <int>[0, 77, 255, 99]);
+    expect(firstBytes(modulated), <int>[20, 77]);
+  });
+
   test('colourspace methods support sRGB and black-white aliases', () async {
     final bw = await pixels(
       ImagePipeline.fromRawPixels(

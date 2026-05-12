@@ -184,7 +184,7 @@ RawPixels _unsharp(RawPixels raw, SharpenOptions options) {
   final channels = raw.channels.value;
   final input = raw.bytes;
   final output = Uint8List(input.length);
-  final colorChannels = min(3, channels);
+  final colorChannels = colorChannelCount(channels);
   for (var i = 0; i < input.length; i += channels) {
     for (var c = 0; c < colorChannels; c += 1) {
       final delta = input[i + c] - blurred[i + c];

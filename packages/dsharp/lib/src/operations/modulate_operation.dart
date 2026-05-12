@@ -41,10 +41,8 @@ final class ModulateOperation implements PipelineOperation {
         }
         final lightnessOffset = options.lightness * 255 / 100;
         output[i] = byteClamp(red + lightnessOffset);
-        if (channels > 1) {
-          output[i + 1] = byteClamp(green + lightnessOffset);
-        }
         if (channels > 2) {
+          output[i + 1] = byteClamp(green + lightnessOffset);
           output[i + 2] = byteClamp(blue + lightnessOffset);
         }
       }

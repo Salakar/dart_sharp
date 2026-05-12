@@ -31,7 +31,7 @@ RawPixels sameSizeRaw(
   Uint8List bytes,
   ChannelCount channels,
 ) {
-  final premultiplication = channels == ChannelCount.four
+  final premultiplication = hasAlphaChannel(channels.value)
       ? source.premultiplication
       : Premultiplication.none;
   return RawPixels(
@@ -51,6 +51,9 @@ int byteClamp(num value) => value.round().clamp(0, 255);
 /// Reads a pixel as an RGBA color.
 RgbaColor readColor(Uint8List bytes, int offset, int channels) {
   final red = bytes[offset];
+  if (channels == 2) {
+    return RgbaColor(red: red, green: red, blue: red, alpha: bytes[offset + 1]);
+  }
   return RgbaColor(
     red: red,
     green: channels > 1 ? bytes[offset + 1] : red,
@@ -62,6 +65,10 @@ RgbaColor readColor(Uint8List bytes, int offset, int channels) {
 /// Writes [color] into [bytes].
 void writeColor(Uint8List bytes, int offset, int channels, RgbaColor color) {
   bytes[offset] = color.red;
+  if (channels == 2) {
+    bytes[offset + 1] = color.alpha;
+    return;
+  }
   if (channels > 1) {
     bytes[offset + 1] = color.green;
   }
@@ -72,6 +79,12 @@ void writeColor(Uint8List bytes, int offset, int channels, RgbaColor color) {
     bytes[offset + 3] = color.alpha;
   }
 }
+
+/// Number of non-alpha color channels in a raw layout.
+int colorChannelCount(int channels) => channels == 2 ? 1 : min(3, channels);
+
+/// Whether a raw layout has an alpha channel.
+bool hasAlphaChannel(int channels) => channels == 2 || channels == 4;
 
 /// Returns the luminance approximation of [color].
 int luminance(RgbaColor color) {

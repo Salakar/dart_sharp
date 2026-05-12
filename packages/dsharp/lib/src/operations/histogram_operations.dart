@@ -112,10 +112,8 @@ void _applyTileMap(
       } else {
         final scale = equalized / original;
         output[offset] = byteClamp(color.red * scale);
-        if (channels > 1) {
-          output[offset + 1] = byteClamp(color.green * scale);
-        }
         if (channels > 2) {
+          output[offset + 1] = byteClamp(color.green * scale);
           output[offset + 2] = byteClamp(color.blue * scale);
         }
       }

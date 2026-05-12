@@ -24,17 +24,14 @@ final class GrayscaleOperation implements PipelineOperation {
       final channels = raw.channels.value;
       final output = Uint8List(raw.width * raw.height * channels);
       for (var i = 0; i < input.length; i += channels) {
-        final gray = luminance(readColor(input, i, channels));
-        output[i] = gray;
-        if (channels > 1) {
-          output[i + 1] = gray;
-        }
-        if (channels > 2) {
-          output[i + 2] = gray;
-        }
-        if (channels > 3) {
-          output[i + 3] = input[i + 3];
-        }
+        final color = readColor(input, i, channels);
+        final gray = luminance(color);
+        writeColor(
+          output,
+          i,
+          channels,
+          RgbaColor(red: gray, green: gray, blue: gray, alpha: color.alpha),
+        );
       }
       return sameSizeRaw(raw, output, raw.channels);
     });
@@ -82,7 +79,7 @@ final class NegateOperation implements PipelineOperation {
     final output = raw.bytes;
     final channels = raw.channels.value;
     for (var i = 0; i < output.length; i += channels) {
-      final limit = negateAlpha ? channels : min(3, channels);
+      final limit = negateAlpha ? channels : colorChannelCount(channels);
       for (var c = 0; c < limit; c += 1) {
         output[i + c] = 255 - output[i + c];
       }
@@ -142,11 +139,11 @@ final class ThresholdOperation implements PipelineOperation {
               luminance(readColor(output, i, channels)) >= options.threshold
               ? 255
               : 0;
-          for (var c = 0; c < min(3, channels); c += 1) {
+          for (var c = 0; c < colorChannelCount(channels); c += 1) {
             output[i + c] = value;
           }
         } else {
-          for (var c = 0; c < min(3, channels); c += 1) {
+          for (var c = 0; c < colorChannelCount(channels); c += 1) {
             output[i + c] = output[i + c] >= options.threshold ? 255 : 0;
           }
         }
@@ -207,10 +204,8 @@ final class TintOperation implements PipelineOperation {
       final channels = raw.channels.value;
       for (var i = 0; i < output.length; i += channels) {
         output[i] = byteClamp((output[i] + color.red) / 2);
-        if (channels > 1) {
-          output[i + 1] = byteClamp((output[i + 1] + color.green) / 2);
-        }
         if (channels > 2) {
+          output[i + 1] = byteClamp((output[i + 1] + color.green) / 2);
           output[i + 2] = byteClamp((output[i + 2] + color.blue) / 2);
         }
       }
@@ -242,7 +237,7 @@ final class GammaOperation implements PipelineOperation {
       final output = raw.bytes;
       final channels = raw.channels.value;
       for (var i = 0; i < output.length; i += channels) {
-        for (var c = 0; c < min(3, channels); c += 1) {
+        for (var c = 0; c < colorChannelCount(channels); c += 1) {
           output[i + c] = byteClamp(
             255 * pow(output[i + c] / 255, 1 / outputGamma),
           );
@@ -278,7 +273,7 @@ final class NormalizeOperation implements PipelineOperation {
       final channels = raw.channels.value;
       final samples = <int>[];
       for (var i = 0; i < output.length; i += channels) {
-        for (var c = 0; c < min(3, channels); c += 1) {
+        for (var c = 0; c < colorChannelCount(channels); c += 1) {
           samples.add(output[i + c]);
         }
       }
@@ -289,7 +284,7 @@ final class NormalizeOperation implements PipelineOperation {
         return sameSizeRaw(raw, output, raw.channels);
       }
       for (var i = 0; i < output.length; i += channels) {
-        for (var c = 0; c < min(3, channels); c += 1) {
+        for (var c = 0; c < colorChannelCount(channels); c += 1) {
           output[i + c] = byteClamp(
             (output[i + c] - minValue) * 255 / (maxValue - minValue),
           );

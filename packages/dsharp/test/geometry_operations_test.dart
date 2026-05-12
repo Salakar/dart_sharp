@@ -174,10 +174,28 @@ void main() {
           ),
         )
         .toPixelImage();
+    final grayAlpha =
+        await ImagePipeline.fromRawPixels(
+              RawPixels(
+                bytes: Uint8List.fromList(<int>[100, 128]),
+                width: 1,
+                height: 1,
+                channels: ChannelCount.two,
+              ),
+            )
+            .extend(
+              const ExtendOptions(
+                insets: Insets(left: 1),
+                background: RgbaColor(red: 9, green: 20, blue: 30, alpha: 40),
+              ),
+            )
+            .toPixelImage();
 
     expect(image.width, 2);
     expect(image.height, 3);
     expect(image.firstFrameBytes().take(4), <int>[9, 0, 0, 255]);
+    expect(grayAlpha.channels, ChannelCount.two);
+    expect(grayAlpha.firstFrameBytes(), <int>[9, 40, 100, 128]);
   });
 
   test('extend accepts sharp-style all-edge integer', () async {

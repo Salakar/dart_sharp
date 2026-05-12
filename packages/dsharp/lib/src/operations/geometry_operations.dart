@@ -559,6 +559,10 @@ void _copyPixel(
 
 void _writeColor(Uint8List output, int target, int channels, RgbaColor color) {
   output[target] = color.red;
+  if (channels == 2) {
+    output[target + 1] = color.alpha;
+    return;
+  }
   if (channels > 1) {
     output[target + 1] = color.green;
   }
@@ -572,6 +576,9 @@ void _writeColor(Uint8List output, int target, int channels, RgbaColor color) {
 
 RgbaColor _readColor(Uint8List bytes, int offset, int channels) {
   final red = bytes[offset];
+  if (channels == 2) {
+    return RgbaColor(red: red, green: red, blue: red, alpha: bytes[offset + 1]);
+  }
   return RgbaColor(
     red: red,
     green: channels > 1 ? bytes[offset + 1] : red,
