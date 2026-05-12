@@ -11,6 +11,15 @@ RawPixels rawGray(int width, int height, List<int> bytes) {
   );
 }
 
+RawPixels rawGrayAlpha(int width, int height, List<int> bytes) {
+  return RawPixels(
+    bytes: Uint8List.fromList(bytes),
+    width: width,
+    height: height,
+    channels: ChannelCount.two,
+  );
+}
+
 RawPixels rawRgb(int width, int height, List<int> bytes) {
   return RawPixels(
     bytes: Uint8List.fromList(bytes),

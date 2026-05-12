@@ -8,6 +8,11 @@ void main() {
     final gray = await pixels(
       ImagePipeline.fromRawPixels(rawGray(1, 1, <int>[9])).ensureAlpha(),
     );
+    final grayAlpha = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[9, 32]),
+      ).ensureAlpha(0.5),
+    );
     final rgb = await pixels(
       ImagePipeline.fromRawPixels(
         rawRgb(1, 1, <int>[1, 2, 3]),
@@ -15,6 +20,8 @@ void main() {
     );
 
     expect(firstBytes(gray), <int>[9, 9, 9, 255]);
+    expect(grayAlpha.channels, ChannelCount.two);
+    expect(firstBytes(grayAlpha), <int>[9, 32]);
     expect(firstBytes(rgb), <int>[1, 2, 3, 127]);
     expect(
       () => ImagePipeline.fromRawPixels(
@@ -89,6 +96,36 @@ void main() {
       ).flatten('black'),
       throwsA(isA<OperationValidationException>()),
     );
+  });
+
+  test('alpha operations handle grayscale alpha pixels', () async {
+    final removed = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[100, 128]),
+      ).removeAlpha(),
+    );
+    final flattened = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[100, 128]),
+      ).flatten(const RgbaColor(red: 0, green: 50, blue: 200)),
+    );
+    final premultiplied = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[128, 128]),
+      ).premultiplyAlpha(),
+    );
+    final restored = await pixels(
+      ImagePipeline.fromRawPixels(
+        premultiplied.firstFrame.pixels,
+      ).unpremultiplyAlpha(),
+    );
+
+    expect(removed.channels, ChannelCount.one);
+    expect(firstBytes(removed), <int>[100]);
+    expect(flattened.channels, ChannelCount.three);
+    expect(firstBytes(flattened), <int>[50, 75, 150]);
+    expect(firstBytes(premultiplied), <int>[64, 128]);
+    expect(firstBytes(restored), <int>[128, 128]);
   });
 
   test(

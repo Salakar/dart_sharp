@@ -23,7 +23,7 @@ final class EnsureAlphaOperation implements PipelineOperation {
   PixelImage apply(PixelImage image) => mapFrames(image, _ensure);
 
   RawPixels _ensure(RawPixels raw) {
-    if (raw.channels == ChannelCount.four) {
+    if (raw.channels == ChannelCount.two || raw.channels == ChannelCount.four) {
       return raw;
     }
     final input = raw.bytes;
@@ -51,6 +51,14 @@ final class RemoveAlphaOperation implements PipelineOperation {
   PixelImage apply(PixelImage image) => mapFrames(image, _remove);
 
   RawPixels _remove(RawPixels raw) {
+    if (raw.channels == ChannelCount.two) {
+      final input = raw.bytes;
+      final output = Uint8List(raw.width * raw.height);
+      for (var i = 0, o = 0; i < input.length; i += 2, o += 1) {
+        output[o] = input[i];
+      }
+      return sameSizeRaw(raw, output, ChannelCount.one);
+    }
     if (raw.channels != ChannelCount.four) {
       return raw;
     }
@@ -80,6 +88,18 @@ final class FlattenOperation implements PipelineOperation {
   PixelImage apply(PixelImage image) => mapFrames(image, _flatten);
 
   RawPixels _flatten(RawPixels raw) {
+    if (raw.channels == ChannelCount.two) {
+      final input = raw.bytes;
+      final output = Uint8List(raw.width * raw.height * 3);
+      for (var i = 0, o = 0; i < input.length; i += 2, o += 3) {
+        final gray = input[i];
+        final alpha = input[i + 1] / 255;
+        output[o] = _flattenSample(gray, background.red, alpha);
+        output[o + 1] = _flattenSample(gray, background.green, alpha);
+        output[o + 2] = _flattenSample(gray, background.blue, alpha);
+      }
+      return sameSizeRaw(raw, output, ChannelCount.three);
+    }
     if (raw.channels != ChannelCount.four) {
       return raw;
     }
@@ -87,15 +107,9 @@ final class FlattenOperation implements PipelineOperation {
     final output = Uint8List(raw.width * raw.height * 3);
     for (var i = 0, o = 0; i < input.length; i += 4, o += 3) {
       final alpha = input[i + 3] / 255;
-      output[o] = byteClamp(
-        (input[i] * alpha) + (background.red * (1 - alpha)),
-      );
-      output[o + 1] = byteClamp(
-        (input[i + 1] * alpha) + (background.green * (1 - alpha)),
-      );
-      output[o + 2] = byteClamp(
-        (input[i + 2] * alpha) + (background.blue * (1 - alpha)),
-      );
+      output[o] = _flattenSample(input[i], background.red, alpha);
+      output[o + 1] = _flattenSample(input[i + 1], background.green, alpha);
+      output[o + 2] = _flattenSample(input[i + 2], background.blue, alpha);
     }
     return sameSizeRaw(raw, output, ChannelCount.three);
   }
@@ -232,18 +246,20 @@ final class UnpremultiplyAlphaOperation implements PipelineOperation {
 
 /// Premultiplies RGB channels by alpha.
 RawPixels premultiplyAlpha(RawPixels raw) {
-  if (raw.channels != ChannelCount.four ||
+  if (!_hasAlphaChannel(raw.channels) ||
       raw.premultiplication == Premultiplication.premultiplied) {
     return raw;
   }
   final input = raw.bytes;
   final output = Uint8List(input.length);
-  for (var i = 0; i < input.length; i += 4) {
-    final alpha = input[i + 3] / 255;
-    output[i] = byteClamp(input[i] * alpha);
-    output[i + 1] = byteClamp(input[i + 1] * alpha);
-    output[i + 2] = byteClamp(input[i + 2] * alpha);
-    output[i + 3] = input[i + 3];
+  final channels = raw.channels.value;
+  final alphaOffset = channels - 1;
+  for (var i = 0; i < input.length; i += channels) {
+    final alpha = input[i + alphaOffset] / 255;
+    for (var channel = 0; channel < alphaOffset; channel += 1) {
+      output[i + channel] = byteClamp(input[i + channel] * alpha);
+    }
+    output[i + alphaOffset] = input[i + alphaOffset];
   }
   return RawPixels(
     bytes: output,
@@ -258,25 +274,27 @@ RawPixels premultiplyAlpha(RawPixels raw) {
 
 /// Converts premultiplied RGB channels back to straight alpha.
 RawPixels unpremultiplyAlpha(RawPixels raw) {
-  if (raw.channels != ChannelCount.four ||
+  if (!_hasAlphaChannel(raw.channels) ||
       raw.premultiplication == Premultiplication.none) {
     return raw;
   }
   final input = raw.bytes;
   final output = Uint8List(input.length);
-  for (var i = 0; i < input.length; i += 4) {
-    final alpha = input[i + 3];
+  final channels = raw.channels.value;
+  final alphaOffset = channels - 1;
+  for (var i = 0; i < input.length; i += channels) {
+    final alpha = input[i + alphaOffset];
     if (alpha == 0) {
-      output[i] = 0;
-      output[i + 1] = 0;
-      output[i + 2] = 0;
+      for (var channel = 0; channel < alphaOffset; channel += 1) {
+        output[i + channel] = 0;
+      }
     } else {
       final scale = 255 / alpha;
-      output[i] = byteClamp(input[i] * scale);
-      output[i + 1] = byteClamp(input[i + 1] * scale);
-      output[i + 2] = byteClamp(input[i + 2] * scale);
+      for (var channel = 0; channel < alphaOffset; channel += 1) {
+        output[i + channel] = byteClamp(input[i + channel] * scale);
+      }
     }
-    output[i + 3] = alpha;
+    output[i + alphaOffset] = alpha;
   }
   return RawPixels(
     bytes: output,
@@ -287,4 +305,12 @@ RawPixels unpremultiplyAlpha(RawPixels raw) {
     premultiplication: Premultiplication.none,
     pageHeight: raw.pageHeight,
   );
+}
+
+int _flattenSample(int foreground, int background, double alpha) {
+  return byteClamp((foreground * alpha) + (background * (1 - alpha)));
+}
+
+bool _hasAlphaChannel(ChannelCount channels) {
+  return channels == ChannelCount.two || channels == ChannelCount.four;
 }
