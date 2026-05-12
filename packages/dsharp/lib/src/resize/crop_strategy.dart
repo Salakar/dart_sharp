@@ -68,9 +68,7 @@ final class AttentionCropStrategy implements CropStrategy {
     for (var y = 0; y < raw.height; y += 1) {
       for (var x = 0; x < raw.width; x += 1) {
         final offset = ((y * raw.width) + x) * channels;
-        final red = bytes[offset];
-        final green = channels > 1 ? bytes[offset + 1] : red;
-        final blue = channels > 2 ? bytes[offset + 2] : red;
+        final (red, green, blue) = _rgb(bytes, offset, channels);
         final maxChannel = max(red, max(green, blue));
         final minChannel = min(red, min(green, blue));
         final saturation = (maxChannel - minChannel) / 255;
@@ -100,10 +98,19 @@ final class AttentionCropStrategy implements CropStrategy {
 }
 
 int _luminance(List<int> bytes, int offset, int channels) {
-  final red = bytes[offset];
-  final green = channels > 1 ? bytes[offset + 1] : red;
-  final blue = channels > 2 ? bytes[offset + 2] : red;
+  final (red, green, blue) = _rgb(bytes, offset, channels);
   return ((0.2126 * red) + (0.7152 * green) + (0.0722 * blue)).round();
+}
+
+(int, int, int) _rgb(List<int> bytes, int offset, int channels) {
+  final red = bytes[offset];
+  final green = channels == 2
+      ? red
+      : channels > 1
+      ? bytes[offset + 1]
+      : red;
+  final blue = channels > 2 ? bytes[offset + 2] : red;
+  return (red, green, blue);
 }
 
 bool _isSkinTone(int red, int green, int blue) {

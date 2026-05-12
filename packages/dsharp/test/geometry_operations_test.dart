@@ -349,6 +349,14 @@ void main() {
 
   test('crop strategies expose deterministic scores', () async {
     final image = await ImagePipeline.fromRawPixels(raw2x2()).toPixelImage();
+    final alphaOnlyVariation = PixelImage.fromRawPixels(
+      RawPixels(
+        bytes: Uint8List.fromList(<int>[80, 0, 80, 255]),
+        width: 2,
+        height: 1,
+        channels: ChannelCount.two,
+      ),
+    );
 
     expect(const EntropyCropStrategy().name, 'entropy');
     expect(const EntropyCropStrategy().score(image), greaterThan(0));
@@ -357,6 +365,8 @@ void main() {
       const AttentionCropStrategy().score(image),
       isNot(const EntropyCropStrategy().score(image)),
     );
+    expect(const EntropyCropStrategy().score(alphaOnlyVariation), 0);
+    expect(const AttentionCropStrategy().score(alphaOnlyVariation), 0);
   });
 }
 
