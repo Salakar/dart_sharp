@@ -175,9 +175,7 @@ RgbaColor _dominant(List<int> bytes, int channelCount) {
   final blueSums = List<int>.filled(4096, 0);
   var bestBin = 0;
   for (var i = 0; i < bytes.length; i += channelCount) {
-    final red = bytes[i];
-    final green = channelCount > 1 ? bytes[i + 1] : red;
-    final blue = channelCount > 2 ? bytes[i + 2] : red;
+    final (red, green, blue) = _rgb(bytes, i, channelCount);
     final bin = (red >> 4) << 8 | (green >> 4) << 4 | (blue >> 4);
     counts[bin] += 1;
     redSums[bin] += red;
@@ -220,8 +218,17 @@ double _sharpness(int width, int height, List<int> bytes, int channelCount) {
 }
 
 int _luminance(List<int> bytes, int offset, int channelCount) {
-  final red = bytes[offset];
-  final green = channelCount > 1 ? bytes[offset + 1] : red;
-  final blue = channelCount > 2 ? bytes[offset + 2] : red;
+  final (red, green, blue) = _rgb(bytes, offset, channelCount);
   return (red * 299 + green * 587 + blue * 114 + 500) ~/ 1000;
+}
+
+(int, int, int) _rgb(List<int> bytes, int offset, int channelCount) {
+  final red = bytes[offset];
+  final green = channelCount == 2
+      ? red
+      : channelCount > 1
+      ? bytes[offset + 1]
+      : red;
+  final blue = channelCount > 2 ? bytes[offset + 2] : red;
+  return (red, green, blue);
 }

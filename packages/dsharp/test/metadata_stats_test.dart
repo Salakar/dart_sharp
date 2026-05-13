@@ -123,6 +123,28 @@ void main() {
     expect(stats.dominant.red, 0);
   });
 
+  test('stats ignore alpha when scoring grayscale alpha pixels', () async {
+    final stats = await ImagePipeline.fromRawPixels(
+      RawPixels(
+        bytes: Uint8List.fromList(<int>[80, 0, 80, 255]),
+        width: 2,
+        height: 1,
+        channels: ChannelCount.two,
+      ),
+    ).stats();
+
+    expect(stats.channels, hasLength(2));
+    expect(stats.channels[0].min, 80);
+    expect(stats.channels[0].max, 80);
+    expect(stats.channels[1].min, 0);
+    expect(stats.channels[1].max, 255);
+    expect(stats.isOpaque, isFalse);
+    expect(stats.entropy, 0);
+    expect(stats.dominant.red, 80);
+    expect(stats.dominant.green, 80);
+    expect(stats.dominant.blue, 80);
+  });
+
   test('stats estimate sharpness and dominant color', () async {
     final sharpStats = await ImagePipeline.fromRawPixels(
       RawPixels(
