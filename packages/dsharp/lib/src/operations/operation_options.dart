@@ -63,6 +63,36 @@ enum ImageChannel {
       'Expected channel to be an integer or one of: red, green, blue, alpha.',
     );
   }
+
+  /// Resolves a channel selector for a concrete raw channel count.
+  static int resolveForChannels(Object channel, int channelCount) {
+    if (channel is int) {
+      return channel;
+    }
+    final name = switch (channel) {
+      final ImageChannel value => value.name,
+      final String value => value,
+      _ => null,
+    };
+    if (name == null) {
+      throw const OperationValidationException(
+        'Expected channel to be an integer or one of: red, green, blue, alpha.',
+      );
+    }
+    if (channelCount == 2) {
+      return switch (name) {
+        'red' => 0,
+        'alpha' => 1,
+        'green' || 'blue' => throw OperationValidationException(
+          'Channel "$name" is not available for grayscale-alpha pixels.',
+        ),
+        _ => throw const OperationValidationException(
+          'Expected channel to be an integer or one of: red, green, blue, alpha.',
+        ),
+      };
+    }
+    return resolve(name);
+  }
 }
 
 /// Matrix used by convolution.

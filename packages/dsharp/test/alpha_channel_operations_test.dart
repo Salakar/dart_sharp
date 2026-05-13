@@ -169,10 +169,28 @@ void main() {
     final byEnum = await pixels(
       ImagePipeline.fromRawPixels(raw).extractChannel(ImageChannel.green),
     );
+    final grayAlphaByName = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[9, 32]),
+      ).extractChannel('alpha'),
+    );
+    final grayAlphaByEnum = await pixels(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[9, 32]),
+      ).extractChannel(ImageChannel.alpha),
+    );
 
     expect(firstBytes(byIndex), <int>[3]);
     expect(firstBytes(byName), <int>[4]);
     expect(firstBytes(byEnum), <int>[2]);
+    expect(firstBytes(grayAlphaByName), <int>[32]);
+    expect(firstBytes(grayAlphaByEnum), <int>[32]);
+    expect(
+      ImagePipeline.fromRawPixels(
+        rawGrayAlpha(1, 1, <int>[9, 32]),
+      ).extractChannel('green').toPixelImage(),
+      throwsA(isA<OperationValidationException>()),
+    );
   });
 
   test('joinChannel appends one-channel images and validates inputs', () async {

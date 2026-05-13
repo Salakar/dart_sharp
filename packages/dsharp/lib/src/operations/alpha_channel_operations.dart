@@ -129,7 +129,10 @@ final class ExtractChannelOperation implements PipelineOperation {
   @override
   PixelImage apply(PixelImage image) {
     return mapFrames(image, (raw) {
-      final index = ImageChannel.resolve(channel);
+      final index = ImageChannel.resolveForChannels(
+        channel,
+        raw.channels.value,
+      );
       if (index < 0 || index >= raw.channels.value) {
         throw RangeError.range(index, 0, raw.channels.value - 1, 'channel');
       }
