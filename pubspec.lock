@@ -125,10 +125,10 @@ packages:
     dependency: transitive
     description:
       name: json_annotation
-      sha256: cb09e7dac6210041fad964ed7fbee004f14258b4eca4040f72d1234062ace4c8
+      sha256: "1ce844379ca14835a50d2f019a3099f419082cfdd231cd86a142af94dd5c6bb1"
       url: "https://pub.dev"
     source: hosted
-    version: "4.11.0"
+    version: "4.9.0"
   melos:
     dependency: "direct dev"
     description:
@@ -149,10 +149,10 @@ packages:
     dependency: transitive
     description:
       name: mustache_template
-      sha256: "544ff0b837836f5ad6b351e7a676ff7c2cad4fa412c465908aeb9358caddb6fc"
+      sha256: daa42be75f2ccfb287c24a75e7ac594f2ea0b32bf9ebe7c15154aa45b2dfb2de
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.4"
+    version: "2.0.2"
   path:
     dependency: transitive
     description:
@@ -282,4 +282,4 @@ packages:
     source: hosted
     version: "2.2.4"
 sdks:
-  dart: ">=3.9.0 <4.0.0"
+  dart: ">=3.8.0 <4.0.0"

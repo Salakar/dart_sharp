@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.0.0
+## 0.1.0
 
-- Initial pure Dart image processing API with no runtime dependencies,
+- Initial public release of the pure Dart image processing API with no runtime
+  dependencies,
   first-party raw/PNG/baseline, progressive, and lossless
   JPEG/GIF/TIFF/WebP codec paths, VP8L lossless WebP static and animated
   output with animation loop and per-frame delay controls, encoded header

@@ -1,5 +1,7 @@
 
 # Dart port planning scaffold
+.DS_Store
+tmp/imagegen/
 sharp_clone/
 .dart_tool/
 .idea/
