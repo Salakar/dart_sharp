@@ -9,17 +9,17 @@ command:
 
 scripts:
   analyze:
-    run: melos exec -- "dart analyze ."
+    run: dart run melos exec -- "dart analyze ."
     description: Run static analysis in every package.
   format:
-    run: melos exec -- "dart format --set-exit-if-changed ."
+    run: dart run melos exec -- "dart format --set-exit-if-changed ."
     description: Check Dart formatting in every package.
   test:
-    run: melos exec -- "dart test"
+    run: dart run melos exec -- "dart test"
     description: Run package tests.
   test:web:
-    run: melos exec -- "dart test -p chrome"
+    run: dart run melos exec -- "dart test -p chrome"
     description: Run package tests on Chrome, skipping VM-only test libraries.
   coverage:
-    run: melos exec -- "dart test --coverage=coverage"
+    run: dart run melos exec -- "dart test --coverage=coverage"
     description: Run tests with coverage collection.
