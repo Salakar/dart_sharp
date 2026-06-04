@@ -1,6 +1,6 @@
 name: dsharp
 description: Pure Dart Sharp.js-style image processing for resize, codecs, metadata, compositing, raw pixels, streams, and optional IO.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/Salakar/dart_sharp
 issue_tracker: https://github.com/Salakar/dart_sharp/issues
 homepage: https://github.com/Salakar/dart_sharp

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Use the public repository raw logo URL in the README so pub.dev can render the
+  package logo.
+
 ## 0.1.0
 
 - Initial public release of the pure Dart image processing API with no runtime

@@ -1,5 +1,5 @@
 <p align="center">
-<img src="assets/logo.png" alt="dsharp logo" width="160">
+<img src="https://raw.githubusercontent.com/Salakar/dart_sharp/main/packages/dsharp/assets/logo.png" alt="dsharp logo" width="160">
 </p>
 <h1 align="center">dsharp</h1>
 <hr>
